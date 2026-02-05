@@ -4,12 +4,12 @@ build-backend = "uv_build"
 
 [project]
 name = "myteam"
-version = "0.1.0"
+version = "0.2.0"
 description = "Agent roster CLI"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
-authors = [{ name = "Unknown" }]
+authors = [{ name = "BeanLab" }]
 license = { file = "LICENSE" }
 
 [project.scripts]
