@@ -20,8 +20,8 @@ def main() -> int:
         _print_block(instructions.read_text(encoding="utf-8"))
 
     for role_dir in sorted(p for p in agents_root.iterdir() if p.is_dir()):
-        if role_dir == base:
-            continue
+        if role_dir == base or role_dir.name == "main":
+            continue  # avoid reading main/info.md
         info = role_dir / "info.md"
         if not info.exists():
             continue

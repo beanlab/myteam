@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 import argparse
 import shutil
+import subprocess
 from importlib import resources
 from pathlib import Path
 
@@ -17,6 +18,16 @@ AGENTS_DIRNAME = ".agents"
 def _main_agent_script() -> str:
     """Load the embedded agent template from package data."""
     return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding="utf-8")
+
+
+def _main_instructions_template() -> str:
+    """Load the default main-role instructions template."""
+    return resources.files(__package__).joinpath("main_instructions_template.md").read_text(encoding="utf-8")
+
+
+def _main_info_template() -> str:
+    """Load the default main-role info template."""
+    return resources.files(__package__).joinpath("main_info_template.md").read_text(encoding="utf-8")
 
 
 def _agents_root(base: Path) -> Path:
@@ -48,10 +59,12 @@ def cmd_init(base: Path) -> int:
     main_dir = _role_dir(base, DEFAULT_ROLE)
     _ensure_dir(main_dir)
 
-    (main_dir / "info.md").touch(exist_ok=True)
+    info = main_dir / "info.md"
+    if not info.exists():
+        info.write_text(_main_info_template(), encoding="utf-8")
     instructions = main_dir / "instructions.md"
     if not instructions.exists():
-        instructions.write_text("Provide main-role instructions here.\n", encoding="utf-8")
+        instructions.write_text(_main_instructions_template(), encoding="utf-8")
     agent_py = main_dir / "agent.py"
     if not agent_py.exists():
         agent_py.write_text(_main_agent_script(), encoding="utf-8")
@@ -102,9 +115,12 @@ def cmd_get_role(base: Path, role: str) -> int:
 
     agent_py = role_dir / "agent.py"
     if agent_py.exists():
-        # For now, we simply notify; executing arbitrary code is avoided.
-        print(f"agent.py found at {agent_py}; execution not implemented.")
-        return 0
+        try:
+            result = subprocess.run([sys.executable, str(agent_py)], cwd=role_dir, check=False)
+        except OSError as exc:
+            print(f"Failed to execute agent.py for role '{role}': {exc}", file=sys.stderr)
+            return 1
+        return result.returncode
 
     instructions = role_dir / "instructions.md"
     if instructions.exists():

@@ -43,7 +43,7 @@ AGENTS.md               # Onboarding note for agents
 
 ## Notes and behavior
 - Commands act on the current working directory; run them from the root of the project that owns the roster.
-- If a role directory contains `agent.py`, myteam will currently **not execute it**; the CLI only reports that the file exists.
+- If a role directory contains `agent.py`, `myteam get-role` will execute it; otherwise it prints `instructions.md` if present.
 - `get-role` defaults to the `main` role if no role name is provided.
 
 ## Typical workflow
