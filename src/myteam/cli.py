@@ -34,7 +34,7 @@ def cmd_init(base: Path) -> int:
     agents_md = base / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(
-            "Run `myteam whoami <role>` with your role. If you have no role, assume your role is `main`.\n",
+            "Run `myteam get-role <role>` with your role. If you have no role, assume your role is `main`.\n",
             encoding="utf-8",
         )
 
@@ -83,7 +83,7 @@ def cmd_remove(base: Path, role: str) -> int:
     return 0
 
 
-def cmd_whoami(base: Path, role: str) -> int:
+def cmd_get_role(base: Path, role: str) -> int:
     """Print the instructions for the given role if available."""
     role_dir = _role_dir(base, role)
     if not role_dir.exists():
@@ -118,8 +118,8 @@ def build_parser() -> argparse.ArgumentParser:
     remove_parser = sub.add_parser("remove", help="Delete an existing role.")
     remove_parser.add_argument("role", help="Role name to delete.")
 
-    who_parser = sub.add_parser("whoami", help="Print instructions for a role.")
-    who_parser.add_argument("role", nargs="?", default=DEFAULT_ROLE, help="Role name (default: main).")
+    get_role_parser = sub.add_parser("get-role", help="Print instructions for a role.")
+    get_role_parser.add_argument("role", nargs="?", default=DEFAULT_ROLE, help="Role name (default: main).")
 
     return parser
 
@@ -136,8 +136,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_new(base, args.role)
     if args.command == "remove":
         return cmd_remove(base, args.role)
-    if args.command == "whoami":
-        return cmd_whoami(base, args.role)
+    if args.command == "get-role":
+        return cmd_get_role(base, args.role)
 
     parser.error("Unknown command")
     return 1

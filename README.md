@@ -17,9 +17,9 @@ pip install myteam
 
 ## Quick start
 1) `myteam init` — set up `AGENTS.md` and `.agents/` with a default `developer` role.
-2) `myteam new main` — add your primary role (defaults to `main` when omitted in `whoami`).
+2) `myteam new main` — add your primary role (defaults to `main` when omitted in `get-role`).
 3) Edit `.agents/<role>/info.md` and `.agents/<role>/instructions.md` with details for each role.
-4) `myteam whoami <role>` — print the instructions for that role (or `main` if omitted).
+4) `myteam get-role <role>` — print the instructions for that role (or `main` if omitted).
 
 ## Commands
 | Command | Purpose |
@@ -27,7 +27,7 @@ pip install myteam
 | `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `developer` role. |
 | `myteam new <role>` | Create a new role directory with empty `info.md` and `instructions.md`. |
 | `myteam remove <role>` | Delete the specified role directory and its contents. |
-| `myteam whoami [role]` | Print the `instructions.md` for a role (defaults to `main`). |
+| `myteam get-role [role]` | Print the `instructions.md` for a role (defaults to `main`). |
 
 ## What gets created
 Running `myteam init` produces:
@@ -37,20 +37,20 @@ AGENTS.md               # Onboarding note for agents
 .agents/
   └── developer/
       ├── info.md       # Free-form metadata about the role
-      └── instructions.md # The instructions printed by `myteam whoami developer`
+      └── instructions.md # The instructions printed by `myteam get-role developer`
 ```
 
 ## Notes and behavior
 - Commands act on the current working directory; run them from the root of the project that owns the roster.
 - If a role directory contains `agent.py`, myteam will currently **not execute it**; the CLI only reports that the file exists.
-- `whoami` defaults to the `main` role if no role name is provided.
+- `get-role` defaults to the `main` role if no role name is provided.
 
 ## Typical workflow
 ```bash
 myteam init
 myteam new main
 echo "Your role instructions here" > .agents/main/instructions.md
-myteam whoami main # Run by agent working in project
+myteam get-role main # Run by agent working in project
 ```
 
 ## License
