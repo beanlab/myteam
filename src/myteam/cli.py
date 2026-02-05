@@ -30,6 +30,11 @@ def _main_info_template() -> str:
     return resources.files(__package__).joinpath("main_info_template.md").read_text(encoding="utf-8")
 
 
+def _role_agent_script() -> str:
+    """Load the generic role agent template."""
+    return resources.files(__package__).joinpath("role_agent_template.py").read_text(encoding="utf-8")
+
+
 def _agents_root(base: Path) -> Path:
     return base / AGENTS_DIRNAME
 
@@ -83,6 +88,9 @@ def cmd_new(base: Path, role: str) -> int:
     _ensure_dir(role_dir)
     (role_dir / "info.md").write_text("", encoding="utf-8")
     (role_dir / "instructions.md").write_text("", encoding="utf-8")
+    agent_py = role_dir / "agent.py"
+    agent_py.write_text(_role_agent_script(), encoding="utf-8")
+    agent_py.chmod(agent_py.stat().st_mode | 0o111)
     return 0
 
 
@@ -122,12 +130,7 @@ def cmd_get_role(base: Path, role: str) -> int:
             return 1
         return result.returncode
 
-    instructions = role_dir / "instructions.md"
-    if instructions.exists():
-        print(instructions.read_text(encoding="utf-8"))
-        return 0
-
-    print(f"No instructions found for role '{role}'.", file=sys.stderr)
+    print(f"No agent.py found for role '{role}'.", file=sys.stderr)
     return 1
 
 

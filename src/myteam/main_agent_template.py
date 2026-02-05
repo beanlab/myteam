@@ -21,7 +21,7 @@ def main() -> int:
 
     for role_dir in sorted(p for p in agents_root.iterdir() if p.is_dir()):
         if role_dir == base or role_dir.name == "main":
-            continue  # avoid reading main/info.md
+            continue
         info = role_dir / "info.md"
         if not info.exists():
             continue

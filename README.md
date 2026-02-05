@@ -25,7 +25,7 @@ pip install myteam
 | Command | Purpose |
 | --- | --- |
 | `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `main` role (with `agent.py`). |
-| `myteam new <role>` | Create a new role directory with empty `info.md` and `instructions.md`. |
+| `myteam new <role>` | Create a new role directory with `agent.py`, empty `info.md`, and `instructions.md`. |
 | `myteam remove <role>` | Delete the specified role directory and its contents. |
 | `myteam get-role [role]` | Print the `instructions.md` for a role (defaults to `main`). |
 
@@ -43,7 +43,7 @@ AGENTS.md               # Onboarding note for agents
 
 ## Notes and behavior
 - Commands act on the current working directory; run them from the root of the project that owns the roster.
-- If a role directory contains `agent.py`, `myteam get-role` will execute it; otherwise it prints `instructions.md` if present.
+- If a role directory contains `agent.py`, `myteam get-role` will execute it; otherwise it prints `instructions.md` if present. New roles created with `myteam new` include an `agent.py` that prints their `instructions.md`.
 - `get-role` defaults to the `main` role if no role name is provided.
 
 ## Typical workflow
