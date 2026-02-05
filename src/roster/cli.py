@@ -1,9 +1,12 @@
 """Command-line interface for the roster package."""
 from __future__ import annotations
 
-import argparse
-from pathlib import Path
 import sys
+import argparse
+import shutil
+from pathlib import Path
+
+from . import __version__
 
 APP_NAME = "roster"
 DEFAULT_ROLE = "main"
@@ -60,6 +63,26 @@ def cmd_new(base: Path, role: str) -> int:
     return 0
 
 
+def cmd_remove(base: Path, role: str) -> int:
+    """Delete the directory for a role if it exists."""
+    role_dir = _role_dir(base, role)
+    if not role_dir.exists():
+        print(f"Role '{role}' not found at {role_dir}", file=sys.stderr)
+        return 1
+
+    if not role_dir.is_dir():
+        print(f"Path for role '{role}' is not a directory: {role_dir}", file=sys.stderr)
+        return 1
+
+    try:
+        shutil.rmtree(role_dir)
+    except OSError as exc:
+        print(f"Failed to remove role '{role}': {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
 def cmd_whoami(base: Path, role: str) -> int:
     """Print the instructions for the given role if available."""
     role_dir = _role_dir(base, role)
@@ -84,12 +107,16 @@ def cmd_whoami(base: Path, role: str) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=APP_NAME, description="Manage agent roster roles.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init", help="Initialize roster with default files.")
 
     new_parser = sub.add_parser("new", help="Create a new role.")
     new_parser.add_argument("role", help="Role name to create.")
+
+    remove_parser = sub.add_parser("remove", help="Delete an existing role.")
+    remove_parser.add_argument("role", help="Role name to delete.")
 
     who_parser = sub.add_parser("whoami", help="Print instructions for a role.")
     who_parser.add_argument("role", nargs="?", default=DEFAULT_ROLE, help="Role name (default: main).")
@@ -107,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init(base)
     if args.command == "new":
         return cmd_new(base, args.role)
+    if args.command == "remove":
+        return cmd_remove(base, args.role)
     if args.command == "whoami":
         return cmd_whoami(base, args.role)
 

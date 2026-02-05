@@ -14,3 +14,4 @@ license = { file = "LICENSE" }
 
 [project.scripts]
 roster = "roster.cli:main"
+

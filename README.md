@@ -21,6 +21,7 @@ AGENTS.md
 
 The `.agents` dir is where agent roles will be defined.  The init script creates an `developer` role which can be modified or deleted if desired.
 To create a new role, run `roster new <role>`, which will create a new dir within `.agents` named after the provided role containing empty `info.md` and `instructions.md` files.
+To delete a role, run `roster remove <role>`, which will delete that role's directory and contents.
 
 The initial `AGENTS.md` file contains the following instructions: Run `roster whoami <role>` with your role.  If you have no role, assume your role is `main`.
 
