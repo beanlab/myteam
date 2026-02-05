@@ -3,7 +3,7 @@ requires = ["uv-build>=0.2"]
 build-backend = "uv_build"
 
 [project]
-name = "roster"
+name = "myteam"
 version = "0.1.0"
 description = "Agent roster CLI"
 readme = "README.md"
@@ -13,5 +13,4 @@ authors = [{ name = "Unknown" }]
 license = { file = "LICENSE" }
 
 [project.scripts]
-roster = "roster.cli:main"
-
+myteam = "myteam.cli:main"

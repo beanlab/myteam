@@ -1,6 +1,6 @@
-# Roster
+# Myteam
 
-Simple CLI for managing an on-disk roster of agent roles. Roster creates a lightweight structure (`AGENTS.md` plus a `.agents/` directory) that other tools can read to understand available roles and their instructions.
+Simple CLI for managing an on-disk roster of agent roles. Myteam creates a lightweight structure (`AGENTS.md` plus a `.agents/` directory) that other tools can read to understand available roles and their instructions.
 
 ## Features
 - Zero-dependency CLI (Python 3.11+)
@@ -12,45 +12,45 @@ Simple CLI for managing an on-disk roster of agent roles. Roster creates a light
 
 ## Installation
 ```bash
-pip install roster
+pip install myteam
 ```
 
 ## Quick start
-1) `roster init` — set up `AGENTS.md` and `.agents/` with a default `developer` role.
-2) `roster new main` — add your primary role (defaults to `main` when omitted in `whoami`).
+1) `myteam init` — set up `AGENTS.md` and `.agents/` with a default `developer` role.
+2) `myteam new main` — add your primary role (defaults to `main` when omitted in `whoami`).
 3) Edit `.agents/<role>/info.md` and `.agents/<role>/instructions.md` with details for each role.
-4) `roster whoami <role>` — print the instructions for that role (or `main` if omitted).
+4) `myteam whoami <role>` — print the instructions for that role (or `main` if omitted).
 
 ## Commands
 | Command | Purpose |
 | --- | --- |
-| `roster init` | Initialize `AGENTS.md` and `.agents/` with the default `developer` role. |
-| `roster new <role>` | Create a new role directory with empty `info.md` and `instructions.md`. |
-| `roster remove <role>` | Delete the specified role directory and its contents. |
-| `roster whoami [role]` | Print the `instructions.md` for a role (defaults to `main`). |
+| `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `developer` role. |
+| `myteam new <role>` | Create a new role directory with empty `info.md` and `instructions.md`. |
+| `myteam remove <role>` | Delete the specified role directory and its contents. |
+| `myteam whoami [role]` | Print the `instructions.md` for a role (defaults to `main`). |
 
 ## What gets created
-Running `roster init` produces:
+Running `myteam init` produces:
 
 ```
 AGENTS.md               # Onboarding note for agents
 .agents/
   └── developer/
       ├── info.md       # Free-form metadata about the role
-      └── instructions.md # The instructions printed by `roster whoami developer`
+      └── instructions.md # The instructions printed by `myteam whoami developer`
 ```
 
 ## Notes and behavior
 - Commands act on the current working directory; run them from the root of the project that owns the roster.
-- If a role directory contains `agent.py`, roster will currently **not execute it**; the CLI only reports that the file exists.
+- If a role directory contains `agent.py`, myteam will currently **not execute it**; the CLI only reports that the file exists.
 - `whoami` defaults to the `main` role if no role name is provided.
 
 ## Typical workflow
 ```bash
-roster init
-roster new main
+myteam init
+myteam new main
 echo "Your role instructions here" > .agents/main/instructions.md
-roster whoami main # Run by agent working in project
+myteam whoami main # Run by agent working in project
 ```
 
 ## License

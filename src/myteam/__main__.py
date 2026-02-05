@@ -1,4 +1,4 @@
-"""Allow `python -m roster` to run the CLI."""
+"""Allow `python -m myteam` to run the CLI."""
 
 from .cli import main
 

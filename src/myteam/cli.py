@@ -1,4 +1,4 @@
-"""Command-line interface for the roster package."""
+"""Command-line interface for the myteam package."""
 from __future__ import annotations
 
 import sys
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import __version__
 
-APP_NAME = "roster"
+APP_NAME = "myteam"
 DEFAULT_ROLE = "main"
 AGENTS_DIRNAME = ".agents"
 
@@ -26,7 +26,7 @@ def _ensure_dir(path: Path) -> None:
 
 
 def cmd_init(base: Path) -> int:
-    """Initialize the roster directory with default developer role."""
+    """Initialize the myteam directory with default developer role."""
     agents_dir = _agents_root(base)
     _ensure_dir(agents_dir)
 
@@ -34,7 +34,7 @@ def cmd_init(base: Path) -> int:
     agents_md = base / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(
-            "Run `roster whoami <role>` with your role. If you have no role, assume your role is `main`.\n",
+            "Run `myteam whoami <role>` with your role. If you have no role, assume your role is `main`.\n",
             encoding="utf-8",
         )
 
@@ -87,7 +87,7 @@ def cmd_whoami(base: Path, role: str) -> int:
     """Print the instructions for the given role if available."""
     role_dir = _role_dir(base, role)
     if not role_dir.exists():
-        print(f"Role '{role}' not found. Run 'roster new {role}' to create it.", file=sys.stderr)
+        print(f"Role '{role}' not found. Run 'myteam new {role}' to create it.", file=sys.stderr)
         return 1
 
     agent_py = role_dir / "agent.py"
