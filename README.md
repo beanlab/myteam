@@ -16,15 +16,15 @@ pip install myteam
 ```
 
 ## Quick start
-1) `myteam init` — set up `AGENTS.md` and `.agents/` with a default `main` role (creates `.agents/main/agent.py`).
+1) `myteam init` — set up `AGENTS.md` and `.agents/` with a default `main` role (creates `.agents/main/agent.py` plus templated `info.md`/`instructions.md`).
 2) `myteam new developer` — add another role (optional).
-3) Edit `.agents/<role>/info.md` and `.agents/<role>/instructions.md` with details for each role.
-4) `myteam get-role <role>` — print the instructions for that role (or `main` if omitted).
+3) Edit `.agents/<role>/info.md` and `.agents/<role>/instructions.md` with details for each role (new roles start empty; main starts with templates).
+4) `myteam get-role <role>` — run the role’s `agent.py` (if present) or print `instructions.md` (defaults to `main` when omitted).
 
 ## Commands
 | Command | Purpose |
 | --- | --- |
-| `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `main` role (with `agent.py`). |
+| `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `main` role (with `agent.py`, templated `info.md` and `instructions.md`). |
 | `myteam new <role>` | Create a new role directory with `agent.py`, empty `info.md`, and `instructions.md`. |
 | `myteam remove <role>` | Delete the specified role directory and its contents. |
 | `myteam get-role [role]` | Print the `instructions.md` for a role (defaults to `main`). |
@@ -37,13 +37,17 @@ AGENTS.md               # Onboarding note for agents
 .agents/
   └── main/
       ├── agent.py        # Prints main instructions plus info.md for other roles
-      ├── info.md         # Free-form metadata about the role
-      └── instructions.md # The instructions printed by `myteam get-role main`
+      ├── info.md         # Pre-populated main role metadata template
+      └── instructions.md # Pre-populated main role instructions template
+  └── <new-role>/        # Created by `myteam new <role>`
+      ├── agent.py        # Prints <role>/instructions.md
+      ├── info.md         # Empty placeholder
+      └── instructions.md # Empty placeholder
 ```
 
 ## Notes and behavior
 - Commands act on the current working directory; run them from the root of the project that owns the roster.
-- If a role directory contains `agent.py`, `myteam get-role` will execute it; otherwise it prints `instructions.md` if present. New roles created with `myteam new` include an `agent.py` that prints their `instructions.md`.
+- If a role directory contains `agent.py`, `myteam get-role` executes it; otherwise it prints `instructions.md` if present. New roles created with `myteam new` include an `agent.py` that prints their `instructions.md`.
 - `get-role` defaults to the `main` role if no role name is provided.
 
 ## Typical workflow
