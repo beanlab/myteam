@@ -1,28 +1,57 @@
-#  Roster
+# Roster
 
-An agent roster is a directory of Agent definitions AI coding tools can take advantage of when using multi agent workflows.
+Simple CLI for managing an on-disk roster of agent roles. Roster creates a lightweight structure (`AGENTS.md` plus a `.agents/` directory) that other tools can read to understand available roles and their instructions.
+
+## Features
+- Zero-dependency CLI (Python 3.11+)
+- Commands to create, remove, and inspect roles
+- Works from any directory (operates relative to the current working directory)
+
+## Requirements
+- Python 3.11 or newer
 
 ## Installation
+```bash
+pip install roster
+```
 
-`pip install roster`
+## Quick start
+1) `roster init` — set up `AGENTS.md` and `.agents/` with a default `developer` role.
+2) `roster new main` — add your primary role (defaults to `main` when omitted in `whoami`).
+3) Edit `.agents/<role>/info.md` and `.agents/<role>/instructions.md` with details for each role.
+4) `roster whoami <role>` — print the instructions for that role (or `main` if omitted).
 
-## Usage
+## Commands
+| Command | Purpose |
+| --- | --- |
+| `roster init` | Initialize `AGENTS.md` and `.agents/` with the default `developer` role. |
+| `roster new <role>` | Create a new role directory with empty `info.md` and `instructions.md`. |
+| `roster remove <role>` | Delete the specified role directory and its contents. |
+| `roster whoami [role]` | Print the `instructions.md` for a role (defaults to `main`). |
 
-To initialize the agent roster, run `roster init`.  This will create the following:
-
+## What gets created
+Running `roster init` produces:
 
 ```
-AGENTS.md
+AGENTS.md               # Onboarding note for agents
 .agents/
-    └──developer/
-        └──info.md
-        └──instructions.md
+  └── developer/
+      ├── info.md       # Free-form metadata about the role
+      └── instructions.md # The instructions printed by `roster whoami developer`
 ```
 
-The `.agents` dir is where agent roles will be defined.  The init script creates an `developer` role which can be modified or deleted if desired.
-To create a new role, run `roster new <role>`, which will create a new dir within `.agents` named after the provided role containing empty `info.md` and `instructions.md` files.
-To delete a role, run `roster remove <role>`, which will delete that role's directory and contents.
+## Notes and behavior
+- Commands act on the current working directory; run them from the root of the project that owns the roster.
+- If a role directory contains `agent.py`, roster will currently **not execute it**; the CLI only reports that the file exists.
+- `whoami` defaults to the `main` role if no role name is provided.
 
-The initial `AGENTS.md` file contains the following instructions: Run `roster whoami <role>` with your role.  If you have no role, assume your role is `main`.
+## Typical workflow
+```bash
+roster init
+roster new main
+echo "Your role instructions here" > .agents/main/instructions.md
+roster whoami main # Run by agent working in project
+```
 
-When the agent runs `roster whoami <role>` with its role, it's `instructions.md` file will be printed out.  If a `agent.py` file is provided in the agent dir, it will be run instead.
+## License
+MIT
