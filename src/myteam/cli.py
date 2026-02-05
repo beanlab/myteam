@@ -26,7 +26,7 @@ def _ensure_dir(path: Path) -> None:
 
 
 def cmd_init(base: Path) -> int:
-    """Initialize the myteam directory with default developer role."""
+    """Initialize the myteam directory with default main role."""
     agents_dir = _agents_root(base)
     _ensure_dir(agents_dir)
 
@@ -38,14 +38,14 @@ def cmd_init(base: Path) -> int:
             encoding="utf-8",
         )
 
-    # Create default developer role.
-    developer_dir = _role_dir(base, "developer")
-    _ensure_dir(developer_dir)
+    # Create default main role.
+    main_dir = _role_dir(base, DEFAULT_ROLE)
+    _ensure_dir(main_dir)
 
-    (developer_dir / "info.md").touch(exist_ok=True)
-    instructions = developer_dir / "instructions.md"
+    (main_dir / "info.md").touch(exist_ok=True)
+    instructions = main_dir / "instructions.md"
     if not instructions.exists():
-        instructions.write_text("Provide developer-specific instructions here.\n", encoding="utf-8")
+        instructions.write_text("Provide main-role instructions here.\n", encoding="utf-8")
 
     return 0
 

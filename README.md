@@ -16,15 +16,15 @@ pip install myteam
 ```
 
 ## Quick start
-1) `myteam init` — set up `AGENTS.md` and `.agents/` with a default `developer` role.
-2) `myteam new main` — add your primary role (defaults to `main` when omitted in `get-role`).
+1) `myteam init` — set up `AGENTS.md` and `.agents/` with a default `main` role.
+2) `myteam new developer` — add another role (optional).
 3) Edit `.agents/<role>/info.md` and `.agents/<role>/instructions.md` with details for each role.
 4) `myteam get-role <role>` — print the instructions for that role (or `main` if omitted).
 
 ## Commands
 | Command | Purpose |
 | --- | --- |
-| `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `developer` role. |
+| `myteam init` | Initialize `AGENTS.md` and `.agents/` with the default `main` role. |
 | `myteam new <role>` | Create a new role directory with empty `info.md` and `instructions.md`. |
 | `myteam remove <role>` | Delete the specified role directory and its contents. |
 | `myteam get-role [role]` | Print the `instructions.md` for a role (defaults to `main`). |
@@ -35,9 +35,9 @@ Running `myteam init` produces:
 ```
 AGENTS.md               # Onboarding note for agents
 .agents/
-  └── developer/
+  └── main/
       ├── info.md       # Free-form metadata about the role
-      └── instructions.md # The instructions printed by `myteam get-role developer`
+      └── instructions.md # The instructions printed by `myteam get-role main`
 ```
 
 ## Notes and behavior
@@ -48,7 +48,6 @@ AGENTS.md               # Onboarding note for agents
 ## Typical workflow
 ```bash
 myteam init
-myteam new main
 echo "Your role instructions here" > .agents/main/instructions.md
 myteam get-role main # Run by agent working in project
 ```
