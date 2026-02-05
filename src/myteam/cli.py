@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 import argparse
 import shutil
+from importlib import resources
 from pathlib import Path
 
 from . import __version__
@@ -11,6 +12,11 @@ from . import __version__
 APP_NAME = "myteam"
 DEFAULT_ROLE = "main"
 AGENTS_DIRNAME = ".agents"
+
+
+def _main_agent_script() -> str:
+    """Load the embedded agent template from package data."""
+    return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding="utf-8")
 
 
 def _agents_root(base: Path) -> Path:
@@ -46,6 +52,10 @@ def cmd_init(base: Path) -> int:
     instructions = main_dir / "instructions.md"
     if not instructions.exists():
         instructions.write_text("Provide main-role instructions here.\n", encoding="utf-8")
+    agent_py = main_dir / "agent.py"
+    if not agent_py.exists():
+        agent_py.write_text(_main_agent_script(), encoding="utf-8")
+        agent_py.chmod(agent_py.stat().st_mode | 0o111)
 
     return 0
 
