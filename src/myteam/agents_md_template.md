@@ -1,0 +1,1 @@
+Run `myteam get-role <role>` with your role. If you have no role, assume your role is `main`

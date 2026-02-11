@@ -14,26 +14,31 @@ from . import __version__
 APP_NAME = "myteam"
 DEFAULT_ROLE = "main"
 AGENTS_DIRNAME = ".myteam"
+ENCODING = "utf-8"
 
 
 def _main_agent_script() -> str:
     """Load the embedded agent template from package data."""
-    return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding="utf-8")
+    return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding=ENCODING)
 
 
 def _main_instructions_template() -> str:
     """Load the default main-role instructions template."""
-    return resources.files(__package__).joinpath("main_instructions_template.md").read_text(encoding="utf-8")
+    return resources.files(__package__).joinpath("main_instructions_template.md").read_text(encoding=ENCODING)
 
 
 def _main_info_template() -> str:
     """Load the default main-role info template."""
-    return resources.files(__package__).joinpath("main_info_template.md").read_text(encoding="utf-8")
+    return resources.files(__package__).joinpath("main_info_template.md").read_text(encoding=ENCODING)
 
 
 def _role_agent_script() -> str:
     """Load the generic role agent template."""
-    return resources.files(__package__).joinpath("role_agent_template.py").read_text(encoding="utf-8")
+    return resources.files(__package__).joinpath("role_agent_template.py").read_text(encoding=ENCODING)
+
+
+def _agents_md_template() -> str:
+    return resources.files(__package__).joinpath("agents_md_template").read_text(encoding=ENCODING)
 
 
 def _agents_root(base: Path) -> Path:
@@ -49,7 +54,7 @@ def _ensure_dir(path: Path) -> None:
 
 
 def _write_agent_py_script(path: Path, contents: str):
-    path.write_text(contents, encoding="utf-8")
+    path.write_text(contents, encoding=ENCODING)
     path.chmod(path.stat().st_mode | 0o111)
 
 
@@ -61,10 +66,7 @@ def init() -> int:
     # Create AGENTS.md with onboarding instructions.
     agents_md = _base() / "AGENTS.md"
     if not agents_md.exists():
-        agents_md.write_text(
-            "Run `myteam get-role <role>` with your role. If you have no role, assume your role is `main`.\n",
-            encoding="utf-8",
-        )
+        agents_md.write_text(_agents_md_template(), encoding=ENCODING)
 
     # Create default main role.
     main_dir = _role_dir(_base(), DEFAULT_ROLE)
@@ -72,10 +74,10 @@ def init() -> int:
 
     info = main_dir / "info.md"
     if not info.exists():
-        info.write_text(_main_info_template(), encoding="utf-8")
+        info.write_text(_main_info_template(), encoding=ENCODING)
     instructions = main_dir / "instructions.md"
     if not instructions.exists():
-        instructions.write_text(_main_instructions_template(), encoding="utf-8")
+        instructions.write_text(_main_instructions_template(), encoding=ENCODING)
     agent_py = main_dir / "agent.py"
     if not agent_py.exists():
         _write_agent_py_script(agent_py, _main_agent_script())
@@ -89,8 +91,8 @@ def new(role: str) -> int:
         exit(1)
 
     _ensure_dir(role_dir)
-    (role_dir / "info.md").write_text("", encoding="utf-8")
-    (role_dir / "instructions.md").write_text("", encoding="utf-8")
+    (role_dir / "info.md").write_text("", encoding=ENCODING)
+    (role_dir / "instructions.md").write_text("", encoding=ENCODING)
     agent_py = role_dir / "agent.py"
     _write_agent_py_script(agent_py, _role_agent_script())
 
