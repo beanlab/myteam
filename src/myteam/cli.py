@@ -12,7 +12,7 @@ from . import __version__
 
 APP_NAME = "myteam"
 DEFAULT_ROLE = "main"
-AGENTS_DIRNAME = ".agents"
+AGENTS_DIRNAME = ".myteam"
 
 
 def _main_agent_script() -> str:
