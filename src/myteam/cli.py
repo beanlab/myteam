@@ -27,18 +27,13 @@ def _main_instructions_template() -> str:
     return resources.files(__package__).joinpath("main_instructions_template.md").read_text(encoding=ENCODING)
 
 
-def _main_info_template() -> str:
-    """Load the default main-role info template."""
-    return resources.files(__package__).joinpath("main_info_template.md").read_text(encoding=ENCODING)
-
-
 def _role_agent_script() -> str:
     """Load the generic role agent template."""
     return resources.files(__package__).joinpath("role_agent_template.py").read_text(encoding=ENCODING)
 
 
 def _agents_md_template() -> str:
-    return resources.files(__package__).joinpath("agents_md_template").read_text(encoding=ENCODING)
+    return resources.files(__package__).joinpath("agents_md_template.md").read_text(encoding=ENCODING)
 
 
 def _agents_root(base: Path) -> Path:
@@ -72,9 +67,6 @@ def init() -> int:
     main_dir = _role_dir(_base(), DEFAULT_ROLE)
     _ensure_dir(main_dir)
 
-    info = main_dir / "info.md"
-    if not info.exists():
-        info.write_text(_main_info_template(), encoding=ENCODING)
     instructions = main_dir / "instructions.md"
     if not instructions.exists():
         instructions.write_text(_main_instructions_template(), encoding=ENCODING)
