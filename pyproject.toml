@@ -8,7 +8,9 @@ version = "0.2.0"
 description = "Agent roster CLI"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fire>=0.5",
+]
 authors = [{ name = "BeanLab" }]
 license = { file = "LICENSE" }
 

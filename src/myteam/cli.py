@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import sys
-import argparse
 import shutil
 import subprocess
 from importlib import resources
 from pathlib import Path
+
+import fire
 
 from . import __version__
 
@@ -47,13 +48,18 @@ def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def cmd_init(base: Path) -> int:
+def _write_agent_py_script(path: Path, contents: str):
+    path.write_text(contents, encoding="utf-8")
+    path.chmod(path.stat().st_mode | 0o111)
+
+
+def init() -> int:
     """Initialize the myteam directory with default main role."""
-    agents_dir = _agents_root(base)
+    agents_dir = _agents_root(_base())
     _ensure_dir(agents_dir)
 
     # Create AGENTS.md with onboarding instructions.
-    agents_md = base / "AGENTS.md"
+    agents_md = _base() / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(
             "Run `myteam get-role <role>` with your role. If you have no role, assume your role is `main`.\n",
@@ -61,7 +67,7 @@ def cmd_init(base: Path) -> int:
         )
 
     # Create default main role.
-    main_dir = _role_dir(base, DEFAULT_ROLE)
+    main_dir = _role_dir(_base(), DEFAULT_ROLE)
     _ensure_dir(main_dir)
 
     info = main_dir / "info.md"
@@ -72,54 +78,47 @@ def cmd_init(base: Path) -> int:
         instructions.write_text(_main_instructions_template(), encoding="utf-8")
     agent_py = main_dir / "agent.py"
     if not agent_py.exists():
-        agent_py.write_text(_main_agent_script(), encoding="utf-8")
-        agent_py.chmod(agent_py.stat().st_mode | 0o111)
-
-    return 0
+        _write_agent_py_script(agent_py, _main_agent_script())
 
 
-def cmd_new(base: Path, role: str) -> int:
+def new(role: str) -> int:
     """Create a new role directory with placeholder files."""
-    role_dir = _role_dir(base, role)
+    role_dir = _role_dir(_base(), role)
     if role_dir.exists():
         print(f"Role '{role}' already exists at {role_dir}", file=sys.stderr)
-        return 1
+        exit(1)
 
     _ensure_dir(role_dir)
     (role_dir / "info.md").write_text("", encoding="utf-8")
     (role_dir / "instructions.md").write_text("", encoding="utf-8")
     agent_py = role_dir / "agent.py"
-    agent_py.write_text(_role_agent_script(), encoding="utf-8")
-    agent_py.chmod(agent_py.stat().st_mode | 0o111)
-    return 0
+    _write_agent_py_script(agent_py, _role_agent_script())
 
 
-def cmd_remove(base: Path, role: str) -> int:
+def remove(role: str) -> int:
     """Delete the directory for a role if it exists."""
-    role_dir = _role_dir(base, role)
+    role_dir = _role_dir(_base(), role)
     if not role_dir.exists():
         print(f"Role '{role}' not found at {role_dir}", file=sys.stderr)
-        return 1
+        exit(1)
 
     if not role_dir.is_dir():
         print(f"Path for role '{role}' is not a directory: {role_dir}", file=sys.stderr)
-        return 1
+        exit(1)
 
     try:
         shutil.rmtree(role_dir)
     except OSError as exc:
         print(f"Failed to remove role '{role}': {exc}", file=sys.stderr)
-        return 1
-
-    return 0
+        exit(1)
 
 
-def cmd_get_role(base: Path, role: str) -> int:
+def get_role(role: str) -> int:
     """Print the instructions for the given role if available."""
-    role_dir = _role_dir(base, role)
+    role_dir = _role_dir(_base(), role)
     if not role_dir.exists():
         print(f"Role '{role}' not found. Run 'myteam new {role}' to create it.", file=sys.stderr)
-        return 1
+        exit(1)
 
     agent_py = role_dir / "agent.py"
     if agent_py.exists():
@@ -127,49 +126,32 @@ def cmd_get_role(base: Path, role: str) -> int:
             result = subprocess.run([sys.executable, str(agent_py)], cwd=role_dir, check=False)
         except OSError as exc:
             print(f"Failed to execute agent.py for role '{role}': {exc}", file=sys.stderr)
-            return 1
-        return result.returncode
+            exit(1)
+        exit(result.returncode)
 
     print(f"No agent.py found for role '{role}'.", file=sys.stderr)
-    return 1
+    exit(1)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog=APP_NAME, description="Manage agent roster roles.")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    sub = parser.add_subparsers(dest="command", required=True)
+def _base() -> Path:
+    """Return the directory from which the CLI was invoked."""
+    return Path.cwd()
 
-    sub.add_parser("init", help="Initialize roster with default files.")
 
-    new_parser = sub.add_parser("new", help="Create a new role.")
-    new_parser.add_argument("role", help="Role name to create.")
-
-    remove_parser = sub.add_parser("remove", help="Delete an existing role.")
-    remove_parser.add_argument("role", help="Role name to delete.")
-
-    get_role_parser = sub.add_parser("get-role", help="Print instructions for a role.")
-    get_role_parser.add_argument("role", nargs="?", default=DEFAULT_ROLE, help="Role name (default: main).")
-
-    return parser
+def version() -> str:
+    return f"{APP_NAME} {__version__}"
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
-    base = Path.cwd()
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    commands = {
+        "init": init,
+        "new": new,
+        "remove": remove,
+        "get-role": get_role,
+        "--version": version,
+    }
 
-    if args.command == "init":
-        return cmd_init(base)
-    if args.command == "new":
-        return cmd_new(base, args.role)
-    if args.command == "remove":
-        return cmd_remove(base, args.role)
-    if args.command == "get-role":
-        return cmd_get_role(base, args.role)
-
-    parser.error("Unknown command")
-    return 1
+    fire.Fire(commands)
 
 
 if __name__ == "__main__":
