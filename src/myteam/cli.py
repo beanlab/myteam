@@ -9,6 +9,7 @@ import urllib.request
 import zipfile
 from importlib import resources
 from pathlib import Path
+from typing import Callable
 
 import fire
 
@@ -143,7 +144,7 @@ def _clear_agents_dir(agents_dir: Path):
     _ensure_dir(agents_dir)
 
 
-def _unzip_agents_file(zip_path: Path, agents_dir: Path):
+def _unzip_file(zip_path: Path, agents_dir: Path):
     try:
         with zipfile.ZipFile(zip_path) as archive:
             archive.extractall(agents_dir)
@@ -152,9 +153,33 @@ def _unzip_agents_file(zip_path: Path, agents_dir: Path):
         exit(1)
 
 
-def _fetch_zipfile(zip_file_url: str, output_path: Path):
+def _progress_bar_reporthook(roster_name: str) -> Callable:
+    def reporthook(blocknum: int, blocksize: int, totalsize: int):
+        downloaded = blocknum * blocksize
+        if totalsize and totalsize > 0:
+            percent = min(100, int(downloaded * 100 / totalsize))
+            bar_len = 30
+            filled = int(bar_len * percent / 100)
+            bar = "=" * filled + "-" * (bar_len - filled)
+            print(
+                f"\rDownloading {roster_name} [{bar}] {percent}%",
+                end="",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"\rDownloading {roster_name} {downloaded // 1024} KB",
+                end="",
+                file=sys.stderr,
+            )
+
+    return reporthook
+
+
+def _fetch_zipfile(zip_file_url: str, output_path: Path, roster_name: str):
     try:
-        urllib.request.urlretrieve(zip_file_url, output_path)
+        urllib.request.urlretrieve(zip_file_url, output_path, _progress_bar_reporthook(roster_name))
+        print("", file=sys.stderr)
     except Exception as exc:
         print(f"Failed to download roster from {zip_file_url}: {exc}", file=sys.stderr)
         exit(1)
@@ -169,8 +194,8 @@ def download_roster(roster: str):
     with tempfile.TemporaryDirectory() as tmpdir:
         zip_path = Path(tmpdir) / ZIP_FILE_NAME
         
-        _fetch_zipfile(zip_file_url, zip_path)
-        _unzip_agents_file(zip_path, agents_dir)
+        _fetch_zipfile(zip_file_url, zip_path, roster)
+        _unzip_file(zip_path, agents_dir)
 
 
 def _base() -> Path:
@@ -182,7 +207,7 @@ def version() -> str:
     return f"{APP_NAME} {__version__}"
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None):
     commands = {
         "init": init,
         "new": new,
