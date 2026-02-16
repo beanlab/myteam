@@ -21,5 +21,5 @@ def print_team_info(agents_root: Path, base: Path):
         info = role_dir / "info.md"
         if not info.exists():
             continue
-        _print_block(f"\n## info for {role_dir.name}\n")
+        _print_block(f"\n## {role_dir.name}\n")
         _print_block(info.read_text(encoding="utf-8"))
