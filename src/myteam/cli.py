@@ -135,17 +135,6 @@ def get_role(role: str):
     exit(1)
 
 
-def _clear_agents_dir(agents_dir: Path):
-    if agents_dir.exists():
-        if agents_dir.is_dir():
-            try:
-                shutil.rmtree(agents_dir)
-            except OSError as exc:
-                print(f"Failed to clear {agents_dir}: {exc}", file=sys.stderr)
-                exit(1)
-    _ensure_dir(agents_dir)
-
-
 def _fetch_json(url: str) -> dict:
     try:
         request = urllib.request.Request(url, headers={"User-Agent": APP_NAME})
@@ -219,7 +208,6 @@ def _download_tree_files(file_entries, roster_dir_name: str):
 
 
 def download_roster(roster_dir_name: str):
-    _clear_agents_dir(_agents_root(_base()))
     roster_tree = _fetch_roster_tree(roster_dir_name)
     tree_files = _fetch_tree_files(roster_tree)
     _download_tree_files(tree_files, roster_dir_name)
