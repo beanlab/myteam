@@ -28,6 +28,8 @@ pip install myteam
 | `myteam new <role>` | Create a new role directory with `agent.py`, empty `info.md`, and `instructions.md`. |
 | `myteam remove <role>` | Delete the specified role directory and its contents. |
 | `myteam get-role [role]` | Print the `instructions.md` for a role (defaults to `main`). |
+| `myteam list` | List available remote rosters and files that can be downloaded. |
+| `myteam download <path> [destination]` | Download a remote roster directory or a single file into the destination (defaults to `.myteam/`). |
 
 ## What gets created
 Running `myteam init` produces:
@@ -49,6 +51,14 @@ AGENTS.md               # Onboarding note for agents
 - Commands act on the current working directory; run them from the root of the project that owns the roster.
 - If a role directory contains `agent.py`, `myteam get-role` executes it; otherwise it prints `instructions.md` if present. New roles created with `myteam new` include an `agent.py` that prints their `instructions.md`.
 - `get-role` defaults to the `main` role if no role name is provided.
+- `download` pulls from the remote roster repository. If `<path>` points to a directory, all files in that directory are downloaded. If `<path>` points to a specific file, only that file is downloaded (into the destination root).
+
+## Download examples
+```bash
+myteam list
+myteam download teams/example-team
+myteam download teams/example-team/agent.py .myteam/example-team
+```
 
 ## Typical workflow
 ```bash

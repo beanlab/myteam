@@ -25,6 +25,11 @@ ROSTER_RAW_BASE_URL = "https://raw.githubusercontent.com/beanlab/rosters/refs/he
 ZIP_FILE_NAME = "roster.zip"
 
 
+def _base() -> Path:
+    """Return the directory from which the CLI was invoked."""
+    return Path.cwd()
+
+
 def _main_agent_script() -> str:
     """Load the embedded agent template from package data."""
     return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding=ENCODING)
@@ -44,12 +49,12 @@ def _agents_md_template() -> str:
     return resources.files(__package__).joinpath("agents_md_template.md").read_text(encoding=ENCODING)
 
 
-def _agents_root(base: Path) -> Path:
-    return base / AGENTS_DIRNAME
+def _agents_root() -> Path:
+    return _base() / AGENTS_DIRNAME
 
 
-def _role_dir(base: Path, role: str) -> Path:
-    return _agents_root(base) / role
+def _role_dir(role: str) -> Path:
+    return _agents_root() / role
 
 
 def _ensure_dir(path: Path) -> None:
@@ -72,7 +77,7 @@ def init():
         agents_md.write_text(_agents_md_template(), encoding=ENCODING)
 
     # Create default main role.
-    main_dir = _role_dir(_base(), DEFAULT_ROLE)
+    main_dir = _role_dir(DEFAULT_ROLE)
     _ensure_dir(main_dir)
 
     instructions = main_dir / "instructions.md"
@@ -85,7 +90,7 @@ def init():
 
 def new(role: str):
     """Create a new role directory with placeholder files."""
-    role_dir = _role_dir(_base(), role)
+    role_dir = _role_dir(role)
     if role_dir.exists():
         print(f"Role '{role}' already exists at {role_dir}", file=sys.stderr)
         exit(1)
@@ -99,7 +104,7 @@ def new(role: str):
 
 def remove(role: str):
     """Delete the directory for a role if it exists."""
-    role_dir = _role_dir(_base(), role)
+    role_dir = _role_dir(role)
     if not role_dir.exists():
         print(f"Role '{role}' not found at {role_dir}", file=sys.stderr)
         exit(1)
@@ -117,7 +122,7 @@ def remove(role: str):
 
 def get_role(role: str):
     """Print the instructions for the given role if available."""
-    role_dir = _role_dir(_base(), role)
+    role_dir = _role_dir(role)
     if not role_dir.exists():
         print(f"Role '{role}' not found. Run 'myteam new {role}' to create it.", file=sys.stderr)
         exit(1)
@@ -158,15 +163,16 @@ def _download_file(url: str, output_path: Path):
 
 
 def _fetch_available_rosters():
-    root_tree = _fetch_json(ROSTER_REPOSITORY_URL + "/main")
+    root_tree = _fetch_json(ROSTER_REPOSITORY_URL + "/main?recursive=1")
     trees =  root_tree.get("tree", [])
-    return [tree for tree in trees if tree.get('type') == "tree"]
+    # return [tree for tree in trees if tree.get('type') == "tree"]
+    return trees
 
 
 def _fetch_roster_tree(roster: str):
     roster_trees = _fetch_available_rosters()
     roster_tree = next(
-        (entry for entry in roster_trees if entry.get("path") == roster and entry.get("type") == "tree"),
+        (entry for entry in roster_trees if entry.get("path") == roster),
         None,
     )
     if roster_tree is None:
@@ -194,35 +200,36 @@ def _fetch_tree_files(roster_tree):
     return file_entries
 
 
-def _download_tree_files(file_entries, roster_dir_name: str):
+def _download_tree_files(file_entries: list, tree_path: str, destination: Path):
     total = len(file_entries)
     base = _base()
     for idx, entry in enumerate(file_entries, start=1):
         rel_path = entry.get("path")
         if not rel_path:
             continue
-        raw_url = f"{ROSTER_RAW_BASE_URL}/{roster_dir_name}/{rel_path}"
-        print(f"\rDownloading {roster_dir_name} {idx}/{total}", end="", file=sys.stderr)
-        _download_file(raw_url, _agents_root(base) / rel_path)
+        raw_url = f"{ROSTER_RAW_BASE_URL}/{tree_path}/{rel_path}"
+        print(f"\rDownloading {tree_path} {idx}/{total}", end="", file=sys.stderr)
+        _download_file(raw_url, destination / rel_path)
     print("", file=sys.stderr)
 
 
-def download_roster(roster_dir_name: str):
-    roster_tree = _fetch_roster_tree(roster_dir_name)
-    tree_files = _fetch_tree_files(roster_tree)
-    _download_tree_files(tree_files, roster_dir_name)
+def download(download_path: str, relative_destination: str = AGENTS_DIRNAME):
+    destination = _base() / relative_destination
+    roster_tree = _fetch_roster_tree(download_path)
+
+    if roster_tree.get('type') == 'blob':
+        file_name = roster_tree.get('path').split("/")[-1]
+        _download_file(f"{ROSTER_RAW_BASE_URL}/{roster_tree.get('path')}", destination / file_name)
+    else:
+        tree_files = _fetch_tree_files(roster_tree)
+        _download_tree_files(tree_files, download_path, destination)
 
 
-def list_available_rosters():
+def list_available_items():
     available_rosters = _fetch_available_rosters()
     roster_names = [roster.get('path') for roster in available_rosters]
     for name in roster_names:
         print(name)
-
-
-def _base() -> Path:
-    """Return the directory from which the CLI was invoked."""
-    return Path.cwd()
 
 
 def version() -> str:
@@ -235,8 +242,8 @@ def main(argv: list[str] | None = None):
         "new": new,
         "remove": remove,
         "get-role": get_role,
-        "download-roster": download_roster,
-        "list-rosters": list_available_rosters,
+        "download": download,
+        "list": list_available_items,
         "--version": version,
     }
 
