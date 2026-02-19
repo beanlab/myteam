@@ -5,52 +5,38 @@ import json
 import shutil
 import subprocess
 import sys
-import tempfile
 import urllib.request
-import zipfile
 from importlib import resources
 from pathlib import Path
-from typing import Callable
+from .download import download, list_available_items
+from .constants import *
 
 import fire
 
 from . import __version__
 
-APP_NAME = "myteam"
-DEFAULT_ROLE = "main"
-AGENTS_DIRNAME = ".myteam"
-ENCODING = "utf-8"
-ROSTER_REPOSITORY_URL = "https://api.github.com/repos/beanlab/rosters/git/trees"
-ROSTER_RAW_BASE_URL = "https://raw.githubusercontent.com/beanlab/rosters/refs/heads/main"
-ZIP_FILE_NAME = "roster.zip"
-
-
-def _base() -> Path:
-    """Return the directory from which the CLI was invoked."""
-    return Path.cwd()
-
 
 def _main_agent_script() -> str:
     """Load the embedded agent template from package data."""
-    return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding=ENCODING)
+    return resources.files(__package__).joinpath("templates/main_agent_template.py").read_text(encoding=ENCODING)
 
 
 def _main_instructions_template() -> str:
     """Load the default main-role instructions template."""
-    return resources.files(__package__).joinpath("main_instructions_template.md").read_text(encoding=ENCODING)
+    return resources.files(__package__).joinpath("templates/main_instructions_template.md").read_text(encoding=ENCODING)
 
 
 def _role_agent_script() -> str:
     """Load the generic role agent template."""
-    return resources.files(__package__).joinpath("role_agent_template.py").read_text(encoding=ENCODING)
+    return resources.files(__package__).joinpath("templates/role_agent_template.py").read_text(encoding=ENCODING)
 
 
 def _agents_md_template() -> str:
-    return resources.files(__package__).joinpath("agents_md_template.md").read_text(encoding=ENCODING)
+    return resources.files(__package__).joinpath("templates/agents_md_template.md").read_text(encoding=ENCODING)
 
 
 def _agents_root() -> Path:
-    return _base() / AGENTS_DIRNAME
+    return Path.cwd() / AGENTS_DIRNAME
 
 
 def _role_dir(role: str) -> Path:
@@ -68,11 +54,11 @@ def _write_agent_py_script(path: Path, contents: str):
 
 def init():
     """Initialize the myteam directory with default main role."""
-    agents_dir = _agents_root(_base())
+    agents_dir = _agents_root()
     _ensure_dir(agents_dir)
 
     # Create AGENTS.md with onboarding instructions.
-    agents_md = _base() / "AGENTS.md"
+    agents_md = Path.cwd() / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(_agents_md_template(), encoding=ENCODING)
 
@@ -138,98 +124,6 @@ def get_role(role: str):
 
     print(f"No agent.py found for role '{role}'.", file=sys.stderr)
     exit(1)
-
-
-def _fetch_json(url: str) -> dict:
-    try:
-        request = urllib.request.Request(url, headers={"User-Agent": APP_NAME})
-        with urllib.request.urlopen(request) as response:
-            return json.load(response)
-    except Exception as exc:
-        print(f"Failed to fetch JSON from {url}: {exc}", file=sys.stderr)
-        exit(1)
-
-
-def _download_file(url: str, output_path: Path):
-    try:
-        request = urllib.request.Request(url, headers={"User-Agent": APP_NAME})
-        with urllib.request.urlopen(request) as response:
-            data = response.read()
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_bytes(data)
-    except Exception as exc:
-        print(f"Failed to download file from {url}: {exc}", file=sys.stderr)
-        exit(1)
-
-
-def _fetch_available_rosters():
-    root_tree = _fetch_json(ROSTER_REPOSITORY_URL + "/main?recursive=1")
-    trees =  root_tree.get("tree", [])
-    # return [tree for tree in trees if tree.get('type') == "tree"]
-    return trees
-
-
-def _fetch_roster_tree(roster: str):
-    roster_trees = _fetch_available_rosters()
-    roster_tree = next(
-        (entry for entry in roster_trees if entry.get("path") == roster),
-        None,
-    )
-    if roster_tree is None:
-        _handle_missing_roster(roster, roster_trees)
-
-    return roster_tree
-
-
-def _handle_missing_roster(roster: str, roster_trees: list):
-    roster_names = [entry.get("path") for entry in roster_trees if entry.get("type") == "tree"]
-    roster_names.sort()
-    available = ", ".join(roster_names) if roster_names else "none"
-    print(f"Roster '{roster}' not found. Available rosters: {available}", file=sys.stderr)
-    exit(1)
-
-
-def _fetch_tree_files(roster_tree):
-    subtree_url = f"{ROSTER_REPOSITORY_URL}/{roster_tree['sha']}?recursive=1"
-    subtree = _fetch_json(subtree_url)
-    file_entries = [entry for entry in subtree.get("tree", []) if entry.get("type") == "blob"]
-    if not file_entries:
-        print(f"No files found in roster '{roster_tree.get('path')}'.", file=sys.stderr)
-        exit(1)
-
-    return file_entries
-
-
-def _download_tree_files(file_entries: list, tree_path: str, destination: Path):
-    total = len(file_entries)
-    base = _base()
-    for idx, entry in enumerate(file_entries, start=1):
-        rel_path = entry.get("path")
-        if not rel_path:
-            continue
-        raw_url = f"{ROSTER_RAW_BASE_URL}/{tree_path}/{rel_path}"
-        print(f"\rDownloading {tree_path} {idx}/{total}", end="", file=sys.stderr)
-        _download_file(raw_url, destination / rel_path)
-    print("", file=sys.stderr)
-
-
-def download(download_path: str, relative_destination: str = AGENTS_DIRNAME):
-    destination = _base() / relative_destination
-    roster_tree = _fetch_roster_tree(download_path)
-
-    if roster_tree.get('type') == 'blob':
-        file_name = roster_tree.get('path').split("/")[-1]
-        _download_file(f"{ROSTER_RAW_BASE_URL}/{roster_tree.get('path')}", destination / file_name)
-    else:
-        tree_files = _fetch_tree_files(roster_tree)
-        _download_tree_files(tree_files, download_path, destination)
-
-
-def list_available_items():
-    available_rosters = _fetch_available_rosters()
-    roster_names = [roster.get('path') for roster in available_rosters]
-    for name in roster_names:
-        print(name)
 
 
 def version() -> str:

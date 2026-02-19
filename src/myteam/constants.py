@@ -1,0 +1,7 @@
+APP_NAME = "myteam"
+DEFAULT_ROLE = "main"
+AGENTS_DIRNAME = ".myteam"
+ENCODING = "utf-8"
+ROSTER_REPOSITORY_URL = "https://api.github.com/repos/beanlab/rosters/git/trees"
+ROSTER_RAW_BASE_URL = "https://raw.githubusercontent.com/beanlab/rosters/refs/heads/main"
+ZIP_FILE_NAME = "roster.zip"
