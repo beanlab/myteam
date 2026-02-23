@@ -1,15 +1,13 @@
 """Command-line interface for the myteam package."""
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
-import urllib.request
 from importlib import resources
 from pathlib import Path
 from .download import download, list_available_items
-from .constants import *
+from .constants import ENCODING, AGENTS_DIRNAME, DEFAULT_ROLE, APP_NAME
 
 import fire
 

@@ -1,8 +1,8 @@
 import json
 import sys
-import urllib
+import urllib.request
 from pathlib import Path
-from .constants import *
+from .constants import APP_NAME, ROSTER_REPOSITORY_URL, ROSTER_RAW_BASE_URL, AGENTS_DIRNAME
 
 
 def _fetch_json(url: str) -> dict:
