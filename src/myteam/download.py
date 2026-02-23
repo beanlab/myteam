@@ -78,7 +78,7 @@ def _download_tree_files(file_entries: list, tree_path: str, destination: Path):
 
 
 def download(download_path: str, relative_destination: str = AGENTS_DIRNAME):
-    destination = Path.cwd() / relative_destination
+    destination = Path(relative_destination).resolve()
     roster_tree = _fetch_roster_tree(download_path)
 
     if roster_tree.get('type') == 'blob':
