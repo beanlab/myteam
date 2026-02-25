@@ -1,53 +1,67 @@
 """Command-line interface for the myteam package."""
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
+import urllib.request
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
-from .download import download, list_available_items
-from .constants import ENCODING, AGENTS_DIRNAME, DEFAULT_ROLE, APP_NAME, INFO_FILE, INSTRUCTIONS_FILE, AGENT_PY_FILE, AGENTS_MD_FILE
-
 import fire
 
 from . import __version__
 
 
-def _base() -> Path:
-    return Path.cwd()
+APP_NAME = "myteam"
+DEFAULT_ROLE = "main"
+AGENTS_DIRNAME = ".myteam"
+ENCODING = "utf-8"
+INSTRUCTIONS_FILE = "instructions.md"
+INFO_FILE = "info.md"
+AGENT_PY_FILE = "agent.py"
+AGENTS_MD_FILE = "AGENTS.md"
+ROSTER_REPOSITORY_URL = "https://api.github.com/repos/beanlab/rosters/git/trees"
+ROSTER_RAW_BASE_URL = "https://raw.githubusercontent.com/beanlab/rosters/refs/heads/main"
+ZIP_FILE_NAME = "roster.zip"
+ROLE_AGENT_SCRIPT_TEMPLATE = "templates/role_agent_template.py"
+MAIN_AGENT_SCRIPT_TEMPLATE = "templates/main_agent_template.py"
+AGENTS_MD_TEMPLATE = "templates/agents_md_template.md"
+MAIN_INSTRUCTIONS_TEMPLATE = "templates/main_instructions_template.md"
 
+
+def _download_file(url: str, output_path: Path):
+    try:
+        request = urllib.request.Request(url)
+        with urllib.request.urlopen(request) as response:
+            data = response.read()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(data)
+    except Exception as exc:
+        print(f"Failed to download file from {url}: {exc}", file=sys.stderr)
+        exit(1)
+
+
+def _handle_missing_roster(roster: str, roster_trees: list):
+    roster_names = [entry.get("path") for entry in roster_trees if entry.get("type") == "tree"]
+    roster_names.sort()
+    available = ", ".join(roster_names) if roster_names else "none"
+    print(f"Roster '{roster}' not found. Available rosters: {available}", file=sys.stderr)
+    exit(1)
+
+
+def _fetch_json(url: str) -> dict:
+    try:
+        request = urllib.request.Request(url)
+        with urllib.request.urlopen(request) as response:
+            return json.load(response)
+    except Exception as exc:
+        print(f"Failed to fetch JSON from {url}: {exc}", file=sys.stderr)
+        exit(1)
 
 def _write_file(path: Path, content: str):
     path.write_text(content, encoding=ENCODING)
-
-
-def _main_agent_script() -> str:
-    """Load the embedded agent template from package data."""
-    return resources.files(__package__).joinpath("templates/main_agent_template.py").read_text(encoding=ENCODING)
-
-
-def _main_instructions_template() -> str:
-    """Load the default main-role instructions template."""
-    return resources.files(__package__).joinpath("templates/main_instructions_template.md").read_text(encoding=ENCODING)
-
-
-def _role_agent_script() -> str:
-    """Load the generic role agent template."""
-    return resources.files(__package__).joinpath("templates/role_agent_template.py").read_text(encoding=ENCODING)
-
-
-def _agents_md_template() -> str:
-    return resources.files(__package__).joinpath("templates/agents_md_template.md").read_text(encoding=ENCODING)
-
-
-def _agents_root(base: Path = Path.cwd()) -> Path:
-    return base / AGENTS_DIRNAME
-
-
-def _role_dir(role: str) -> Path:
-    return _agents_root() / role
 
 
 def _ensure_dir(path: Path) -> None:
@@ -57,12 +71,6 @@ def _ensure_dir(path: Path) -> None:
 def _write_py_file(path: Path, contents: str):
     _write_file(path, contents)
     path.chmod(path.stat().st_mode | 0o111)
-
-
-def _create_main_agent(path, agents_py_path: Path, agents_py: str, instructions_path: Path, instructions: str):
-    _ensure_dir(path)
-    _write_file(instructions_path, instructions)
-    _write_py_file(agents_py_path, agents_py)
 
 
 def _read_template_file(path: str) -> str:
@@ -174,31 +182,114 @@ class Cli:
         exit(1)
 
 
+class DownloadCli:
+    def __init__(self, agents_dir: Path, roster_repo_url: str, roster_download_url: str):
+        self._agents_dir = agents_dir
+        self._roster_repo_url: str = roster_repo_url
+        self._roster_download_url: str = roster_download_url
+
+
+    def _fetch_available_rosters(self):
+        root_tree = _fetch_json(self._roster_repo_url + "/main?recursive=1")
+        trees = root_tree.get("tree", [])
+        return trees
+
+
+    def _fetch_roster_tree(self, roster: str):
+        roster_trees = self._fetch_available_rosters()
+        roster_tree = next(
+            (entry for entry in roster_trees if entry.get("path") == roster),
+            None,
+        )
+        if roster_tree is None:
+            _handle_missing_roster(roster, roster_trees)
+
+        return roster_tree
+
+
+    def _fetch_tree_files(self, roster_tree):
+        subtree_url = f"{self._roster_repo_url}/{roster_tree['sha']}?recursive=1"
+        subtree = _fetch_json(subtree_url)
+        file_entries = [entry for entry in subtree.get("tree", []) if entry.get("type") == "blob"]
+        if not file_entries:
+            print(f"No files found in roster '{roster_tree.get('path')}'.", file=sys.stderr)
+            exit(1)
+
+        return file_entries
+
+
+    def _download_blob(self, roster_tree, destination):
+        file_name = roster_tree.get('path').split("/")[-1]
+        _download_file(f"{self._roster_download_url}/{roster_tree.get('path')}", destination / file_name)
+
+
+    def _download_tree_files(self, file_entries: list, tree_path: str, destination: Path):
+        total = len(file_entries)
+        for idx, entry in enumerate(file_entries, start=1):
+            rel_path = entry.get("path")
+            if not rel_path:
+                continue
+            raw_url = f"{self._roster_download_url}/{tree_path}/{rel_path}"
+            print(f"\rDownloading {tree_path} {idx}/{total}", end="", file=sys.stderr)
+            _download_file(raw_url, destination / rel_path)
+        print("", file=sys.stderr)
+
+
+    def _download_roster_files(self, download_path, roster_tree, destination):
+        if roster_tree.get('type') == 'blob':
+            self._download_blob(roster_tree, destination)
+        else:
+            tree_files = self._fetch_tree_files(roster_tree)
+            self._download_tree_files(tree_files, download_path, destination)
+
+
+    def download(self, download_path: str, relative_destination: str | None = None):
+        destination = self._agents_dir if relative_destination is None else Path(relative_destination).resolve()
+
+        roster_tree = self._fetch_roster_tree(download_path)
+        self._download_roster_files(download_path, roster_tree, destination)
+
+
+    def list_available_items(self):
+        available_rosters = self._fetch_available_rosters()
+        roster_names = [roster.get('path') for roster in available_rosters]
+        for name in roster_names:
+            print(name)
+
+
 def version() -> str:
     return f"{APP_NAME} {__version__}"
 
 
-def main(argv: list[str] | None = None):
+def main():
+    base = Path.cwd()
+
     file_name_provider = FileNameProvider(
-        agents_dir=".myteam",
-        main_role="main",
-        agent_py="agent.py",
-        agents_md="AGENTS.md",
-        instructions="instructions.md",
-        info="info.md"
+        agents_dir=AGENTS_DIRNAME,
+        main_role=DEFAULT_ROLE,
+        agent_py=AGENT_PY_FILE,
+        agents_md=AGENTS_MD_FILE,
+        instructions=INSTRUCTIONS_FILE,
+        info=INFO_FILE
     )
 
     template_file_provider = TemplateFileProvider(
-        role_agent_script="templates/role_agent_template.py",
-        main_agent_script="templates/main_agent_template.py",
-        agents_md_path="templates/agents_md_template.md",
-        main_instructions="templates/main_instructions_template.md"
+        role_agent_script=ROLE_AGENT_SCRIPT_TEMPLATE,
+        main_agent_script=MAIN_AGENT_SCRIPT_TEMPLATE,
+        agents_md_path=AGENTS_MD_TEMPLATE,
+        main_instructions=MAIN_INSTRUCTIONS_TEMPLATE
     )
 
     cli = Cli(
-        base=Path.cwd(),
+        base=base,
         file_name_provider=file_name_provider,
         template_file_provider=template_file_provider
+    )
+
+    download_cli = DownloadCli(
+        agents_dir= base / file_name_provider.agents_dir,
+        roster_repo_url=ROSTER_REPOSITORY_URL,
+        roster_download_url=ROSTER_RAW_BASE_URL
     )
 
     commands = {
@@ -206,8 +297,8 @@ def main(argv: list[str] | None = None):
         "new": cli.new_command,
         "remove": cli.remove_command,
         "get-role": cli.get_role_command,
-        "download": download,
-        "list": list_available_items,
+        "download": download_cli.download,
+        "list": download_cli.list_available_items,
         "--version": version,
     }
 
