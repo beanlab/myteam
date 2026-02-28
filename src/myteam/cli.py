@@ -5,12 +5,9 @@ import json
 import shutil
 import subprocess
 import sys
-import tempfile
 import urllib.request
-import zipfile
 from importlib import resources
 from pathlib import Path
-from typing import Callable
 
 import fire
 
@@ -27,21 +24,22 @@ ZIP_FILE_NAME = "roster.zip"
 
 def _main_agent_script() -> str:
     """Load the embedded agent template from package data."""
-    return resources.files(__package__).joinpath("main_agent_template.py").read_text(encoding=ENCODING)
+    return resources.files(f"{__package__}.templates").joinpath("main_agent_template.py").read_text(encoding=ENCODING)
 
 
 def _main_instructions_template() -> str:
     """Load the default main-role instructions template."""
-    return resources.files(__package__).joinpath("main_instructions_template.md").read_text(encoding=ENCODING)
+    return resources.files(f"{__package__}.templates").joinpath("main_instructions_template.md").read_text(
+        encoding=ENCODING)
 
 
 def _role_agent_script() -> str:
     """Load the generic role agent template."""
-    return resources.files(__package__).joinpath("role_agent_template.py").read_text(encoding=ENCODING)
+    return resources.files(f"{__package__}.templates").joinpath("role_agent_template.py").read_text(encoding=ENCODING)
 
 
 def _agents_md_template() -> str:
-    return resources.files(__package__).joinpath("agents_md_template.md").read_text(encoding=ENCODING)
+    return resources.files(f"{__package__}.templates").joinpath("agents_md_template.md").read_text(encoding=ENCODING)
 
 
 def _agents_root(base: Path) -> Path:
@@ -83,7 +81,7 @@ def init():
         _write_agent_py_script(agent_py, _main_agent_script())
 
 
-def new(role: str):
+def new_role(role: str):
     """Create a new role directory with placeholder files."""
     role_dir = _role_dir(_base(), role)
     if role_dir.exists():
@@ -159,7 +157,7 @@ def _download_file(url: str, output_path: Path):
 
 def _fetch_available_rosters():
     root_tree = _fetch_json(ROSTER_REPOSITORY_URL + "/main")
-    trees =  root_tree.get("tree", [])
+    trees = root_tree.get("tree", [])
     return [tree for tree in trees if tree.get('type') == "tree"]
 
 
@@ -232,7 +230,7 @@ def version() -> str:
 def main(argv: list[str] | None = None):
     commands = {
         "init": init,
-        "new": new,
+        "new": new_role,
         "remove": remove,
         "get-role": get_role,
         "download-roster": download_roster,
