@@ -13,10 +13,13 @@ from .rosters import download_roster, list_available_rosters
 from .templates import get_template
 
 APP_NAME = "myteam"
-DEFAULT_ROLE = "main"
 AGENTS_DIRNAME = ".myteam"
 ENCODING = "utf-8"
-ZIP_FILE_NAME = "roster.zip"
+
+
+def _base() -> Path:
+    """Return the directory from which the CLI was invoked."""
+    return Path.cwd()
 
 
 def _agents_root(base: Path) -> Path:
@@ -130,11 +133,6 @@ def get_role(role: str):
 def get_skill(skill: str):
     """Print the instructions for the given skill if available."""
     _get_name('skill', skill)
-
-
-def _base() -> Path:
-    """Return the directory from which the CLI was invoked."""
-    return Path.cwd()
 
 
 def version() -> str:
