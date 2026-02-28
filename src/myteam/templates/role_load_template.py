@@ -8,7 +8,7 @@ from myteam.utils import print_instructions
 
 def main() -> int:
     base = Path(__file__).resolve().parent  # .myteam/<role>
-    print_instructions(base)
+    print_instructions('role', base)
 
     return 0
 

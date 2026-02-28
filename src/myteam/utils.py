@@ -5,10 +5,10 @@ def _print_block(text: str) -> None:
     print(text.rstrip('\n'))
 
 
-def print_instructions(base: Path):
-    instructions = base / "instructions.md"
-    if instructions.exists():
-        _print_block(instructions.read_text(encoding="utf-8"))
+def print_instructions(dir_type: str, base: Path):
+    role_md = base / f"{dir_type}.md"
+    if role_md.exists():
+        _print_block(role_md.read_text(encoding="utf-8"))
 
 
 def print_team_info(agents_root: Path, base: Path):

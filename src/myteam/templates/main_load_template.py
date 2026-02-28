@@ -11,7 +11,7 @@ def main() -> int:
     base = Path(__file__).resolve().parent  # .myteam/main
     agents_root = base.parent
 
-    print_instructions(base)
+    print_instructions('role', base)
     print_team_info(agents_root, base)
 
     return 0
