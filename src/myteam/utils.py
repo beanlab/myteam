@@ -14,7 +14,7 @@ def get_myteam_root(cur_dir: Path):
 
 
 def _print_block(text: str) -> None:
-    print(text.rstrip('\n'))
+    print(text.rstrip('\n') + '\n')
 
 
 def print_instructions(base: Path):
@@ -47,7 +47,8 @@ def _print_info(
         header: str,
         folder: Path, base_dir: Path, ignore: list[str],
         is_relevant: Callable[[Path], bool],
-        get_info: Callable[[Path], str]
+        get_info: Callable[[Path], str],
+        instructions: str
 ):
     relevant = list(sorted(
         p
@@ -55,6 +56,8 @@ def _print_info(
         if is_relevant(p) and p.name not in ignore
     ))
     if relevant:
+        if instructions:
+            _print_block(instructions)
         print()
         print(f' {header} '.center(30, '*'))
     for cur_dir in relevant:
@@ -62,22 +65,18 @@ def _print_info(
         print(f" {name} ".center(30, '-'))
         if (info := get_info(cur_dir)) is not None:
             print(info)
+    if relevant:
+        print()
 
 
-def list_dir(folder: Path, base_dir: Path, ignore: list[str]):
+def list_dir(folder: Path, base_dir: Path, ignore: list[str], include_instructions=True):
     # Sub roles
-    _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info)
+    _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info,
+                get_template('explain_roles.md') if include_instructions else '')
 
     # Skills
-    _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info)
+    _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info,
+                get_template('explain_skills.md') if include_instructions else '')
 
-    _print_info('Tools', folder, base_dir, ignore + ['load.py'], _is_py_file, lambda f: '')
+    _print_info('Tools', folder, base_dir, ignore + ['load.py'], _is_py_file, lambda f: '', '')
     # TODO - get usage from py file
-
-
-def explain_skills():
-    print(get_template('explain_skills.md')+'\n')
-
-
-def explain_roles():
-    print(get_template('explain_roles.md')+'\n')
