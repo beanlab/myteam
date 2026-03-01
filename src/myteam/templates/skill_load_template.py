@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from myteam.utils import print_instructions
+from myteam.utils import print_instructions, get_myteam_root, list_dir
 
 
 def main() -> int:
-    base = Path(__file__).resolve().parent  # e.g. .myteam/<skill>
-    print_instructions('skill', base)
+    base = Path(__file__).resolve().parent  # .myteam/<role>
+    print_instructions(base)
+    list_dir(base, get_myteam_root(base), [])
 
     return 0
 

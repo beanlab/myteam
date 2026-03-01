@@ -21,10 +21,4 @@ Leaders are the following:
 - long-suffering
 - humble
 
-## Working with team members
-
-To summon team members, use the `spawn-agent` tool.  If the `spawn-agent` tool is unavailable, notify the user immediately.
-When spawning an agent, provide the agents role before the task you are assigning.  The role of an agent is name of 
-their role exactly as it appears in the list below.  For example, if the list below contained a `Developer` agent, you
-would spawn it with the following prompt: `"role: Developer, task:<task>"`.
 
