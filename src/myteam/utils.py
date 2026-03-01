@@ -48,7 +48,6 @@ def _print_info(
         folder: Path, base_dir: Path, ignore: list[str],
         is_relevant: Callable[[Path], bool],
         get_info: Callable[[Path], str],
-        instructions: str
 ):
     relevant = list(sorted(
         p
@@ -56,8 +55,6 @@ def _print_info(
         if is_relevant(p) and p.name not in ignore
     ))
     if relevant:
-        if instructions:
-            _print_block(instructions)
         print()
         print(f' {header} '.center(30, '*'))
     for cur_dir in relevant:
@@ -71,12 +68,18 @@ def _print_info(
 
 def list_dir(folder: Path, base_dir: Path, ignore: list[str], include_instructions=True):
     # Sub roles
-    _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info,
-                get_template('explain_roles.md') if include_instructions else '')
+    _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info)
 
     # Skills
-    _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info,
-                get_template('explain_skills.md') if include_instructions else '')
+    _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info)
 
-    _print_info('Tools', folder, base_dir, ignore + ['load.py'], _is_py_file, lambda f: '', '')
+    _print_info('Tools', folder, base_dir, ignore + ['load.py'], _is_py_file, lambda f: '')
     # TODO - get usage from py file
+
+
+def explain_skills():
+    _print_block(get_template('explain_skills.md'))
+
+
+def explain_roles():
+    _print_block(get_template('explain_roles.md'))
