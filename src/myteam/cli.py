@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from importlib import resources
 from pathlib import Path
+import requests
 
 import fire
 
@@ -15,6 +16,7 @@ APP_NAME = "myteam"
 DEFAULT_ROLE = "main"
 AGENTS_DIRNAME = ".myteam"
 ENCODING = "utf-8"
+DEFAULT_REPO = "OWNER/REPO"
 
 
 def _main_agent_script() -> str:
@@ -127,6 +129,66 @@ def get_role(role: str) -> int:
     exit(1)
 
 
+def _github_contents(repo: str, path: str, ref: str) -> list[dict] | dict:
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Accept": "application/vnd.github+json"}
+    r = requests.get(url, headers=headers, params={"ref": ref}, timeout=30)
+    if r.status_code != 200:
+        raise SystemExit(f"Failed to fetch metadata for {path} from {repo}@{ref}: {r.status_code} {r.text}")
+    return r.json()
+
+
+def _download_file(url: str, target: Path) -> None:
+    r = requests.get(url, timeout=30)
+    if r.status_code != 200:
+        raise SystemExit(f"Failed to download {url}: {r.status_code} {r.text}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        raise SystemExit(f"Target file already exists: {target}")
+    target.write_bytes(r.content)
+
+
+def _download_dir(repo: str, path: str, ref: str, target_root: Path) -> None:
+    entries = _github_contents(repo, path, ref)
+    if not isinstance(entries, list):
+        raise SystemExit(f"Expected directory at {path}, got a file instead.")
+    for entry in entries:
+        entry_type = entry.get("type")
+        entry_path = entry.get("path")
+        if not entry_path:
+            continue
+        relative = Path(entry_path).relative_to(path)
+        target = target_root / relative
+        if entry_type == "dir":
+            _download_dir(repo, entry_path, ref, target_root)
+        elif entry_type == "file":
+            download_url = entry.get("download_url")
+            if not download_url:
+                raise SystemExit(f"Missing download_url for {entry_path}")
+            _download_file(download_url, target)
+        else:
+            raise SystemExit(f"Unsupported entry type '{entry_type}' for {entry_path}")
+
+
+def download_role(path: str, repo: str = DEFAULT_REPO, ref: str = "main", dest: str | None = None) -> int:
+    """Download a file or directory from GitHub and save it into the project."""
+    meta = _github_contents(repo, path, ref)
+    target_root = Path(dest or path)
+    if isinstance(meta, list):
+        if target_root.exists():
+            raise SystemExit(f"Target directory already exists: {target_root}")
+        target_root.mkdir(parents=True, exist_ok=True)
+        _download_dir(repo, path, ref, target_root)
+        return 0
+    if meta.get("type") != "file":
+        raise SystemExit(f"Unsupported path type at {path}: {meta.get('type')}")
+    download_url = meta.get("download_url")
+    if not download_url:
+        raise SystemExit(f"Missing download_url for {path}")
+    _download_file(download_url, target_root)
+    return 0
+
+
 def _base() -> Path:
     """Return the directory from which the CLI was invoked."""
     return Path.cwd()
@@ -143,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
         "remove": remove,
         "get-role": get_role,
         "--version": version,
+        "download-role": download_role,
     }
 
     fire.Fire(commands)

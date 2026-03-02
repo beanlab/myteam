@@ -22,12 +22,13 @@ pip install myteam
 4) `myteam get-role <role>` — run the role’s `agent.py` (if present) or print `instructions.md` (defaults to `main` when omitted).
 
 ## Commands
-| Command | Purpose |
-| --- | --- |
-| `myteam init` | Initialize `AGENTS.md` and `.myteam/` with the default `main` role (with `agent.py`, templated `info.md` and `instructions.md`). |
-| `myteam new <role>` | Create a new role directory with `agent.py`, empty `info.md`, and `instructions.md`. |
-| `myteam remove <role>` | Delete the specified role directory and its contents. |
-| `myteam get-role [role]` | Print the `instructions.md` for a role (defaults to `main`). |
+| Command                               | Purpose                                                                                                                          |
+|---------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `myteam init`                         | Initialize `AGENTS.md` and `.myteam/` with the default `main` role (with `agent.py`, templated `info.md` and `instructions.md`). |
+| `myteam new <role>`                   | Create a new role directory with `agent.py`, empty `info.md`, and `instructions.md`.                                             |
+| `myteam remove <role>`                | Delete the specified role directory and its contents.                                                                            |
+| `myteam get-role [role]`              | Print the `instructions.md` for a role (defaults to `main`).                                                                     |
+| `myteam download-role <roster> <role>` | Download a specific role from the repository.                                                                                    |
 
 ## What gets created
 Running `myteam init` produces:
