@@ -54,27 +54,28 @@ def _print_info(
         for p in folder.iterdir()
         if is_relevant(p) and p.name not in ignore
     ))
-    if relevant:
-        print()
-        print(f' {header} '.center(30, '*'))
+    if not relevant:
+        return
+
+    print()
+    print(f' {header} '.center(30, '*'))
     for cur_dir in relevant:
         name = cur_dir.relative_to(base_dir).as_posix()
         print(f" {name} ".center(30, '-'))
         if (info := get_info(cur_dir)) is not None:
             print(info)
-    if relevant:
-        print()
+    print()
 
 
 def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info)
 
 
-def list_skills(folder: Path, base_dir, Path, ignore: list[str]):
+def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info)
 
 
-def list_tools(folder: Path, base_dir, Path, ignore: list[str]):
+def list_tools(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info('Tools', folder, base_dir, ignore + ['load.py'], _is_py_file, lambda f: '')
     # TODO - get usage from py file
 
