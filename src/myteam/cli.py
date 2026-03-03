@@ -54,7 +54,7 @@ def _new_dir(base: Path, dir_type: str, name_parts: list[str], info_text: str, i
 
 
 def init():
-    """Initialize the myteam directory with default main role."""
+    """Initialize the myteam directory with a top-level role."""
     agents_dir = _agents_root(_base())
     _ensure_dir(agents_dir)
 
@@ -63,12 +63,14 @@ def init():
     if not agents_md.exists():
         agents_md.write_text(get_template('agents_md_template.md'), encoding=ENCODING)
 
-    # Create default main role.
-    _new_dir(agents_dir, 'role', ['main'],
-             get_template('main_info_template.md'),
-             get_template('main_definition_template.md'),
-             get_template('main_load_template.py')
-             )
+    # Create top-level role.md and load.py if missing.
+    top_role = agents_dir / "role.md"
+    if not top_role.exists():
+        top_role.write_text(get_template('main_definition_template.md'), encoding=ENCODING)
+
+    top_load = agents_dir / "load.py"
+    if not top_load.exists():
+        _write_py_script(top_load, get_template('main_load_template.py'))
 
 
 def new_role(role: str):
@@ -127,8 +129,21 @@ def _get_name(dir_type: str, name_dir: Path, name: str):
         exit(1)
 
 
-def get_role(role: str):
+def get_role(role: str | None = None):
     """Print the instructions for the given role if available."""
+    if not role:
+        folder = _agents_root(_base())
+        load_py = folder / "load.py"
+        if not load_py.exists():
+            print("No top-level load.py found. Run 'myteam init' to create it.", file=sys.stderr)
+            exit(1)
+        try:
+            result = subprocess.run([sys.executable, str(load_py)], cwd=folder, check=False)
+            exit(result.returncode)
+        except OSError as exc:
+            print(f"Failed to execute top-level load.py: {exc}", file=sys.stderr)
+            exit(1)
+
     folder = _agents_root(_base()).joinpath(*role.split('/'))
     if not is_role_dir(folder):
         print(f'Not a role: {role}', file=sys.stderr)
