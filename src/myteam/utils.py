@@ -66,13 +66,15 @@ def _print_info(
         print()
 
 
-def list_dir(folder: Path, base_dir: Path, ignore: list[str], include_instructions=True):
-    # Sub roles
+def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info)
 
-    # Skills
+
+def list_skills(folder: Path, base_dir, Path, ignore: list[str]):
     _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info)
 
+
+def list_tools(folder: Path, base_dir, Path, ignore: list[str]):
     _print_info('Tools', folder, base_dir, ignore + ['load.py'], _is_py_file, lambda f: '')
     # TODO - get usage from py file
 
@@ -83,3 +85,6 @@ def explain_skills():
 
 def explain_roles():
     _print_block(get_template('explain_roles.md'))
+
+def explain_tools():
+    _print_block(get_template('explain_tools.md'))

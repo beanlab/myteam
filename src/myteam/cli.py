@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 import fire
-
 from myteam.utils import is_role_dir, is_skill_dir
+
 from . import __version__
 from .rosters import download_roster, list_available_rosters
 from .templates import get_template
@@ -37,7 +37,7 @@ def _ensure_dir(path: Path) -> None:
 
 def _write_py_script(path: Path, contents: str):
     path.write_text(contents, encoding=ENCODING)
-    path.chmod(path.stat().st_mode | 0o111)
+    # path.chmod(path.stat().st_mode | 0o111)
 
 
 def _new_dir(base: Path, dir_type: str, name_parts: list[str], info_text: str, instruction_text: str, load_text: str):
@@ -54,21 +54,17 @@ def _new_dir(base: Path, dir_type: str, name_parts: list[str], info_text: str, i
 
 
 def init():
-    """Initialize the myteam directory with default main role."""
-    agents_dir = _agents_root(_base())
-    _ensure_dir(agents_dir)
+    """Initialize the myteam directory with default role."""
+    _new_dir(_base(), 'role', ['.myteam'],
+             '', # default role doesn't need info.md
+             '',  # default role doesn't come with instructions
+             get_template('role_load_template.py')
+             )
 
     # Create AGENTS.md with onboarding instructions.
     agents_md = _base() / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(get_template('agents_md_template.md'), encoding=ENCODING)
-
-    # Create default main role.
-    _new_dir(agents_dir, 'role', ['main'],
-             get_template('main_info_template.md'),
-             get_template('main_definition_template.md'),
-             get_template('main_load_template.py')
-             )
 
 
 def new_role(role: str):
@@ -127,9 +123,12 @@ def _get_name(dir_type: str, name_dir: Path, name: str):
         exit(1)
 
 
-def get_role(role: str):
+def get_role(role: str = None):
     """Print the instructions for the given role if available."""
-    folder = _agents_root(_base()).joinpath(*role.split('/'))
+    folder = _agents_root(_base())
+    if role is not None:
+        folder = folder.joinpath(*role.split('/'))
+
     if not is_role_dir(folder):
         print(f'Not a role: {role}', file=sys.stderr)
         exit(1)

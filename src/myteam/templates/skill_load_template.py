@@ -9,7 +9,10 @@ from myteam.utils import print_instructions, get_myteam_root, list_dir
 def main() -> int:
     base = Path(__file__).resolve().parent  # .myteam/<role>
     print_instructions(base)
-    list_dir(base, get_myteam_root(base), [])
+    myteam = get_myteam_root(base)
+    list_roles(base, myteam, [])
+    list_skills(base, myteam, [])
+    list_tools(base, myteam, [])
 
     return 0
 
