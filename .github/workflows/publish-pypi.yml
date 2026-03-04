@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-
 jobs:
   build:
     name: Build distributions
@@ -22,10 +21,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Build package
-        run: |
-          python -m pip install --upgrade pip build
-          python -m build
+        run: uv build
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
