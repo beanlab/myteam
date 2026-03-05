@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import print_instructions, get_myteam_root, list_dir
+from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills, list_tools
 
 
 def main() -> int:
