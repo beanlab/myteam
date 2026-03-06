@@ -46,7 +46,7 @@ jobs:
       url: https://pypi.org/p/myteam
 
     steps:
-      - name: Download distributions
+      - name: download distributions
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
