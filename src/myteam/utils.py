@@ -39,12 +39,20 @@ def print_instructions(base: Path):
             return
 
 
+def _get_definition_file(folder: Path, definition_stem: str) -> Path | None:
+    for candidate in (f"{definition_stem}.md", f"{definition_stem.upper()}.md"):
+        definition_file = folder / candidate
+        if definition_file.exists():
+            return definition_file
+    return None
+
+
 def is_role_dir(folder: Path) -> bool:
-    return folder.is_dir() and (folder / 'role.md').exists()
+    return folder.is_dir() and _get_definition_file(folder, "role") is not None
 
 
 def is_skill_dir(folder: Path) -> bool:
-    return folder.is_dir() and (folder / 'skill.md').exists()
+    return folder.is_dir() and _get_definition_file(folder, "skill") is not None
 
 
 def _parse_yaml_frontmatter(file: Path) -> dict[str, str]:
@@ -90,10 +98,12 @@ def _format_frontmatter_info(frontmatter: dict[str, str]) -> str:
     return ""
 
 
-def _get_folder_info(folder: Path, definition_file: str) -> str:
-    frontmatter_info = _format_frontmatter_info(_parse_yaml_frontmatter(folder / definition_file))
-    if frontmatter_info:
-        return frontmatter_info
+def _get_folder_info(folder: Path, definition_stem: str) -> str:
+    definition_file = _get_definition_file(folder, definition_stem)
+    if definition_file is not None:
+        frontmatter_info = _format_frontmatter_info(_parse_yaml_frontmatter(definition_file))
+        if frontmatter_info:
+            return frontmatter_info
 
     info = folder / "info.md"
     if info.exists():
@@ -136,7 +146,7 @@ def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
         base_dir,
         ignore,
         is_role_dir,
-        lambda role_dir: _get_folder_info(role_dir, "role.md"),
+        lambda role_dir: _get_folder_info(role_dir, "role"),
     )
 
 
@@ -147,7 +157,7 @@ def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
         base_dir,
         ignore,
         is_skill_dir,
-        lambda skill_dir: _get_folder_info(skill_dir, "skill.md"),
+        lambda skill_dir: _get_folder_info(skill_dir, "skill"),
     )
 
 
