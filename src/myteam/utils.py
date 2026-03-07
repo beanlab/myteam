@@ -17,26 +17,98 @@ def _print_block(text: str) -> None:
     print(text.rstrip('\n') + '\n')
 
 
+def _strip_yaml_frontmatter(text: str) -> str:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return text
+
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            body = "\n".join(lines[i + 1:])
+            if text.endswith("\n"):
+                body += "\n"
+            return body
+    return text
+
+
 def print_instructions(base: Path):
     for file in ['role.md', 'ROLE.md', 'skill.md', 'SKILL.md']:
         instructions_file = base / file
         if instructions_file.exists():
-            _print_block(instructions_file.read_text(encoding='utf-8'))
+            _print_block(_strip_yaml_frontmatter(instructions_file.read_text(encoding='utf-8')))
             return
 
 
+def _get_definition_file(folder: Path, definition_stem: str) -> Path | None:
+    for candidate in (f"{definition_stem}.md", f"{definition_stem.upper()}.md"):
+        definition_file = folder / candidate
+        if definition_file.exists():
+            return definition_file
+    return None
+
+
 def is_role_dir(folder: Path) -> bool:
-    return folder.is_dir() and (folder / 'role.md').exists()
+    return folder.is_dir() and _get_definition_file(folder, "role") is not None
 
 
 def is_skill_dir(folder: Path) -> bool:
-    return folder.is_dir() and (folder / 'skill.md').exists()
+    return folder.is_dir() and _get_definition_file(folder, "skill") is not None
 
 
-def _get_dir_info(folder: Path) -> str:
+def _parse_yaml_frontmatter(file: Path) -> dict[str, str]:
+    if not file.exists():
+        return {}
+
+    lines = file.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    if end is None:
+        return {}
+
+    data: dict[str, str] = {}
+    for line in lines[1:end]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        key = key.strip().lower()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        data[key] = value
+
+    return data
+
+
+def _format_frontmatter_info(frontmatter: dict[str, str]) -> str:
+    name = frontmatter.get("name", "")
+    description = frontmatter.get("description", "")
+    if name and description:
+        return f"{name}: {description}"
+    if name:
+        return name
+    if description:
+        return description
+    return ""
+
+
+def _get_folder_info(folder: Path, definition_stem: str) -> str:
+    definition_file = _get_definition_file(folder, definition_stem)
+    if definition_file is not None:
+        frontmatter_info = _format_frontmatter_info(_parse_yaml_frontmatter(definition_file))
+        if frontmatter_info:
+            return frontmatter_info
+
     info = folder / "info.md"
     if info.exists():
         return info.read_text(encoding="utf-8").rstrip('\n')
+    return ""
 
 
 def _is_py_file(file: Path) -> bool:
@@ -62,17 +134,31 @@ def _print_info(
     for cur_dir in relevant:
         name = cur_dir.relative_to(base_dir).as_posix()
         print(f" {name} ".center(30, '-'))
-        if (info := get_info(cur_dir)) is not None:
+        if info := get_info(cur_dir):
             print(info)
     print()
 
 
 def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
-    _print_info('Team Members', folder, base_dir, ignore, is_role_dir, _get_dir_info)
+    _print_info(
+        'Team Members',
+        folder,
+        base_dir,
+        ignore,
+        is_role_dir,
+        lambda role_dir: _get_folder_info(role_dir, "role"),
+    )
 
 
 def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
-    _print_info('Skills', folder, base_dir, ignore, is_skill_dir, _get_dir_info)
+    _print_info(
+        'Skills',
+        folder,
+        base_dir,
+        ignore,
+        is_skill_dir,
+        lambda skill_dir: _get_folder_info(skill_dir, "skill"),
+    )
 
 
 def list_tools(folder: Path, base_dir: Path, ignore: list[str]):
