@@ -40,7 +40,7 @@ def _write_py_script(path: Path, contents: str):
     # path.chmod(path.stat().st_mode | 0o111)
 
 
-def _new_dir(base: Path, dir_type: str, name_parts: list[str], info_text: str, instruction_text: str, load_text: str):
+def _new_dir(base: Path, dir_type: str, name_parts: list[str], instruction_text: str, load_text: str):
     name_dir = base.joinpath(*name_parts)
     name = '/'.join(name_parts)
     if name_dir.exists():
@@ -48,7 +48,6 @@ def _new_dir(base: Path, dir_type: str, name_parts: list[str], info_text: str, i
         exit(1)
 
     _ensure_dir(name_dir)
-    (name_dir / "info.md").write_text(info_text, encoding=ENCODING)
     (name_dir / (dir_type + ".md")).write_text(instruction_text, encoding=ENCODING)
     _write_py_script(name_dir / "load.py", load_text)
 
@@ -56,7 +55,6 @@ def _new_dir(base: Path, dir_type: str, name_parts: list[str], info_text: str, i
 def init():
     """Initialize the myteam directory with default role."""
     _new_dir(_base(), 'role', ['.myteam'],
-             '', # default role doesn't need info.md
              '',  # default role doesn't come with instructions
              get_template('role_load_template.py')
              )
@@ -70,7 +68,6 @@ def init():
 def new_role(role: str):
     """Create a new role directory with placeholder files."""
     _new_dir(_agents_root(_base()), 'role', role.split('/'),
-             get_template('role_info_template.md'),
              get_template('role_definition_template.md'),
              get_template('role_load_template.py')
              )
@@ -78,7 +75,6 @@ def new_role(role: str):
 
 def new_skill(skill: str):
     _new_dir(_agents_root(_base()), 'skill', skill.split('/'),
-             get_template('skill_info_template.md'),
              get_template('skill_definition_template.md'),
              get_template('skill_load_template.py')
              )

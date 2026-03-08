@@ -16,4 +16,3 @@ myteam = "myteam.cli:main"
 [build-system]
 requires = ["uv-build>=0.2"]
 build-backend = "uv_build"
-
