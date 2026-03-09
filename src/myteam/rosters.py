@@ -48,15 +48,14 @@ def _download_file(url: str, output_path: Path):
 
 
 def _fetch_available_rosters(roster_repository_url: str):
-    root_tree = _fetch_json(roster_repository_url + "/main")
-    trees = root_tree.get("tree", [])
-    return [tree for tree in trees if tree.get("type") == "tree"]
+    root_tree = _fetch_json(roster_repository_url + "/main?recursive=1")
+    return root_tree.get("tree", [])
 
 
 def _fetch_roster_tree(roster: str, roster_repository_url: str):
     roster_trees = _fetch_available_rosters(roster_repository_url)
     roster_tree = next(
-        (entry for entry in roster_trees if entry.get("path") == roster and entry.get("type") == "tree"),
+        (entry for entry in roster_trees if entry.get("path") == roster),
         None,
     )
     if roster_tree is None:
@@ -84,7 +83,13 @@ def _fetch_tree_files(roster_tree, roster_repository_url: str):
     return file_entries
 
 
-def _download_tree_files(file_entries, roster_dir_name: str, base: Path, roster_raw_base_url: str):
+def _download_blob(blob_object: dict, destination: Path, roster_raw_base_url: str):
+    file_name = blob_object.get('path').split("/")[-1]
+    print(f"\rDownloading {file_name}")
+    _download_file(f"{roster_raw_base_url}/{blob_object.get('path')}", destination / file_name)
+
+
+def _download_tree_files(file_entries, roster_dir_name: str, destination: Path, roster_raw_base_url: str):
     total = len(file_entries)
     for idx, entry in enumerate(file_entries, start=1):
         rel_path = entry.get("path")
@@ -92,16 +97,28 @@ def _download_tree_files(file_entries, roster_dir_name: str, base: Path, roster_
             continue
         raw_url = f"{roster_raw_base_url}/{roster_dir_name}/{rel_path}"
         print(f"\rDownloading {roster_dir_name} {idx}/{total}", end="", file=sys.stderr)
-        _download_file(raw_url, _agents_root(base) / rel_path)
+        _download_file(raw_url, destination / rel_path)
     print("", file=sys.stderr)
 
 
-def download_roster(roster_dir_name: str, repo: str = DEFAULT_REPO):
+def download_roster(
+    roster_dir_name: str,
+    destination: Path | str | None = None,
+    repo: str = DEFAULT_REPO,
+):
     base = Path.cwd()
+    if destination is None:
+        destination = _agents_root(base)
+    else:
+        destination = Path(destination)
+
     roster_repository_url, roster_raw_base_url = _repo_urls(repo)
     roster_tree = _fetch_roster_tree(roster_dir_name, roster_repository_url)
-    tree_files = _fetch_tree_files(roster_tree, roster_repository_url)
-    _download_tree_files(tree_files, roster_dir_name, base, roster_raw_base_url)
+    if roster_tree.get('type') == 'blob':
+        _download_blob(roster_tree, destination, roster_raw_base_url)
+    else:
+        tree_files = _fetch_tree_files(roster_tree, roster_repository_url)
+        _download_tree_files(tree_files, roster_dir_name, destination, roster_raw_base_url)
 
 
 def list_available_rosters(repo: str = DEFAULT_REPO):

@@ -156,8 +156,8 @@ def main(argv: list[str] | None = None):
             "role": get_role,
             "skill": get_skill,
         },
-        "download-roster": download_roster,
-        "list-rosters": list_available_rosters,
+        "download": download_roster,
+        "list": list_available_rosters,
         "--version": version,
     }
 
