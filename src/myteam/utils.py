@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Callable
 
+import yaml
+
 from myteam.templates import get_template
 
 
@@ -71,17 +73,20 @@ def _parse_yaml_frontmatter(file: Path) -> dict[str, str]:
     if end is None:
         return {}
 
+    frontmatter = "\n".join(lines[1:end])
+    try:
+        loaded = yaml.safe_load(frontmatter)
+    except yaml.YAMLError:
+        return {}
+
+    if not isinstance(loaded, dict):
+        return {}
+
     data: dict[str, str] = {}
-    for line in lines[1:end]:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or ":" not in stripped:
+    for key, value in loaded.items():
+        if value is None:
             continue
-        key, value = stripped.split(":", 1)
-        key = key.strip().lower()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-            value = value[1:-1]
-        data[key] = value
+        data[str(key).lower()] = str(value)
 
     return data
 

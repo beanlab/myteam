@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.3
+
+- Switched YAML frontmatter parsing in `list_roles` / `list_skills` to `PyYAML` instead of manual line parsing.
+- This fixes frontmatter metadata handling for valid YAML that was previously misparsed or skipped.
+
 ## 0.2.1
 
 - `list_roles` / `list_skills` now prefer `name` + `description` from YAML frontmatter in `role.md` / `skill.md`.
