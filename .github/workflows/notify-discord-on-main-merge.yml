@@ -1,0 +1,116 @@
+name: Notify Discord on Main Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build merged commit
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out merged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build package
+        run: uv build
+
+  notify:
+    name: Post Discord release note
+    needs: build
+    if: github.event.pull_request.merged == true && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out merged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Discord payload
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY' > discord-payload.json
+          import json
+          import os
+          from pathlib import Path
+          import tomllib
+
+          root = Path(".")
+          project = tomllib.loads((root / "pyproject.toml").read_text())
+          version = project["project"]["version"]
+
+          changelog = (root / "src" / "CHANGELOG.md").read_text().splitlines()
+          header = f"## {version}"
+          notes = []
+          capture = False
+
+          for line in changelog:
+              if line.startswith("## "):
+                  if capture:
+                      break
+                  capture = line.strip() == header
+                  continue
+              if capture:
+                  notes.append(line.rstrip())
+
+          note_lines = [line for line in notes if line.strip()]
+          formatted_notes = "\n".join(note_lines) if note_lines else "- No changelog notes found."
+
+          content = (
+              f"myteam {version} was merged to `main` and built successfully.\n"
+              f"PR #{os.environ['PR_NUMBER']}: {os.environ['PR_TITLE']}\n"
+              f"{os.environ['PR_URL']}\n\n"
+              f"Changelog\n{formatted_notes}\n\n"
+              f"Commit: `{os.environ['MERGE_SHA'][:7]}` in `{os.environ['REPO']}`"
+          )
+
+          if len(content) > 2000:
+              max_notes_length = max(0, 2000 - len(content) + len(formatted_notes) - 3)
+              formatted_notes = formatted_notes[:max_notes_length].rstrip() + "..."
+              content = (
+                  f"myteam {version} was merged to `main` and built successfully.\n"
+                  f"PR #{os.environ['PR_NUMBER']}: {os.environ['PR_TITLE']}\n"
+                  f"{os.environ['PR_URL']}\n\n"
+                  f"Changelog\n{formatted_notes}\n\n"
+                  f"Commit: `{os.environ['MERGE_SHA'][:7]}` in `{os.environ['REPO']}`"
+              )
+
+          print(json.dumps({"content": content}))
+          PY
+
+      - name: Post to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          test -n "$DISCORD_WEBHOOK_URL"
+          curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            --data @discord-payload.json \
+            "$DISCORD_WEBHOOK_URL"
