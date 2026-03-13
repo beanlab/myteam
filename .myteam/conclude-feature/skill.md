@@ -9,6 +9,21 @@ description: |
 
 Before a feature branch is ready to merge, the following must be complete.
 
+### Run `code-linter`
+
+Please delegate to the `code-linter` role. Address any concerns they raise. 
+
+After addressing their concerns, run it again. Loop until no concerns are raised.
+
+**Do not** proceed until this step is complete.
+
+### Run `project-myteam-update`
+
+Please delegate to the `project-myteam-update` role. 
+When they are finished, proceed.
+
+**Do not** proceed until this step is complete.
+
 ### Git commit
 
 Please review all untracked files. 
@@ -18,6 +33,7 @@ Please make sure all current work has been committed.
 If it hasn't, please alert the user and wait for their approval before proceeding.
 
 Commit the files with a descriptive commit message.
+Always confirm with the user the changes in the commit before running `git commit`.
 
 When asking for approval for `git` commands, 
 make sure the approval prefix is just `git add` or `git commit`;
@@ -41,6 +57,11 @@ Then inspect the version:
 
 Only one version bump in a branch is needed. If the version in the branch has already been bumped,
 do not bump it again.
+
+Do not decide this from the current file contents alone. Check the branch history first to see whether
+this branch already includes a version-bump commit or a prior change to the version/changelog files.
+Compare against the branch's earlier commits or merge-base as needed before making any new bump.
+If the branch already contains a version bump, keep that version unless the user explicitly asks to change it.
 
 ### Changelog
 
