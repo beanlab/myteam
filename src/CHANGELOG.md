@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.2.5
+
+- Refactored the CLI module so `src/myteam/cli.py` now only contains command wiring and `main()`.
+- Moved CLI command implementations into dedicated modules to separate command logic from path/config helpers.
+- Consolidated package versioning to a single source of truth in `pyproject.toml` while preserving `myteam --version`.
+- Added `scratch/` to `.gitignore` for local workspace artifacts.
+
 ## 0.2.3
 
 - Switched YAML frontmatter parsing in `list_roles` / `list_skills` to `PyYAML` instead of manual line parsing.
