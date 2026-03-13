@@ -8,6 +8,9 @@
 - Added `scratch/` to `.gitignore` for local workspace artifacts.
 - Added a GitHub Actions workflow that runs after pull requests are merged into `main`, builds the merged commit, and posts the released version plus matching changelog notes to Discord.
 - The Discord notification workflow is configured to use a repository secret for the webhook URL instead of hardcoding the credential in the repository.
+- Changed both GitHub Actions workflows so they trigger on pushes to `main`.
+- Updated the Discord notification workflow to report the pushed commit instead of pull request merge metadata.
+- Updated the PyPI publish and Discord notification workflows so they only run for pushes to `main` when `pyproject.toml`'s version changed and that version is not already present on PyPI.
 
 ## 0.2.4
 

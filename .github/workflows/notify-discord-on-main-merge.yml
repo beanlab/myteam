@@ -1,24 +1,94 @@
 name: Notify Discord on Main Merge
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 permissions:
   contents: read
 
 jobs:
+  detect-release-state:
+    name: Detect release state
+    runs-on: ubuntu-latest
+    outputs:
+      should_notify: ${{ steps.decide.outputs.should_notify }}
+      version_changed: ${{ steps.version.outputs.version_changed }}
+      new_version: ${{ steps.version.outputs.new_version }}
+      exists_on_pypi: ${{ steps.pypi.outputs.exists_on_pypi }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect version change
+        id: version
+        shell: bash
+        run: |
+          before_sha="${{ github.event.before }}"
+          old_version=""
+
+          if [ "$before_sha" != "0000000000000000000000000000000000000000" ]; then
+            old_version="$(git show "${before_sha}:pyproject.toml" 2>/dev/null | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)"
+          fi
+
+          new_version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
+
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$new_version" ] && [ "$old_version" != "$new_version" ]; then
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check whether version exists on PyPI
+        id: pypi
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.new_version }}"
+          package="myteam"
+
+          if [ -z "$version" ]; then
+            echo "exists_on_pypi=unknown" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          status="$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/${package}/${version}/json")"
+
+          if [ "$status" = "200" ]; then
+            echo "exists_on_pypi=true" >> "$GITHUB_OUTPUT"
+          elif [ "$status" = "404" ]; then
+            echo "exists_on_pypi=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unexpected PyPI response: $status"
+            exit 1
+          fi
+
+      - name: Decide whether to notify
+        id: decide
+        shell: bash
+        run: |
+          if [ "${{ steps.version.outputs.version_changed }}" = "true" ] && \
+             [ "${{ steps.pypi.outputs.exists_on_pypi }}" = "false" ]; then
+            echo "should_notify=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_notify=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build merged commit
-    if: github.event.pull_request.merged == true
+    needs: detect-release-state
+    if: needs.detect-release-state.outputs.should_notify == 'true'
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out merged commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,15 +103,15 @@ jobs:
 
   notify:
     name: Post Discord release note
-    needs: build
-    if: github.event.pull_request.merged == true && needs.build.result == 'success'
+    needs: [detect-release-state, build]
+    if: needs.detect-release-state.outputs.should_notify == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out merged commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -50,10 +120,8 @@ jobs:
 
       - name: Build Discord payload
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           REPO: ${{ github.repository }}
         run: |
           python - <<'PY' > discord-payload.json
@@ -84,22 +152,20 @@ jobs:
           formatted_notes = "\n".join(note_lines) if note_lines else "- No changelog notes found."
 
           content = (
-              f"myteam {version} was merged to `main` and built successfully.\n"
-              f"PR #{os.environ['PR_NUMBER']}: {os.environ['PR_TITLE']}\n"
-              f"{os.environ['PR_URL']}\n\n"
+              f"myteam {version} was pushed to `main` and built successfully.\n"
+              f"{os.environ['COMMIT_URL']}\n\n"
               f"Changelog\n{formatted_notes}\n\n"
-              f"Commit: `{os.environ['MERGE_SHA'][:7]}` in `{os.environ['REPO']}`"
+              f"Commit: `{os.environ['COMMIT_SHA'][:7]}` in `{os.environ['REPO']}`"
           )
 
           if len(content) > 2000:
               max_notes_length = max(0, 2000 - len(content) + len(formatted_notes) - 3)
               formatted_notes = formatted_notes[:max_notes_length].rstrip() + "..."
               content = (
-                  f"myteam {version} was merged to `main` and built successfully.\n"
-                  f"PR #{os.environ['PR_NUMBER']}: {os.environ['PR_TITLE']}\n"
-                  f"{os.environ['PR_URL']}\n\n"
+                  f"myteam {version} was pushed to `main` and built successfully.\n"
+                  f"{os.environ['COMMIT_URL']}\n\n"
                   f"Changelog\n{formatted_notes}\n\n"
-                  f"Commit: `{os.environ['MERGE_SHA'][:7]}` in `{os.environ['REPO']}`"
+                  f"Commit: `{os.environ['COMMIT_SHA'][:7]}` in `{os.environ['REPO']}`"
               )
 
           print(json.dumps({"content": content}))
