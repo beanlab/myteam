@@ -1,16 +1,13 @@
 # Change Log
 
-## 0.2.6
-
-- Added a GitHub Actions workflow that runs after pull requests are merged into `main`, builds the merged commit, and posts the released version plus matching changelog notes to Discord.
-- The Discord notification workflow is configured to use a repository secret for the webhook URL instead of hardcoding the credential in the repository.
-
 ## 0.2.5
 
 - Refactored the CLI module so `src/myteam/cli.py` now only contains command wiring and `main()`.
 - Moved CLI command implementations into dedicated modules to separate command logic from path/config helpers.
 - Consolidated package versioning to a single source of truth in `pyproject.toml` while preserving `myteam --version`.
 - Added `scratch/` to `.gitignore` for local workspace artifacts.
+- Added a GitHub Actions workflow that runs after pull requests are merged into `main`, builds the merged commit, and posts the released version plus matching changelog notes to Discord.
+- The Discord notification workflow is configured to use a repository secret for the webhook URL instead of hardcoding the credential in the repository.
 
 ## 0.2.4
 
