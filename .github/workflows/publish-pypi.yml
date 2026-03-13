@@ -1,15 +1,87 @@
 name: Publish to PyPI
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
+
 jobs:
+  detect-release-state:
+    name: Detect release state
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.decide.outputs.should_publish }}
+      version_changed: ${{ steps.version.outputs.version_changed }}
+      new_version: ${{ steps.version.outputs.new_version }}
+      exists_on_pypi: ${{ steps.pypi.outputs.exists_on_pypi }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect version change
+        id: version
+        shell: bash
+        run: |
+          before_sha="${{ github.event.before }}"
+          old_version=""
+
+          if [ "$before_sha" != "0000000000000000000000000000000000000000" ]; then
+            old_version="$(git show "${before_sha}:pyproject.toml" 2>/dev/null | sed -n 's/^version = "\(.*\)"/\1/p' | head -n 1)"
+          fi
+
+          new_version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)"
+
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$new_version" ] && [ "$old_version" != "$new_version" ]; then
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check whether version exists on PyPI
+        id: pypi
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.new_version }}"
+          package="myteam"
+
+          if [ -z "$version" ]; then
+            echo "exists_on_pypi=unknown" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          status="$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/${package}/${version}/json")"
+
+          if [ "$status" = "200" ]; then
+            echo "exists_on_pypi=true" >> "$GITHUB_OUTPUT"
+          elif [ "$status" = "404" ]; then
+            echo "exists_on_pypi=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unexpected PyPI response: $status"
+            exit 1
+          fi
+
+      - name: Decide whether to publish
+        id: decide
+        shell: bash
+        run: |
+          if [ "${{ steps.version.outputs.version_changed }}" = "true" ] && \
+             [ "${{ steps.pypi.outputs.exists_on_pypi }}" = "false" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build distributions
+    needs: detect-release-state
+    if: needs.detect-release-state.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -35,9 +107,9 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: [detect-release-state, build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: needs.detect-release-state.outputs.should_publish == 'true'
     permissions:
       id-token: write
 
