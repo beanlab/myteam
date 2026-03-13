@@ -48,3 +48,6 @@ htmlcov/
 # IDEs
 .idea/
 .vscode/
+
+# Local scratch space
+scratch/
