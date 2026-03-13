@@ -1,19 +1,20 @@
-[build-system]
-requires = ["uv-build>=0.2"]
-build-backend = "uv_build"
-
 [project]
 name = "myteam"
-version = "0.1.2"
+version = "0.2.4"
 description = "Agent roster CLI"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fire>=0.5",
     "requests>=2.32.5",
+    "pyyaml>=6.0",
 ]
 authors = [{ name = "BeanLab" }]
 license = { file = "LICENSE" }
 
 [project.scripts]
 myteam = "myteam.cli:main"
+
+[build-system]
+requires = ["uv-build>=0.2"]
+build-backend = "uv_build"
