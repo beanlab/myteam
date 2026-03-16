@@ -1,3 +1,5 @@
+import subprocess
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Callable
 
@@ -141,6 +143,145 @@ def _print_info(
         print(f" {name} ".center(30, '-'))
         if info := get_info(cur_dir):
             print(info)
+    print()
+
+
+def _matches_tree_glob(path: Path, root: Path, glob: str) -> bool:
+    return path.relative_to(root).match(glob)
+
+
+def _is_excluded_tree_path(path: Path, root: Path, exclude: tuple[str, ...]) -> bool:
+    relative_path = path.relative_to(root).as_posix()
+    return any(
+        fnmatch(path.name, pattern) or fnmatch(relative_path, pattern)
+        for pattern in exclude
+    )
+
+
+def _get_git_ignored_paths(root: Path) -> set[str]:
+    try:
+        repo_root_text = subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+
+    repo_root = Path(repo_root_text)
+    try:
+        relative_root = root.relative_to(repo_root)
+    except ValueError:
+        return set()
+
+    pathspec = relative_root.as_posix()
+    if not pathspec:
+        pathspec = "."
+
+    try:
+        output = subprocess.check_output(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "ls-files",
+                "--ignored",
+                "--exclude-standard",
+                "--others",
+                "--directory",
+                pathspec,
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+
+    ignored: set[str] = set()
+    prefix = "" if pathspec == "." else f"{pathspec.rstrip('/')}/"
+    for line in output.splitlines():
+        normalized = line.rstrip("/")
+        if prefix and normalized.startswith(prefix):
+            normalized = normalized.removeprefix(prefix)
+        ignored.add(normalized)
+    return ignored
+
+
+def _is_git_ignored_tree_path(path: Path, root: Path, ignored_paths: set[str]) -> bool:
+    relative_path = path.relative_to(root).as_posix()
+    for ignored in ignored_paths:
+        if relative_path == ignored or relative_path.startswith(f"{ignored}/"):
+            return True
+    return False
+
+
+def _collect_tree_entries(
+        root: Path,
+        folder: Path,
+        glob: str,
+        max_levels: int | None,
+        level: int,
+        exclude: tuple[str, ...],
+        ignored_paths: set[str],
+) -> list[tuple[Path, list[tuple[Path, list]]]]:
+    entries: list[tuple[Path, list[tuple[Path, list]]]] = []
+    children = sorted(folder.iterdir(), key=lambda path: (not path.is_dir(), path.name.lower(), path.name))
+
+    for child in children:
+        if _is_excluded_tree_path(child, root, exclude):
+            continue
+        if ignored_paths and _is_git_ignored_tree_path(child, root, ignored_paths):
+            continue
+
+        if child.is_dir():
+            if max_levels is not None and level > max_levels:
+                continue
+
+            descendants: list[tuple[Path, list[tuple[Path, list]]]] = []
+            if max_levels is None or level < max_levels:
+                descendants = _collect_tree_entries(root, child, glob, max_levels, level + 1, exclude, ignored_paths)
+
+            if descendants or glob == "*":
+                entries.append((child, descendants))
+            continue
+
+        if max_levels is not None and level > max_levels:
+            continue
+        if _matches_tree_glob(child, root, glob):
+            entries.append((child, []))
+
+    return entries
+
+
+def _print_tree_entries(entries: list[tuple[Path, list[tuple[Path, list]]]], prefix: str) -> None:
+    for index, (path, children) in enumerate(entries):
+        is_last = index == len(entries) - 1
+        branch = "\\-- " if is_last else "|-- "
+        extension = "    " if is_last else "|   "
+        print(f"{prefix}{branch}{path.name}")
+        if children:
+            _print_tree_entries(children, prefix + extension)
+
+
+def print_directory_tree(
+        root: Path,
+        glob: str = "*",
+        max_levels: int | None = None,
+        exclude: tuple[str, ...] = (".*", "_*"),
+        use_gitignore: bool = True,
+        relative_to: Path | None = None,
+) -> None:
+    root = root.resolve()
+    header = root.name or root.as_posix()
+    if relative_to is not None:
+        header = root.relative_to(relative_to.resolve()).as_posix()
+
+    print(header)
+    ignored_paths = _get_git_ignored_paths(root) if use_gitignore else set()
+    _print_tree_entries(
+        _collect_tree_entries(root, root, glob, max_levels, 1, exclude, ignored_paths),
+        "",
+    )
     print()
 
 
