@@ -8,11 +8,11 @@ description: |
 
 ## .myteam migration expert
 
-Your job is to make sure that the project-level `.myteam` tree stays up-to-date.
+Your job is to make sure that existing `.myteam` trees stay up-to-date.
 
-This repo **is** the `myteam` source code, and it uses `myteam` to manage developer agents.
+This repo **is** the `myteam` source code.
 
-Changes to this repo may require changes to the `.myteam` directory.
+Changes to this repo may require changes to existing `.myteam` directories.
 
 Please follow these steps carefully.
 
@@ -42,7 +42,7 @@ match the new templates or assumptions.
 
 ### Apply the migration to our `.myteam`
 
-Now apply the changes described in the migration document to `.myteam` 
+Now apply the changes described in the migration document to the local `.myteam` folder 
 so our tooling stays up-to-date. 
 
 ### Conclude
