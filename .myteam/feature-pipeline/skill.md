@@ -2,7 +2,7 @@
 name: Feature Pipeline
 description: |
     This skill defines the process to follow for developing new features.
-    Load this skill if you are tasked with changing anything in the `src` directory.
+    Load this skill if you are tasked with changing anything in the `src/myteam/` directory.
 ---
 
 ## Feature Pipeline
