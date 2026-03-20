@@ -10,6 +10,10 @@ def test_init_creates_root_agent_system(run_myteam, tmp_path: Path):
     assert (tmp_path / "AGENTS.md").exists()
     assert (tmp_path / ".myteam" / "role.md").exists()
     assert (tmp_path / ".myteam" / "load.py").exists()
+    assert (tmp_path / ".myteam" / ".myteam-version").exists()
+    assert (tmp_path / ".myteam" / "myteam" / "skill.md").exists()
+    assert (tmp_path / ".myteam" / "myteam" / "migrate" / "skill.md").exists()
+    assert (tmp_path / ".myteam" / "myteam" / "changelog" / "skill.md").exists()
 
 
 def test_init_preserves_existing_agents_md(run_myteam, tmp_path: Path):

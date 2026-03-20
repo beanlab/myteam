@@ -83,7 +83,17 @@ This creates:
 ```text
 AGENTS.md
 .myteam/
+  .myteam-version
   load.py
+  myteam/
+    load.py
+    skill.md
+    migrate/
+      load.py
+      skill.md
+    changelog/
+      load.py
+      skill.md
   role.md
 ```
 
@@ -95,6 +105,10 @@ instructions with:
 ```bash
 myteam get role
 ```
+
+The generated root role also tracks the `myteam` version that created the tree. If a newer installed
+`myteam` release is available later, the root role can alert the agent to review `myteam/migrate`
+and `myteam/changelog`.
 
 Create a sub-role and a skill:
 
@@ -119,7 +133,17 @@ Example:
 ```text
 AGENTS.md
 .myteam/
+  .myteam-version
   load.py
+  myteam/
+    load.py
+    skill.md
+    changelog/
+      load.py
+      skill.md
+    migrate/
+      load.py
+      skill.md
   role.md
   developer/
     load.py
@@ -184,6 +208,11 @@ Behavior:
 
 Creates the root `.myteam/` role and `AGENTS.md` in the current directory.
 
+It also:
+
+- stores the current `myteam` version in `.myteam/.myteam-version`
+- scaffolds built-in maintenance skills under `.myteam/myteam/`
+
 ### `myteam new role <path>`
 
 Creates a new role under `.myteam/` with:
@@ -220,6 +249,8 @@ Loads a role's instructions.
 
 - omit `path` to load the root role at `.myteam/`
 - use slash-delimited paths for nested roles
+- when the root role was scaffolded by `myteam init`, it may print an upgrade notice if the installed
+  `myteam` version is newer than the tracked `.myteam` version
 
 Examples:
 
@@ -232,6 +263,8 @@ myteam get role engineer/frontend
 ### `myteam get skill <path>`
 
 Loads a skill's instructions.
+
+Built-in skills under `.myteam/myteam/` can surface packaged upgrade guidance and release notes.
 
 Examples:
 
@@ -253,6 +286,14 @@ Lists available downloadable rosters from the default roster repository.
 Downloads a roster into `.myteam/` by default.
 
 Useful when you want to seed an agent system from a reusable template instead of authoring it from scratch.
+
+There is no dedicated `myteam migrate` CLI command.
+
+For upgrade work:
+
+- load `myteam get skill myteam/migrate` to review packaged migration guidance
+- load `myteam get skill myteam/changelog` to review newer release notes
+- apply approved project-specific edits manually, including any `.myteam` version-file update
 
 ## Why Use Myteam
 

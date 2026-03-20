@@ -12,6 +12,7 @@ from . import __version__
 from .paths import APP_NAME, ENCODING, agents_root, base_dir, role_dir
 from .rosters import download_roster, list_available_rosters
 from .templates import get_template
+from .upgrade import ensure_builtin_upgrade_skills, write_tracked_version
 
 
 def ensure_dir(path: Path) -> None:
@@ -47,8 +48,11 @@ def init() -> None:
         "role",
         [".myteam"],
         "",
-        get_template("role_load_template.py"),
+        get_template("root_role_load_template.py"),
     )
+    myteam_root = agents_root(base_dir())
+    write_tracked_version(myteam_root)
+    ensure_builtin_upgrade_skills(myteam_root)
 
     agents_md = base_dir() / "AGENTS.md"
     if not agents_md.exists():

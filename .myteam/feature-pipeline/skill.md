@@ -46,7 +46,9 @@ Questions that might be relevant:
 Prepare a document in `src/governing_docs/feature_plans/<branch_name>.md`
 that describes the specific details and strategies decided on for the feature.
 
-When this step is complete, commit your changes.
+Get approval from the user on this document before continuing.
+
+When this step is complete, commit your changes before moving on.
 
 ### Update the interface document
 
@@ -57,11 +59,12 @@ It is the black-box description of the user's experience with the application.
 Based on the details in the feature plan document, determine how the 
 user interface of the application will change.
 
-Review these changes with the user. Make sure you are both on the same page.
-
 Update the `application_interface.md` document to reflect the new feature.
 
-When this step is complete, commit your changes.
+Review these changes with the user. Make sure you are both on the same page
+before you continue.
+
+When this step is complete, commit your changes before moving on.
 
 ### Refactor the framework
 
@@ -71,7 +74,7 @@ Following its guidance, make any necessary changes to the application framework.
 
 The existing tests should all still pass.
 
-When this step is complete, commit your changes.
+When this step is complete, commit your changes before moving on.
 
 ### Update the test suite
 
@@ -85,7 +88,7 @@ Make these changes to the test suite.
 Review the changes one more time: do they faithfully capture the new interface design?
 Make changes as needed.
 
-When this step is complete, commit your changes.
+When this step is complete, commit your changes before moving on.
 
 ### Implement the feature
 
@@ -94,7 +97,7 @@ implement the feature.
 
 The tests should pass. 
 
-When this step is complete, commit your changes.
+When this step is complete, commit your changes before moving on.
 
 ### Concluding the feature
 

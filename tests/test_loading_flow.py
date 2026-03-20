@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from myteam import __version__
+
 
 def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_project: Path):
     role_dir = initialized_project / ".myteam" / "developer"
@@ -168,3 +170,39 @@ def test_missing_skill_fails_clearly(run_myteam, initialized_project: Path):
 
     assert result.exit_code == 1
     assert "Not a skill: missing" in result.stderr
+
+
+def test_root_role_reports_upgrade_opportunity_when_tracked_version_is_older(run_myteam, initialized_project: Path):
+    (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "role")
+
+    assert result.exit_code == 0
+    assert "Upgrade Available" in result.stdout
+    assert "tracked at myteam 0.2.5" in result.stdout
+    assert f"installed version is {__version__}" in result.stdout
+    assert "myteam/migrate" in result.stdout
+    assert "myteam/changelog" in result.stdout
+    assert "Apply any approved project-specific updates manually" in result.stdout
+
+
+def test_builtin_changelog_skill_reports_newer_release_notes(run_myteam, initialized_project: Path):
+    (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "skill", "myteam/changelog")
+
+    assert result.exit_code == 0
+    assert "Use this skill when you need to explain what newer `myteam` releases added" in result.stdout
+    assert "New `myteam` features since 0.2.5" in result.stdout
+    assert "## 0.2.6" in result.stdout
+
+
+def test_builtin_migrate_skill_reports_pending_migration_notes(run_myteam, initialized_project: Path):
+    (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "skill", "myteam/migrate")
+
+    assert result.exit_code == 0
+    assert "Use the printed migration notes to update older `.myteam` folders" in result.stdout
+    assert "Pending migrations for `.myteam` tracked at 0.2.5" in result.stdout
+    assert "## 0.2.6 migration" in result.stdout
