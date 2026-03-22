@@ -35,3 +35,10 @@ def test_creating_existing_skill_fails_clearly(run_myteam, initialized_project: 
     assert first.exit_code == 0
     assert second.exit_code == 1
     assert "already exists" in second.stderr
+
+
+def test_creating_skill_in_reserved_builtin_namespace_fails_clearly(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "skill", "builtins/changelog")
+
+    assert result.exit_code == 1
+    assert "reserved built-in namespace 'builtins'" in result.stderr

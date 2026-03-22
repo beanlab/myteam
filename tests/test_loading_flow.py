@@ -181,15 +181,25 @@ def test_root_role_reports_upgrade_opportunity_when_tracked_version_is_older(run
     assert "Upgrade Available" in result.stdout
     assert "tracked at myteam 0.2.5" in result.stdout
     assert f"installed version is {__version__}" in result.stdout
-    assert "myteam/migrate" in result.stdout
-    assert "myteam/changelog" in result.stdout
-    assert "Apply any approved project-specific updates manually" in result.stdout
+    assert "assist with migrating this existing `.myteam` tree" in result.stdout
+    assert "myteam get skill builtins/migration" in result.stdout
+    assert "builtins/changelog" in result.stdout
+    assert "approved project-specific updates manually" in result.stdout
+
+
+def test_root_role_lists_packaged_builtin_skill_namespace(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "get", "role")
+
+    assert result.exit_code == 0
+    assert "*********** Skills ***********" in result.stdout
+    assert "---------- builtins ----------" in result.stdout
+    assert "Packaged maintenance and upgrade helpers" in result.stdout
 
 
 def test_builtin_changelog_skill_reports_newer_release_notes(run_myteam, initialized_project: Path):
     (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
 
-    result = run_myteam(initialized_project, "get", "skill", "myteam/changelog")
+    result = run_myteam(initialized_project, "get", "skill", "builtins/changelog")
 
     assert result.exit_code == 0
     assert "Use this skill when you need to explain what newer `myteam` releases added" in result.stdout
@@ -197,12 +207,35 @@ def test_builtin_changelog_skill_reports_newer_release_notes(run_myteam, initial
     assert "## 0.2.6" in result.stdout
 
 
-def test_builtin_migrate_skill_reports_pending_migration_notes(run_myteam, initialized_project: Path):
+def test_builtin_migration_skill_reports_pending_migration_notes(run_myteam, initialized_project: Path):
     (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
 
-    result = run_myteam(initialized_project, "get", "skill", "myteam/migrate")
+    result = run_myteam(initialized_project, "get", "skill", "builtins/migration")
 
     assert result.exit_code == 0
     assert "Use the printed migration notes to update older `.myteam` folders" in result.stdout
     assert "Pending migrations for `.myteam` tracked at 0.2.5" in result.stdout
     assert "## 0.2.6 migration" in result.stdout
+
+
+def test_builtin_parent_skill_lists_packaged_children(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "get", "skill", "builtins")
+
+    assert result.exit_code == 0
+    assert "Use these packaged built-in skills to review migration guidance" in result.stdout
+    assert "builtins/migration" in result.stdout
+    assert "builtins/changelog" in result.stdout
+
+
+def test_packaged_builtin_skill_namespace_does_not_use_project_override(run_myteam, initialized_project: Path):
+    skill_dir = initialized_project / ".myteam" / "builtins" / "changelog"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "skill.md").write_text("Project builtins override\n", encoding="utf-8")
+    (skill_dir / "load.py").write_text("print('LOCAL BUILTINS OVERRIDE')\n", encoding="utf-8")
+    (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "skill", "builtins/changelog")
+
+    assert result.exit_code == 0
+    assert "LOCAL BUILTINS OVERRIDE" not in result.stdout
+    assert "New `myteam` features since" in result.stdout

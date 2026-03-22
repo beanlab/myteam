@@ -85,19 +85,12 @@ AGENTS.md
 .myteam/
   .myteam-version
   load.py
-  myteam/
-    load.py
-    skill.md
-    migrate/
-      load.py
-      skill.md
-    changelog/
-      load.py
-      skill.md
   role.md
 ```
 
 The root `.myteam/` directory is the default root role.
+
+The packaged `builtins/` skill tree is available to load, but it is not created inside `.myteam/`.
 
 Edit `.myteam/role.md` with the instructions that should be given to the default agent. Then that agent can load its
 instructions with:
@@ -107,8 +100,8 @@ myteam get role
 ```
 
 The generated root role also tracks the `myteam` version that created the tree. If a newer installed
-`myteam` release is available later, the root role can alert the agent to review `myteam/migrate`
-and `myteam/changelog`.
+`myteam` release is available later, the root role can alert the agent to review
+`builtins/migration` and `builtins/changelog`.
 
 Create a sub-role and a skill:
 
@@ -135,15 +128,6 @@ AGENTS.md
 .myteam/
   .myteam-version
   load.py
-  myteam/
-    load.py
-    skill.md
-    changelog/
-      load.py
-      skill.md
-    migrate/
-      load.py
-      skill.md
   role.md
   developer/
     load.py
@@ -211,7 +195,7 @@ Creates the root `.myteam/` role and `AGENTS.md` in the current directory.
 It also:
 
 - stores the current `myteam` version in `.myteam/.myteam-version`
-- scaffolds built-in maintenance skills under `.myteam/myteam/`
+- makes the packaged `builtins/` maintenance skills available to load later
 
 ### `myteam new role <path>`
 
@@ -233,6 +217,8 @@ Creates a new skill under `.myteam/` with:
 
 - `skill.md`
 - `load.py`
+
+The reserved `builtins/` namespace is not available for project-defined skills.
 
 Examples:
 
@@ -264,7 +250,8 @@ myteam get role engineer/frontend
 
 Loads a skill's instructions.
 
-Built-in skills under `.myteam/myteam/` can surface packaged upgrade guidance and release notes.
+Paths under `builtins/` resolve from the packaged built-in skill tree. All other skill paths resolve
+from the project's `.myteam/` tree.
 
 Examples:
 
@@ -291,8 +278,8 @@ There is no dedicated `myteam migrate` CLI command.
 
 For upgrade work:
 
-- load `myteam get skill myteam/migrate` to review packaged migration guidance
-- load `myteam get skill myteam/changelog` to review newer release notes
+- load `myteam get skill builtins/migration` to review packaged migration guidance
+- load `myteam get skill builtins/changelog` to review newer release notes
 - apply approved project-specific edits manually, including any `.myteam` version-file update
 
 ## Why Use Myteam

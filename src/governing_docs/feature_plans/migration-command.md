@@ -22,22 +22,22 @@ project tree.
 - [x] Keep using the current `migration-command` branch for this work.
 - [x] Define a persistent version marker inside `.myteam/`.
 - [x] Ensure `myteam init` writes the current `myteam` version into a newly created `.myteam/`.
-- [ ] Stop copying built-in maintenance skills into `.myteam/` during `myteam init`.
-- [ ] Keep built-in maintenance skills inside the installed Python package, under the reserved
-  `myteam/` prefix.
-- [ ] Add a utility surface for packaged built-in skills so they can be listed alongside project
-  skills during discovery.
-- [ ] Resolve `myteam get skill <path>` by checking project-local `.myteam/` skills first, then
-  packaged built-in skills, then failing clearly if neither exists.
-- [ ] Update the default root role loader so it warns when the installed `myteam` version is newer
+- [x] Stop copying built-in maintenance skills into `.myteam/` during `myteam init`.
+- [x] Keep built-in maintenance skills inside the installed Python package, under the reserved
+  `builtins/` prefix.
+- [x] Expose the reserved built-in namespace in root skill discovery without copying it into the
+  project tree.
+- [x] Resolve `myteam get skill builtins/...` from the packaged built-in tree and all other skill
+  paths from `.myteam/`.
+- [x] Update the default root role loader so it warns when the installed `myteam` version is newer
   than the stored `.myteam` version and tells the agent how to proceed if the user approves a
   migration.
-- [ ] Provide a packaged `myteam/migration` skill that exposes migration guidance derived from the
+- [x] Provide a packaged `builtins/migration` skill that exposes migration guidance derived from the
   packaged migration documents.
-- [ ] Provide a packaged `myteam/changelog` skill that exposes changelog entries newer than the
+- [x] Provide a packaged `builtins/changelog` skill that exposes changelog entries newer than the
   stored `.myteam` version.
 - [x] Remove the `myteam migrate` CLI command and any command-oriented migration behavior.
-- [ ] Add high-level tests that exercise packaged built-in skill discovery, loading, and the
+- [x] Add high-level tests that exercise packaged built-in skill discovery, loading, and the
   version-mismatch prompt flow through the CLI.
 
 ## Non-Goals
@@ -61,18 +61,18 @@ later written by a user- or agent-led migration change.
    version and prints an upgrade notice when newer features are available.
 
 Packaged maintenance skills should live inside `src/myteam/` similarly to templates and migrations.
-They are not copied into `.myteam/`. The reserved built-in namespace is `myteam/`.
+They are not copied into `.myteam/`. The reserved built-in namespace is `builtins/`.
 
 Skill discovery and loading should work as follows:
 
-1. Project-local skills under `.myteam/` remain the primary source of truth.
-2. Packaged built-in skills are exposed as a secondary source under the `myteam/` prefix.
-3. `myteam get skill <path>` first resolves the requested skill from `.myteam/`.
-4. If no project-local skill exists, `myteam get skill <path>` checks the packaged built-ins.
-5. If neither source contains the skill, the command fails with the current clear error path.
+1. Project-local skills under `.myteam/` remain the source of truth for ordinary skill paths.
+2. Packaged built-in skills are exposed under the reserved `builtins/` prefix.
+3. `myteam get skill builtins/...` resolves only from the packaged built-in tree.
+4. All other `myteam get skill <path>` calls resolve only from `.myteam/`.
+5. The root role can still list the `builtins` namespace as a discoverable entry point.
 
-This preserves local override behavior while making packaged maintenance skills always available to
-legacy projects that never received copied built-ins.
+This avoids shadowing or override ambiguity while making packaged maintenance skills always
+available to legacy projects that never received copied built-ins.
 
 Migration itself should be agent-mediated rather than command-driven:
 
@@ -80,12 +80,12 @@ Migration itself should be agent-mediated rather than command-driven:
 2. The warning text should explicitly say the agent can assist with migrating the existing
    `.myteam/` tree.
 3. The warning text should also say that if the user agrees, the agent should load
-   `myteam get skill myteam/migration` in order to perform the migration correctly.
+   `myteam get skill builtins/migration` in order to perform the migration correctly.
 4. The agent alerts the user of the available migration and waits for approval before taking
    migration steps.
-5. After approval, the agent loads `myteam/migration` to read the packaged migration guidance for
+5. After approval, the agent loads `builtins/migration` to read the packaged migration guidance for
    newer versions.
-6. The agent may also review `myteam/changelog` to explain what features were added.
+6. The agent may also review `builtins/changelog` to explain what features were added.
 7. The agent proposes concrete edits for the specific project, including any needed changes to
    customized `load.py` files.
 8. The user approves those edits before the agent applies them.
@@ -111,14 +111,14 @@ and the agent could find the full migration documentation (not just the default 
 
 ## Design Notes
 
-- The built-in skill name should be `myteam/migration`, not `myteam/migrate`, to match the
-  user-facing wording in the root-role prompt.
+- The reserved built-in namespace should remain configurable via a global constant even though the
+  current branch uses `builtins/`.
 - Packaged built-in skills need a loading path that does not assume their `load.py` lives inside
   the project `.myteam/` tree. The current built-in load templates depend on `__file__` being under
   `.myteam/`, so the implementation should introduce an explicit way for packaged skills to find the
   active project root and print their definition content.
-- Discovery output should make packaged built-ins appear like regular skills from the agent's point
-  of view, even though they are sourced from the installed package rather than the project tree.
+- Discovery output should expose the reserved `builtins` root so agents can discover the packaged
+  maintenance skills without those skills being copied into `.myteam/`.
 
 ## Notes
 

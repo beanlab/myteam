@@ -5,11 +5,9 @@ import re
 from pathlib import Path
 
 from . import __version__
-from .paths import ENCODING
-from .templates import get_template
+from .paths import BUILTIN_ROOT_NAME, ENCODING
 
 TRACKED_VERSION_FILENAME = ".myteam-version"
-BUILTIN_SKILL_PATH = ("myteam",)
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _CHANGELOG_HEADING_RE = re.compile(r"^##\s+(\d+\.\d+\.\d+)\s*$")
 
@@ -169,47 +167,12 @@ def print_upgrade_notice(myteam_root: Path, current_version: str = __version__) 
             f"This `.myteam` tree is tracked at myteam {tracked_version}, "
             f"but the installed version is {current_version}."
         )
-    print("Load `myteam/migrate` for packaged migration guidance and `myteam/changelog` for release notes.")
-    print("Apply any approved project-specific updates manually, then update the tracked version as part of those edits.\n")
-
-
-def ensure_builtin_upgrade_skills(myteam_root: Path, overwrite: bool = False) -> list[str]:
-    created: list[str] = []
-    builtin_root = myteam_root.joinpath(*BUILTIN_SKILL_PATH)
-    builtin_specs = (
-        (
-            builtin_root,
-            {
-                "skill.md": get_template("builtin_myteam_skill_definition.md"),
-                "load.py": get_template("skill_load_template.py"),
-            },
-            "myteam",
-        ),
-        (
-            builtin_root / "migrate",
-            {
-                "skill.md": get_template("builtin_migrate_skill_definition.md"),
-                "load.py": get_template("builtin_migrate_skill_load_template.py"),
-            },
-            "myteam/migrate",
-        ),
-        (
-            builtin_root / "changelog",
-            {
-                "skill.md": get_template("builtin_changelog_skill_definition.md"),
-                "load.py": get_template("builtin_changelog_skill_load_template.py"),
-            },
-            "myteam/changelog",
-        ),
+    print("The agent can assist with migrating this existing `.myteam` tree if you want to proceed.")
+    print(
+        f"If the user agrees, load `myteam get skill {BUILTIN_ROOT_NAME}/migration` "
+        "to perform the migration correctly."
     )
-
-    for directory, files, display_name in builtin_specs:
-        directory.mkdir(parents=True, exist_ok=True)
-        for filename, contents in files.items():
-            path = directory / filename
-            if overwrite or not path.exists():
-                path.write_text(contents, encoding=ENCODING)
-        created.append(display_name)
-
-    return created
-
+    print(
+        f"Load `myteam get skill {BUILTIN_ROOT_NAME}/changelog` for release notes, "
+        "and apply approved project-specific updates manually.\n"
+    )

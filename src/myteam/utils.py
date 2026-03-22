@@ -1,11 +1,15 @@
 import subprocess
+import os
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Callable
 
 import yaml
 
+from myteam.paths import BUILTIN_ROOT_NAME, builtin_agents_root
 from myteam.templates import get_template
+
+PROJECT_ROOT_ENV_VAR = "MYTEAM_PROJECT_ROOT"
 
 
 def get_myteam_root(cur_dir: Path):
@@ -15,6 +19,13 @@ def get_myteam_root(cur_dir: Path):
             return d
         d = d.parent
     return cur_dir
+
+
+def get_active_myteam_root(cur_dir: Path) -> Path:
+    configured_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    if configured_root:
+        return Path(configured_root)
+    return get_myteam_root(cur_dir)
 
 
 def _print_block(text: str) -> None:
@@ -35,11 +46,15 @@ def _strip_yaml_frontmatter(text: str) -> str:
     return text
 
 
+def print_text_block(text: str) -> None:
+    _print_block(_strip_yaml_frontmatter(text))
+
+
 def print_instructions(base: Path):
     for file in ['role.md', 'ROLE.md', 'skill.md', 'SKILL.md']:
         instructions_file = base / file
         if instructions_file.exists():
-            _print_block(_strip_yaml_frontmatter(instructions_file.read_text(encoding='utf-8')))
+            print_text_block(instructions_file.read_text(encoding='utf-8'))
             return
 
 
@@ -63,7 +78,11 @@ def _parse_yaml_frontmatter(file: Path) -> dict[str, str]:
     if not file.exists():
         return {}
 
-    lines = file.read_text(encoding="utf-8").splitlines()
+    return _parse_yaml_frontmatter_text(file.read_text(encoding="utf-8"))
+
+
+def _parse_yaml_frontmatter_text(text: str) -> dict[str, str]:
+    lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return {}
 
@@ -118,6 +137,36 @@ def _get_folder_info(folder: Path, definition_stem: str) -> str:
     return ""
 
 
+def _builtin_skill_dir(skill_path: str) -> Path:
+    parts = skill_path.split("/")
+    if not parts or parts[0] != BUILTIN_ROOT_NAME:
+        return builtin_agents_root().joinpath(*parts)
+    return builtin_agents_root().joinpath(*parts[1:])
+
+
+def is_builtin_skill_dir(folder: Path) -> bool:
+    return is_skill_dir(folder) and _is_under_builtin_root(folder)
+
+def builtin_skill_dir(skill_path: str) -> Path:
+    return _builtin_skill_dir(skill_path)
+
+
+def has_builtin_skill(skill_path: str) -> bool:
+    return is_builtin_skill_dir(_builtin_skill_dir(skill_path))
+
+
+def _is_under_builtin_root(folder: Path) -> bool:
+    try:
+        folder.resolve().relative_to(builtin_agents_root().resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _builtin_root_info() -> str:
+    return _get_folder_info(builtin_agents_root(), "skill")
+
+
 def _is_py_file(file: Path) -> bool:
     return file.is_file() and file.suffix == '.py'
 
@@ -142,6 +191,19 @@ def _print_info(
         name = cur_dir.relative_to(base_dir).as_posix()
         print(f" {name} ".center(30, '-'))
         if info := get_info(cur_dir):
+            print(info)
+    print()
+
+
+def _print_named_info(header: str, entries: list[tuple[str, str]]) -> None:
+    if not entries:
+        return
+
+    print()
+    print(f' {header} '.center(30, '*'))
+    for name, info in entries:
+        print(f" {name} ".center(30, '-'))
+        if info:
             print(info)
     print()
 
@@ -297,14 +359,27 @@ def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
 
 
 def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
-    _print_info(
-        'Skills',
-        folder,
-        base_dir,
-        ignore,
-        is_skill_dir,
-        lambda skill_dir: _get_folder_info(skill_dir, "skill"),
-    )
+    effective_ignore = list(ignore)
+    entries: list[tuple[str, str]] = []
+    if folder == base_dir and not _is_under_builtin_root(folder):
+        effective_ignore.append(BUILTIN_ROOT_NAME)
+
+    if folder.exists():
+        for skill_dir in sorted(
+            (
+                path
+                for path in folder.iterdir()
+                if is_skill_dir(path) and path.name not in effective_ignore
+            ),
+            key=lambda path: path.name,
+        ):
+            name = skill_dir.relative_to(base_dir).as_posix()
+            entries.append((name, _get_folder_info(skill_dir, "skill")))
+
+    if folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
+        entries.append((BUILTIN_ROOT_NAME, _builtin_root_info()))
+
+    _print_named_info('Skills', entries)
 
 
 def list_tools(folder: Path, base_dir: Path, ignore: list[str]):

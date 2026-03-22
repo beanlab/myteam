@@ -26,7 +26,7 @@ The intended workflow is:
 - Roles and skills are organized as nested directories under `.myteam/`.
 - A loadable role directory contains `role.md` or `ROLE.md` and a `load.py`.
 - A loadable skill directory contains `skill.md` or `SKILL.md` and a `load.py`.
-- Packaged built-in skills also exist under the reserved `myteam/` namespace and are loadable even
+- Packaged built-in skills also exist under the reserved `builtins/` namespace and are loadable even
   though they do not live in the project's `.myteam/` directory.
 - Instruction files may contain YAML frontmatter. When a role or skill is loaded, the frontmatter is not shown in the printed instructions.
 
@@ -38,8 +38,8 @@ At the black-box level, `myteam` provides these categories of behavior:
 - It can scaffold new role and skill nodes inside that tree.
 - It can record which `myteam` version last initialized or refreshed a `.myteam/` tree.
 - It can load and print instructions for a role or skill.
-- It can resolve a requested skill from the project `.myteam/` tree first and from packaged built-in
-  skills second.
+- It can resolve skills from either the project `.myteam/` tree or the packaged built-in tree,
+  depending on the requested namespace.
 - It can alert the caller when the installed `myteam` version is newer than the tracked `.myteam` version.
 - It can expose packaged migration and changelog guidance through built-in maintenance skills.
 - It can remove a previously created node.
@@ -75,7 +75,7 @@ User-visible result:
 
 - After success, the current directory is ready for `myteam get role`.
 - The generated root role can later detect when the installed `myteam` release is newer than the stored `.myteam` version.
-- Packaged maintenance skills under the reserved `myteam/` namespace are available for later use
+- Packaged maintenance skills under the reserved `builtins/` namespace are available for later use
   without being copied into the project tree.
 
 ### `myteam new role <path>`
@@ -145,7 +145,7 @@ User-visible result:
 - If the tracked `.myteam` version file is missing, the generated root role treats the tree as an untracked legacy `.myteam` tree and may still print upgrade guidance instead of failing.
 - The generated root role can tell the caller that it may assist with migrating the existing
   `.myteam/` tree and that, if the user agrees, the agent should load
-  `myteam get skill myteam/migration` to perform the migration correctly.
+  `myteam get skill builtins/migration` to perform the migration correctly.
 
 Failure conditions that matter at the interface:
 
@@ -163,7 +163,8 @@ Inputs:
 
 Expected outcome on success:
 
-- Resolves the target path from `.myteam/` first, then from the packaged built-in skill set.
+- Resolves `builtins/...` from the packaged built-in skill tree.
+- Resolves all other skill paths from `.myteam/`.
 - Executes the resolved skill's loader.
 - Prints the skill instructions.
 - Prints any child roles, child skills, and Python tools exposed from that node by the loader.
@@ -171,14 +172,12 @@ Expected outcome on success:
 User-visible result:
 
 - The caller receives the instructions and local discovery context for that skill.
-- A project-local skill takes precedence over a packaged built-in skill with the same path.
 - Built-in maintenance skills may additionally print migration guidance or release notes derived from the installed `myteam` package.
 - If the tracked `.myteam` version file is missing, built-in maintenance skills treat the tree as an untracked legacy `.myteam` tree and still print the relevant upgrade guidance.
 
 Failure conditions that matter at the interface:
 
-- If the target path is not a valid skill in either the project tree or the packaged built-in set,
-  the command exits with an error.
+- If the target path is not a valid skill in the selected source tree, the command exits with an error.
 - If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
 - If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
 
@@ -265,9 +264,10 @@ The following behavior is part of the current application contract:
 - Paths are interpreted relative to the current working directory.
 - Nested role and skill names use slash-delimited paths.
 - Instruction loading is driven by executable `load.py` files stored alongside role and skill definitions.
-- The `myteam/` skill namespace is reserved for packaged built-in skills shipped with the installed
+- The `builtins/` skill namespace is reserved for packaged built-in skills shipped with the installed
   `myteam` version.
-- Skill resolution checks project `.myteam/` content before packaged built-ins.
+- `builtins/...` paths resolve only from the packaged built-in tree.
+- All other skill paths resolve only from project `.myteam/`.
 - Role and skill metadata may be surfaced from YAML frontmatter in definition files.
 - A `.myteam/` tree may carry a stored `myteam` version used for upgrade notices and migration guidance.
 - Upgrade guidance is surfaced through the generated root role and built-in maintenance skills, not through a dedicated migration CLI command.

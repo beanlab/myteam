@@ -1,5 +1,5 @@
 ---
-name: Migrate
+name: Migration
 description: |
   Review packaged migration guidance for this `.myteam` tree.
   Load this skill to assist with updating an existing `.myteam` to the latest version.
