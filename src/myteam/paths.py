@@ -5,6 +5,7 @@ from pathlib import Path
 
 APP_NAME = "myteam"
 AGENTS_DIRNAME = ".myteam"
+BUILTIN_ROOT_NAME = "builtins"
 ENCODING = "utf-8"
 
 
@@ -15,6 +16,10 @@ def base_dir() -> Path:
 
 def agents_root(base: Path) -> Path:
     return base / AGENTS_DIRNAME
+
+
+def builtin_agents_root() -> Path:
+    return Path(__file__).resolve().parent / "builtins"
 
 
 def role_dir(base: Path, role: str) -> Path:

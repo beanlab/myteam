@@ -83,11 +83,14 @@ This creates:
 ```text
 AGENTS.md
 .myteam/
+  .myteam-version
   load.py
   role.md
 ```
 
 The root `.myteam/` directory is the default root role.
+
+The packaged `builtins/` skill tree is available to load, but it is not created inside `.myteam/`.
 
 Edit `.myteam/role.md` with the instructions that should be given to the default agent. Then that agent can load its
 instructions with:
@@ -95,6 +98,10 @@ instructions with:
 ```bash
 myteam get role
 ```
+
+The generated root role also tracks the `myteam` version that created the tree. If a newer installed
+`myteam` release is available later, the root role can alert the agent to review
+`builtins/migration` and `builtins/changelog`.
 
 Create a sub-role and a skill:
 
@@ -119,6 +126,7 @@ Example:
 ```text
 AGENTS.md
 .myteam/
+  .myteam-version
   load.py
   role.md
   developer/
@@ -184,6 +192,11 @@ Behavior:
 
 Creates the root `.myteam/` role and `AGENTS.md` in the current directory.
 
+It also:
+
+- stores the current `myteam` version in `.myteam/.myteam-version`
+- makes the packaged `builtins/` maintenance skills available to load later
+
 ### `myteam new role <path>`
 
 Creates a new role under `.myteam/` with:
@@ -205,6 +218,8 @@ Creates a new skill under `.myteam/` with:
 - `skill.md`
 - `load.py`
 
+The reserved `builtins/` namespace is not available for project-defined skills.
+
 Examples:
 
 ```bash
@@ -220,6 +235,8 @@ Loads a role's instructions.
 
 - omit `path` to load the root role at `.myteam/`
 - use slash-delimited paths for nested roles
+- when the root role was scaffolded by `myteam init`, it may print an upgrade notice if the installed
+  `myteam` version is newer than the tracked `.myteam` version
 
 Examples:
 
@@ -232,6 +249,9 @@ myteam get role engineer/frontend
 ### `myteam get skill <path>`
 
 Loads a skill's instructions.
+
+Paths under `builtins/` resolve from the packaged built-in skill tree. All other skill paths resolve
+from the project's `.myteam/` tree.
 
 Examples:
 
@@ -253,6 +273,14 @@ Lists available downloadable rosters from the default roster repository.
 Downloads a roster into `.myteam/` by default.
 
 Useful when you want to seed an agent system from a reusable template instead of authoring it from scratch.
+
+There is no dedicated `myteam migrate` CLI command.
+
+For upgrade work:
+
+- load `myteam get skill builtins/migration` to review packaged migration guidance
+- load `myteam get skill builtins/changelog` to review newer release notes
+- apply approved project-specific edits manually, including any `.myteam` version-file update
 
 ## Why Use Myteam
 

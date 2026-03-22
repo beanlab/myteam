@@ -1,17 +1,19 @@
 """Command implementations for the myteam CLI."""
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from myteam.utils import is_role_dir, is_skill_dir
+from myteam.utils import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
 
 from . import __version__
-from .paths import APP_NAME, ENCODING, agents_root, base_dir, role_dir
+from .paths import APP_NAME, BUILTIN_ROOT_NAME, ENCODING, agents_root, base_dir, role_dir
 from .rosters import download_roster, list_available_rosters
 from .templates import get_template
+from .upgrade import write_tracked_version
 
 
 def ensure_dir(path: Path) -> None:
@@ -47,8 +49,10 @@ def init() -> None:
         "role",
         [".myteam"],
         "",
-        get_template("role_load_template.py"),
+        get_template("root_role_load_template.py"),
     )
+    myteam_root = agents_root(base_dir())
+    write_tracked_version(myteam_root)
 
     agents_md = base_dir() / "AGENTS.md"
     if not agents_md.exists():
@@ -67,6 +71,9 @@ def new_role(role: str) -> None:
 
 
 def new_skill(skill: str) -> None:
+    if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
+        print(f"Skill path '{skill}' uses the reserved built-in namespace '{BUILTIN_ROOT_NAME}'.", file=sys.stderr)
+        raise SystemExit(1)
     new_dir(
         agents_root(base_dir()),
         "skill",
@@ -94,7 +101,7 @@ def remove(name: str) -> None:
         raise SystemExit(1)
 
 
-def get_name(dir_type: str, name_dir: Path, name: str | None) -> None:
+def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path | None = None) -> None:
     if not name_dir.exists():
         print(
             f"{dir_type.title()} '{name}' not found. Run 'myteam new {dir_type} {name}' to create it.",
@@ -108,7 +115,11 @@ def get_name(dir_type: str, name_dir: Path, name: str | None) -> None:
         raise SystemExit(1)
 
     try:
-        result = subprocess.run([sys.executable, str(load_py)], cwd=name_dir, check=False)
+        env = None
+        if project_root is not None:
+            env = dict(os.environ)
+            env[PROJECT_ROOT_ENV_VAR] = str(project_root)
+        result = subprocess.run([sys.executable, str(load_py)], cwd=name_dir, env=env, check=False)
         raise SystemExit(result.returncode)
     except OSError as exc:
         print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
@@ -129,11 +140,19 @@ def get_role(role: str | None = None) -> None:
 
 def get_skill(skill: str) -> None:
     """Print the instructions for the given skill if available."""
-    folder = agents_root(base_dir()).joinpath(*skill.split("/"))
-    if not is_skill_dir(folder):
-        print(f"Not a skill: {skill}", file=sys.stderr)
-        raise SystemExit(1)
-    get_name("skill", folder, skill)
+    project_root = agents_root(base_dir())
+    if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
+        folder = builtin_skill_dir(skill)
+        if not is_skill_dir(folder):
+            print(f"Not a skill: {skill}", file=sys.stderr)
+            raise SystemExit(1)
+        get_name("skill", folder, skill, project_root=project_root)
+
+    folder = project_root.joinpath(*skill.split("/"))
+    if is_skill_dir(folder):
+        get_name("skill", folder, skill, project_root=project_root)
+    print(f"Not a skill: {skill}", file=sys.stderr)
+    raise SystemExit(1)
 
 
 def version() -> str:
