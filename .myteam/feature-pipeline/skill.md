@@ -78,7 +78,7 @@ When this step is complete, commit your changes before moving on.
 
 ### Update the test suite
 
-Load the `testing-philosophy` skill.
+Load the `testing` skill.
 
 Review the existing tests. Identify changes that need to be made to test suite
 to bring it in line with the updated interface document.
