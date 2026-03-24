@@ -15,6 +15,14 @@ license = { file = "LICENSE" }
 [project.scripts]
 myteam = "myteam.cli:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [build-system]
 requires = ["uv-build>=0.2"]
 build-backend = "uv_build"
