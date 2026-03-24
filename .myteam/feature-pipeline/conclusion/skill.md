@@ -34,8 +34,8 @@ Follow guidance in the `git-commit` skill.
 If any code or templates have changed, then the version in `pyproject.toml` needs to change.
 
 Because we are still in *preview*, the leading version will stay at 0.
-If the public interface has changed, the minor version should increase.
-If the public interface has not changed, just the patch version should increase.
+If the public interface has a breaking change, the minor version should increase.
+If the public interface has no breaking changes, just the patch version should increase.
 
 Please describe the scope of the changes in the current branch and determine what version bump is needed.
 Then inspect the version:

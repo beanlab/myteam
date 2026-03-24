@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.2.6
+
+- `myteam init` now stores the creating `myteam` version in `.myteam/.myteam-version`.
+- Built-in maintenance skills now live inside the package under the reserved `builtins/` namespace
+  instead of being scaffolded into project `.myteam/` trees.
+- The default root role loader now alerts the agent when the installed `myteam` version is newer than the tracked `.myteam` version.
+- Added packaged migration notes for upgrading older `.myteam` trees to the new tracked-version and built-in maintenance-skill flow.
+- Upgrade guidance is now agent-mediated through the root-role notice plus the built-in `builtins/migration` and `builtins/changelog` skills, rather than a dedicated migration command.
+
 ## 0.2.5
 
 - Refactored the CLI module so `src/myteam/cli.py` now only contains command wiring and `main()`.

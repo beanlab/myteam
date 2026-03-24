@@ -3,13 +3,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import print_instructions, get_active_myteam_root, list_roles, list_skills, list_tools
+from myteam.upgrade import print_release_notes
+from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills, list_tools
 
 
 def main() -> int:
-    base = Path(__file__).resolve().parent  # .myteam/<role>
+    base = Path(__file__).resolve().parent
+    myteam = get_myteam_root(base)
+
     print_instructions(base)
-    myteam = get_active_myteam_root(base)
+    print_release_notes(myteam)
     list_roles(base, myteam, [])
     list_skills(base, myteam, [])
     list_tools(base, myteam, [])
