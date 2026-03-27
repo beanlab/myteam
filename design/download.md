@@ -43,9 +43,10 @@ Behavior:
 
 ## Scope Boundaries
 
-- `get role` and `get skill` should remain unchanged
 - remote content should not be fetched dynamically during role or skill loading
-- this design does not yet define trust verification for downloaded content
+- this design does not yet define the full trust verification model for downloaded content
+- future trust work may add verification-state checks to `get role` and `get skill` without making
+  loading networked
 - this design does not yet define an interactive merge strategy for dirty local copies
 
 ## Implementation Notes
