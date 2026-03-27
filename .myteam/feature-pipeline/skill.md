@@ -29,9 +29,18 @@ to name the branch, get enough details to select a reasonable name.
 The name does NOT need to be perfect; as long as it 
 is loosely relevant, it will work great.
 
-### Plan the feature
+### Understand the feature and update the interface document
 
-The goal of this step is to thoroughly understand the requested feature.
+The goal of this step is to thoroughly understand the requested feature
+and document how the primary interface of the application should be changed.
+
+First read `src/governing_docs/application_interface.md` to understand
+the current design and intent of the project.
+This document describes what this app should do, how it behaves, etc.
+It is the black-box description of the user's experience with the application.
+
+Then seek to understand what the user wants to change. 
+Is it a new behavior? Modifying an existing behavior? A bugfix?
 
 Questions that might be relevant:
 
@@ -43,19 +52,6 @@ Questions that might be relevant:
   - Is there documentation via skills or in the repo that suggests a strategy?
   - Does the user have an opinion on which strategy is used?
 
-Prepare a document in `src/governing_docs/feature_plans/<branch_name>.md`
-that describes the specific details and strategies decided on for the feature.
-
-Get approval from the user on this document before continuing.
-
-When this step is complete, commit your changes before moving on.
-
-### Update the interface document
-
-`src/governing_docs/application_interface.md` describes 
-what this app should do, how it behaves, etc.
-It is the black-box description of the user's experience with the application.
-
 Based on the details in the feature plan document, determine how the 
 user interface of the application will change.
 
@@ -63,6 +59,15 @@ Update the `application_interface.md` document to reflect the new feature.
 
 Review these changes with the user. Make sure you are both on the same page
 before you continue.
+
+When this step is complete, commit your changes before moving on.
+
+### Design the feature
+
+Prepare a document in `src/governing_docs/feature_plans/<branch_name>.md`
+that describes the specific details and strategies decided on for the feature.
+
+Get approval from the user on this document before continuing.
 
 When this step is complete, commit your changes before moving on.
 
