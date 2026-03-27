@@ -26,7 +26,7 @@ If so, then exising `.myteam` folders need to be updated.
 
 ### Define a migration document
 
-Create a document in `migrations/<version>.md`.
+Create a document in `src/myteam/migrations/<version>.md`.
 
 In this document, describe the changes that have been made to `myteam`.
 
@@ -36,16 +36,21 @@ folder and files to reflect the changes.
 The document will be used by our users to update their `.myteam` folders
 to the latest features/format.
 
-These instructions should be generic: they should NOT assume specific role or skill folders.
+These instructions should be generic: 
+they should NOT assume specific role or skill folders.
 They should simply describe the general changes needed to `load.py` or other files to
 match the new templates or assumptions.
 
-### Apply the migration to our `.myteam`
+For example, if new content has been added to the AGENTS.md template, 
+then that new content should be integrated into existing AGENTS.md files.
 
-Now apply the changes described in the migration document to the local `.myteam` folder 
-so our tooling stays up-to-date. 
+Or, if a new function is available in `utils` and was included in the
+default role `load.py` template, then existing role `load.py` files
+should be updated to use this new utility.
+
+The migration instructions should clearly explain what the changes are
+and how those changes might be applied to existing structure.
 
 ### Conclude
 
-Identify the new `migration/` document created,
-and return a description of which files/folders in `.myteam` were changed.
+Report on the new migration document you created.

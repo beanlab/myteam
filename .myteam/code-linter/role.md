@@ -41,4 +41,4 @@ Are packages too large? Should sub-packages be created?
 
 ### README.md
 
-Does the README.me reflect the current state of the code?
+Does the README.md reflect the current state of the code?
