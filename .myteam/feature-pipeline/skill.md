@@ -28,12 +28,15 @@ It is the black-box description of the user's experience with the application.
 Then seek to understand what the user wants to change. 
 Is it a new behavior? Modifying an existing behavior? A bugfix?
 
+Discuss these things with the user. Involve them in the process.
+
 Questions that might be relevant:
 
 - What changes in behavior does the user hope for?
 - What behaviors should NOT change?
 
-Update the `application_interface.md` document to reflect the changes.
+Once you have a thorough understanding of the user's intent, 
+update the `application_interface.md` document to reflect the changes.
 
 Review these changes with the user. Make sure you are both on the same page
 before you continue.
