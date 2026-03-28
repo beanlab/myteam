@@ -222,27 +222,38 @@ Failure conditions that matter at the interface:
 
 ### `myteam download <roster>`
 
-Downloads a named roster from a remote repository.
+Downloads a named roster folder from a remote repository as a managed local install.
 
 Inputs:
 
-- `<roster>` identifies the roster entry to download.
+- `<roster>` identifies the remote roster folder to download.
 - The command also supports an optional destination and alternate repository through its CLI wiring.
+- If no destination is provided, the roster path is installed under `.myteam/` using the same relative
+  folder path as the remote roster.
 
 Expected outcome on success:
 
-- Downloads the requested roster content from the configured repository.
-- Writes the downloaded files into `.myteam/` by default.
-- Creates destination directories as needed.
+- Downloads the requested roster folder content from the configured repository.
+- Creates one managed local folder for that install.
+- Writes a `.source.yml` provenance file at the root of the managed local folder.
+- Writes downloaded files inside that managed local folder while preserving their relative paths within
+  the roster.
 - Prints progress while downloading.
 
 User-visible result:
 
-- The downloaded roster becomes available on disk in the destination directory, ready to be loaded or edited.
+- The downloaded roster becomes available on disk as a managed folder, ready to be loaded or edited.
+- The managed folder records enough source information for later provenance-aware commands.
 
 Failure conditions that matter at the interface:
 
 - If the roster name does not exist in the repository, the command exits with an error and reports available roster names.
+- If the requested roster resolves to a single file instead of a folder, the command exits with an error.
+- If the destination already contains the same managed source, the command exits with an error that
+  tells the caller to run `myteam update <path>` instead of using `download` again.
+- If unrelated content already exists at the destination path, the command exits with an error that
+  explains the content is not the same managed source and tells the caller to delete it or choose a
+  different destination instead of merging.
 - If the remote metadata or file downloads fail, the command exits with an error.
 
 ### `myteam --version`

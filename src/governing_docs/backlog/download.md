@@ -19,7 +19,7 @@ This preserves the current `get role` / `get skill` model and avoids turning rol
 
 Treat `download` as an install operation instead of a one-shot copy.
 
-When content is downloaded, write a hidden metadata file at the root of the installed subtree. A placeholder name like `.myteam-source.yml` is sufficient for design purposes.
+When content is downloaded, write a hidden metadata file named `.source.yml` at the root of the installed subtree.
 
 The metadata should record:
 
@@ -29,6 +29,12 @@ The metadata should record:
 - local install destination
 - download timestamp
 - optional remote tree SHA or similar fingerprint
+
+If `download` targets a local folder that already exists and `.source.yml` says it came from the same
+source, `download` should not overwrite it. Instead, it should direct the caller to `myteam update <path>`.
+
+If the existing destination contains unrelated content, `download` should fail and tell the caller to
+delete the destination or choose a different local path.
 
 ### `myteam update [path]`
 
