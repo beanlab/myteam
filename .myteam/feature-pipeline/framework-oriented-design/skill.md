@@ -13,6 +13,9 @@ An application is a combination of framework and business logic.
 
 We seek to separate framework code for business logic code.
 
+*Framework* refers to the internal, helper code that supports the primary API of the application,
+as well as the conventions and patterns used in the codebase to create consistency and structure.
+
 When preparing to implement a feature, understand the existing framework:
 
 - Why was the code written the way it does? What problems does the current design solve?
@@ -26,9 +29,9 @@ followed by a change to the business logic.
 
 If a change to the framework is needed, refactor the code accordingly without adding
 any new behavior. 
+
 Guidance:
 
-- 
 - Review the principles of self-documenting code and follow them.
 - Functions should be simple, focused, and easy to read.
 - When creating helper functions, look for existing behavior.
