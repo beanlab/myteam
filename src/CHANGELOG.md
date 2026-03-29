@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.2.7
+
+- `myteam download` now installs only folder rosters as managed local folders instead of flattening
+  roster contents directly into the destination root.
+- Default downloads preserve the remote roster path under `.myteam/`, and explicit destinations are
+  treated as managed install roots under `.myteam/`.
+- Managed roster installs now write `.source.yml` at the folder root so future commands can track
+  their origin.
+- `myteam download` now fails when the target already exists, directing same-source reinstalls toward
+  `myteam update <path>` and rejecting unrelated existing content.
+- Removed support for single-file roster downloads.
+
 ## 0.2.6
 
 - `myteam init` now stores the creating `myteam` version in `.myteam/.myteam-version`.

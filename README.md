@@ -270,7 +270,21 @@ Lists available downloadable rosters from the default roster repository.
 
 ### `myteam download <roster>`
 
-Downloads a roster into `.myteam/` by default.
+Downloads a folder roster into `.myteam/` by default.
+
+By default, the roster path is preserved under `.myteam/`, so `myteam download skills/foo` installs
+into `.myteam/skills/foo/`. If you provide a destination path, that path becomes the managed install
+root under `.myteam/`.
+
+Each downloaded folder gets a `.source.yml` file at its root so future commands can track where it
+came from.
+
+If the destination already exists, `myteam download` fails instead of merging into it:
+
+- if the existing folder is the same managed source, run `myteam update <path>` instead
+- if the existing folder is unrelated content, delete it or choose a different destination
+
+Single-file roster downloads are not supported.
 
 Useful when you want to seed an agent system from a reusable template instead of authoring it from scratch.
 
