@@ -17,6 +17,7 @@ myteam = "myteam.cli:main"
 
 [dependency-groups]
 dev = [
+    "faster-whisper>=1.2.1",
     "pytest>=8.3",
 ]
 
