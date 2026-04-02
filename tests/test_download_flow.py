@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import yaml
 from pathlib import Path
 
 import pytest
@@ -46,24 +47,85 @@ def test_download_tree_roster_writes_files(run_myteam_inprocess, initialized_pro
     result = run_myteam_inprocess(initialized_project, "download", "starter")
 
     assert result.exit_code == 0
-    assert (initialized_project / ".myteam" / "role.md").exists()
-    assert (initialized_project / ".myteam" / "nested" / "skill.md").exists()
+    managed_root = initialized_project / ".myteam" / "starter"
+    assert (managed_root / "role.md").exists()
+    assert (managed_root / "nested" / "skill.md").exists()
+    metadata = yaml.safe_load((managed_root / ".source.yml").read_text(encoding="utf-8"))
+    assert metadata["repo"] == rosters.DEFAULT_REPO
+    assert metadata["roster"] == "starter"
     assert downloaded
 
 
-def test_download_single_file_roster_writes_file(run_myteam_inprocess, initialized_project: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url: [{"path": "starter.md", "type": "blob"}])
+def test_download_tree_roster_writes_to_explicit_destination(
+    run_myteam_inprocess,
+    initialized_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url: [{"path": "skills/foo", "type": "tree", "sha": "abc"}])
+    monkeypatch.setattr(
+        rosters,
+        "_fetch_json",
+        lambda url: {"tree": [{"path": "skill.md", "type": "blob"}, {"path": "helpers/load.py", "type": "blob"}]}
+        if "abc" in url
+        else {"tree": [{"path": "skills/foo", "type": "tree", "sha": "abc"}]},
+    )
 
     def fake_download(url: str, output_path: Path):
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text("single file\n", encoding="utf-8")
+        output_path.write_text(f"downloaded from {url}\n", encoding="utf-8")
 
     monkeypatch.setattr(rosters, "_download_file", fake_download)
 
-    result = run_myteam_inprocess(initialized_project, "download", "starter.md")
+    result = run_myteam_inprocess(initialized_project, "download", "skills/foo", "bar/baz")
 
     assert result.exit_code == 0
-    assert (initialized_project / ".myteam" / "starter.md").read_text(encoding="utf-8") == "single file\n"
+    managed_root = initialized_project / ".myteam" / "bar" / "baz"
+    assert (managed_root / "skill.md").exists()
+    assert (managed_root / "helpers" / "load.py").exists()
+    metadata = yaml.safe_load((managed_root / ".source.yml").read_text(encoding="utf-8"))
+    assert metadata["roster"] == "skills/foo"
+    assert metadata["local_path"] == ".myteam/bar/baz"
+
+
+def test_download_single_file_roster_fails(run_myteam_inprocess, initialized_project: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url: [{"path": "starter.md", "type": "blob"}])
+
+    result = run_myteam_inprocess(initialized_project, "download", "starter.md")
+
+    assert result.exit_code == 1
+    assert "folder rosters are supported" in result.stderr
+
+
+def test_download_existing_same_source_directs_user_to_update(
+    run_myteam_inprocess,
+    initialized_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    managed_root = initialized_project / ".myteam" / "starter"
+    managed_root.mkdir(parents=True)
+    (managed_root / ".source.yml").write_text("repo: beanlab/rosters\nroster: starter\n", encoding="utf-8")
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url: [{"path": "starter", "type": "tree", "sha": "abc"}])
+
+    result = run_myteam_inprocess(initialized_project, "download", "starter")
+
+    assert result.exit_code == 1
+    assert "myteam update .myteam/starter" in result.stderr
+
+
+def test_download_existing_unrelated_destination_fails_clearly(
+    run_myteam_inprocess,
+    initialized_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    managed_root = initialized_project / ".myteam" / "starter"
+    managed_root.mkdir(parents=True)
+    (managed_root / "role.md").write_text("local content\n", encoding="utf-8")
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url: [{"path": "starter", "type": "tree", "sha": "abc"}])
+
+    result = run_myteam_inprocess(initialized_project, "download", "starter")
+
+    assert result.exit_code == 1
+    assert "delete it or choose a different destination" in result.stderr
 
 
 def test_download_missing_roster_fails_with_available_names(run_myteam_inprocess, initialized_project: Path, monkeypatch: pytest.MonkeyPatch):

@@ -1,4 +1,4 @@
-# Download Provenance and Update Design
+# Update Design
 
 ## Summary
 
@@ -19,7 +19,7 @@ This preserves the current `get role` / `get skill` model and avoids turning rol
 
 Treat `download` as an install operation instead of a one-shot copy.
 
-When content is downloaded, write a hidden metadata file at the root of the installed subtree. A placeholder name like `.myteam-source.yml` is sufficient for design purposes.
+When content is downloaded, write a hidden metadata file named `.source.yml` at the root of the installed subtree.
 
 The metadata should record:
 
@@ -29,6 +29,12 @@ The metadata should record:
 - local install destination
 - download timestamp
 - optional remote tree SHA or similar fingerprint
+
+If `download` targets a local folder that already exists and `.source.yml` says it came from the same
+source, `download` should not overwrite it. Instead, it should direct the caller to `myteam update <path>`.
+
+If the existing destination contains unrelated content, `download` should fail and tell the caller to
+delete the destination or choose a different local path.
 
 ### `myteam update [path]`
 
@@ -43,9 +49,10 @@ Behavior:
 
 ## Scope Boundaries
 
-- `get role` and `get skill` should remain unchanged
 - remote content should not be fetched dynamically during role or skill loading
-- this design does not yet define trust verification for downloaded content
+- this design does not yet define the full trust verification model for downloaded content
+- future trust work may add verification-state checks to `get role` and `get skill` without making
+  loading networked
 - this design does not yet define an interactive merge strategy for dirty local copies
 
 ## Implementation Notes

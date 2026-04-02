@@ -28,3 +28,4 @@ uv run pytest
 
 Tests are found in `tests/`.
 
+The full test suite takes about 30 seconds to run. Plan accordingly. 

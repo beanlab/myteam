@@ -7,3 +7,4 @@ If there is a skill that sounds like it might apply,
 you MUST load it.
 DO NOT assume ANYTHING is simple enough to justify ignoring a skill or role.
 
+According to the request of the user, load the appropriate skill and proceed.

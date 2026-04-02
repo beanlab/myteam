@@ -4,15 +4,35 @@ from __future__ import annotations
 import json
 import sys
 import urllib.request
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
+
+import yaml
 
 APP_NAME = "myteam"
 AGENTS_DIRNAME = ".myteam"
 DEFAULT_REPO = "beanlab/rosters"
+SOURCE_METADATA = ".source.yml"
+DEFAULT_REF = "main"
 
 
 def _agents_root(base: Path) -> Path:
     return base / AGENTS_DIRNAME
+
+
+def _download_destination(base: Path, roster: str, destination: Path | str | None) -> Path:
+    agents_root = _agents_root(base)
+    if destination is None:
+        return agents_root / Path(roster)
+    return agents_root / Path(destination)
+
+
+def _display_path(base: Path, path: Path) -> str:
+    try:
+        return path.relative_to(base).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def _repo_urls(repo: str) -> tuple[str, str]:
@@ -52,7 +72,7 @@ def _fetch_available_rosters(roster_repository_url: str):
     return root_tree.get("tree", [])
 
 
-def _fetch_roster_tree(roster: str, roster_repository_url: str):
+def _fetch_roster_entry(roster: str, roster_repository_url: str) -> dict:
     roster_trees = _fetch_available_rosters(roster_repository_url)
     roster_tree = next(
         (entry for entry in roster_trees if entry.get("path") == roster),
@@ -83,22 +103,90 @@ def _fetch_tree_files(roster_tree, roster_repository_url: str):
     return file_entries
 
 
-def _download_blob(blob_object: dict, destination: Path, roster_raw_base_url: str):
-    file_name = blob_object.get('path').split("/")[-1]
-    print(f"\rDownloading {file_name}")
-    _download_file(f"{roster_raw_base_url}/{blob_object.get('path')}", destination / file_name)
+def _require_tree_roster(roster_entry: dict, roster_name: str) -> None:
+    if roster_entry.get("type") == "tree":
+        return
+    print(f"Roster '{roster_name}' is a file. Only folder rosters are supported.", file=sys.stderr)
+    exit(1)
 
 
-def _download_tree_files(file_entries, roster_dir_name: str, destination: Path, roster_raw_base_url: str):
+def _tree_file_url(roster_dir_name: str, entry: dict, roster_raw_base_url: str) -> str:
+    return f"{roster_raw_base_url}/{roster_dir_name}/{entry.get('path')}"
+
+
+def _tree_file_destination(entry: dict, destination: Path) -> Path | None:
+    rel_path = entry.get("path")
+    if not rel_path:
+        return None
+    return destination / rel_path
+
+
+def _download_tree_files(file_entries: Iterable[dict], roster_dir_name: str, destination: Path, roster_raw_base_url: str):
+    file_entries = list(file_entries)
     total = len(file_entries)
     for idx, entry in enumerate(file_entries, start=1):
-        rel_path = entry.get("path")
-        if not rel_path:
+        output_path = _tree_file_destination(entry, destination)
+        if output_path is None:
             continue
-        raw_url = f"{roster_raw_base_url}/{roster_dir_name}/{rel_path}"
         print(f"\rDownloading {roster_dir_name} {idx}/{total}", end="", file=sys.stderr)
-        _download_file(raw_url, destination / rel_path)
+        _download_file(_tree_file_url(roster_dir_name, entry, roster_raw_base_url), output_path)
     print("", file=sys.stderr)
+
+
+def _source_metadata_path(destination: Path) -> Path:
+    return destination / SOURCE_METADATA
+
+
+def _read_source_metadata(destination: Path) -> dict[str, str] | None:
+    metadata_path = _source_metadata_path(destination)
+    if not metadata_path.exists():
+        return None
+    try:
+        loaded = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return None
+    if not isinstance(loaded, dict):
+        return None
+    return {str(key): str(value) for key, value in loaded.items() if value is not None}
+
+
+def _same_source(existing_metadata: dict[str, str] | None, repo: str, roster_name: str) -> bool:
+    if existing_metadata is None:
+        return False
+    return existing_metadata.get("repo") == repo and existing_metadata.get("roster") == roster_name
+
+
+def _ensure_destination_available(base: Path, destination: Path, repo: str, roster_name: str) -> None:
+    if not destination.exists():
+        return
+    display_path = _display_path(base, destination)
+    if _same_source(_read_source_metadata(destination), repo, roster_name):
+        print(
+            f"Managed download already exists at {display_path}. Run `myteam update {display_path}` instead.",
+            file=sys.stderr,
+        )
+        exit(1)
+    print(
+        f"Unrelated content already exists at {display_path}; delete it or choose a different destination.",
+        file=sys.stderr,
+    )
+    exit(1)
+
+
+def _source_metadata(base: Path, destination: Path, repo: str, roster_name: str) -> dict[str, str]:
+    return {
+        "repo": repo,
+        "roster": roster_name,
+        "ref": DEFAULT_REF,
+        "local_path": _display_path(base, destination),
+        "downloaded_at": datetime.now(UTC).isoformat(),
+    }
+
+
+def _write_source_metadata(base: Path, destination: Path, repo: str, roster_name: str) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    metadata = _source_metadata(base, destination, repo, roster_name)
+    _source_metadata_path(destination).write_text(yaml.safe_dump(metadata, sort_keys=True), encoding="utf-8")
 
 
 def download_roster(
@@ -107,18 +195,14 @@ def download_roster(
     repo: str = DEFAULT_REPO,
 ):
     base = Path.cwd()
-    if destination is None:
-        destination = _agents_root(base)
-    else:
-        destination = Path(destination)
-
+    destination = _download_destination(base, roster_dir_name, destination)
     roster_repository_url, roster_raw_base_url = _repo_urls(repo)
-    roster_tree = _fetch_roster_tree(roster_dir_name, roster_repository_url)
-    if roster_tree.get('type') == 'blob':
-        _download_blob(roster_tree, destination, roster_raw_base_url)
-    else:
-        tree_files = _fetch_tree_files(roster_tree, roster_repository_url)
-        _download_tree_files(tree_files, roster_dir_name, destination, roster_raw_base_url)
+    roster_entry = _fetch_roster_entry(roster_dir_name, roster_repository_url)
+    _require_tree_roster(roster_entry, roster_dir_name)
+    _ensure_destination_available(base, destination, repo, roster_dir_name)
+    tree_files = _fetch_tree_files(roster_entry, roster_repository_url)
+    _download_tree_files(tree_files, roster_dir_name, destination, roster_raw_base_url)
+    _write_source_metadata(base, destination, repo, roster_dir_name)
 
 
 def list_available_rosters(repo: str = DEFAULT_REPO):
