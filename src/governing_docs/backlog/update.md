@@ -2,7 +2,9 @@
 
 ## Summary
 
-Keep `myteam` runtime loading local-only. Extend `myteam download` so downloaded content carries source metadata, then add `myteam update [path]` to re-fetch installed content from its recorded origin.
+Keep `myteam` runtime loading local-only. 
+Extend `myteam download` so downloaded content carries source metadata, 
+then add `myteam update [path]` to re-fetch installed content from its recorded origin.
 
 This preserves the current `get role` / `get skill` model and avoids turning role or skill loading into a networked operation.
 
@@ -11,7 +13,7 @@ This preserves the current `get role` / `get skill` model and avoids turning rol
 - Keep `get role` and `get skill` deterministic and filesystem-based.
 - Make downloaded remote content updateable without requiring the user to re-specify its origin.
 - Support multiple independently downloaded subtrees inside `.myteam/`.
-- Protect local edits from accidental overwrite during update.
+- Establish the `update` command shape before adding checksum-based local-change protection.
 
 ## Proposed Behavior
 
@@ -44,8 +46,8 @@ Behavior:
 
 - `myteam update <path>` updates the specified installed subtree
 - `myteam update` scans `.myteam/` for subtree metadata files and updates all downloaded subtrees
-- update fails by default if local managed files were modified after download
-- a force option should allow replacing locally modified managed files
+- update currently replaces managed content based on recorded provenance only
+- local change detection and any future force/merge behavior are deferred to checksum tracking work
 
 ## Scope Boundaries
 
@@ -53,6 +55,7 @@ Behavior:
 - this design does not yet define the full trust verification model for downloaded content
 - future trust work may add verification-state checks to `get role` and `get skill` without making
   loading networked
+- this design does not yet define checksum-based dirty detection for managed local edits
 - this design does not yet define an interactive merge strategy for dirty local copies
 
 ## Implementation Notes
@@ -60,7 +63,8 @@ Behavior:
 - The existing roster download logic in `src/myteam/rosters.py` should remain the fetch primitive.
 - Download code should be refactored so install metadata is written as part of the same operation that places files on disk.
 - Update should resolve a target subtree by locating its metadata file rather than inferring provenance from directory naming alone.
-- Dirty detection should compare the current managed subtree against the last installed state strongly enough to block accidental overwrite. The exact mechanism can be finalized during implementation.
+- Update should reuse the same install primitive as `download`, with replacement semantics scoped to the managed subtree root.
+- Dirty detection is intentionally not part of this feature. The follow-on checksum feature should define how `update` detects local edits before overwrite.
 
 ## Open Follow-Up Work
 

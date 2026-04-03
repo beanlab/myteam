@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import urllib.request
 from collections.abc import Iterable
@@ -35,13 +36,13 @@ def _display_path(base: Path, path: Path) -> str:
         return path.as_posix()
 
 
-def _repo_urls(repo: str) -> tuple[str, str]:
+def _repo_urls(repo: str, ref: str = DEFAULT_REF) -> tuple[str, str]:
     repo_path = repo.strip().strip("/")
     if repo_path.count("/") != 1:
         print(f"Invalid repo '{repo}'. Expected format: <owner>/<repo>.", file=sys.stderr)
         exit(1)
     api_base = f"https://api.github.com/repos/{repo_path}/git/trees"
-    raw_base = f"https://raw.githubusercontent.com/{repo_path}/refs/heads/main"
+    raw_base = f"https://raw.githubusercontent.com/{repo_path}/{ref}"
     return api_base, raw_base
 
 
@@ -67,13 +68,13 @@ def _download_file(url: str, output_path: Path):
         exit(1)
 
 
-def _fetch_available_rosters(roster_repository_url: str):
-    root_tree = _fetch_json(roster_repository_url + "/main?recursive=1")
+def _fetch_available_rosters(roster_repository_url: str, ref: str = DEFAULT_REF):
+    root_tree = _fetch_json(f"{roster_repository_url}/{ref}?recursive=1")
     return root_tree.get("tree", [])
 
 
-def _fetch_roster_entry(roster: str, roster_repository_url: str) -> dict:
-    roster_trees = _fetch_available_rosters(roster_repository_url)
+def _fetch_roster_entry(roster: str, roster_repository_url: str, ref: str = DEFAULT_REF) -> dict:
+    roster_trees = _fetch_available_rosters(roster_repository_url, ref)
     roster_tree = next(
         (entry for entry in roster_trees if entry.get("path") == roster),
         None,
@@ -189,6 +190,73 @@ def _write_source_metadata(base: Path, destination: Path, repo: str, roster_name
     _source_metadata_path(destination).write_text(yaml.safe_dump(metadata, sort_keys=True), encoding="utf-8")
 
 
+def _replace_managed_destination(destination: Path) -> None:
+    if not destination.exists():
+        return
+    if not destination.is_dir():
+        print(f"Managed destination is not a directory: {destination}", file=sys.stderr)
+        exit(1)
+    shutil.rmtree(destination)
+
+
+def _install_roster_tree(
+    *,
+    base: Path,
+    destination: Path,
+    repo: str,
+    roster_dir_name: str,
+    ref: str = DEFAULT_REF,
+    replace_existing: bool = False,
+) -> None:
+    roster_repository_url, roster_raw_base_url = _repo_urls(repo, ref)
+    roster_entry = _fetch_roster_entry(roster_dir_name, roster_repository_url, ref)
+    _require_tree_roster(roster_entry, roster_dir_name)
+    if replace_existing:
+        _replace_managed_destination(destination)
+    else:
+        _ensure_destination_available(base, destination, repo, roster_dir_name)
+    tree_files = _fetch_tree_files(roster_entry, roster_repository_url)
+    _download_tree_files(tree_files, roster_dir_name, destination, roster_raw_base_url)
+    _write_source_metadata(base, destination, repo, roster_dir_name)
+
+
+def _require_source_metadata(destination: Path) -> dict[str, str]:
+    metadata = _read_source_metadata(destination)
+    if metadata is None:
+        print(f"Managed download metadata not found at {_display_path(Path.cwd(), destination)}.", file=sys.stderr)
+        exit(1)
+    required_keys = ("repo", "roster", "ref")
+    missing_keys = [key for key in required_keys if not metadata.get(key)]
+    if missing_keys:
+        missing = ", ".join(missing_keys)
+        print(
+            f"Managed download metadata at {_display_path(Path.cwd(), destination)} is missing required fields: {missing}.",
+            file=sys.stderr,
+        )
+        exit(1)
+    return metadata
+
+
+def _managed_roots(base: Path) -> list[Path]:
+    root = _agents_root(base)
+    if not root.exists():
+        return []
+    return sorted(metadata_path.parent for metadata_path in root.rglob(SOURCE_METADATA))
+
+
+def _update_target(base: Path, path: Path | str) -> Path:
+    raw_path = Path(path)
+    if raw_path.is_absolute():
+        try:
+            return raw_path.relative_to(_agents_root(base))
+        except ValueError:
+            print(f"Managed download paths must live under {_display_path(base, _agents_root(base))}.", file=sys.stderr)
+            exit(1)
+    if raw_path.parts and raw_path.parts[0] == AGENTS_DIRNAME:
+        return base / raw_path
+    return _agents_root(base) / raw_path
+
+
 def download_roster(
     roster_dir_name: str,
     destination: Path | str | None = None,
@@ -196,13 +264,25 @@ def download_roster(
 ):
     base = Path.cwd()
     destination = _download_destination(base, roster_dir_name, destination)
-    roster_repository_url, roster_raw_base_url = _repo_urls(repo)
-    roster_entry = _fetch_roster_entry(roster_dir_name, roster_repository_url)
-    _require_tree_roster(roster_entry, roster_dir_name)
-    _ensure_destination_available(base, destination, repo, roster_dir_name)
-    tree_files = _fetch_tree_files(roster_entry, roster_repository_url)
-    _download_tree_files(tree_files, roster_dir_name, destination, roster_raw_base_url)
-    _write_source_metadata(base, destination, repo, roster_dir_name)
+    _install_roster_tree(base=base, destination=destination, repo=repo, roster_dir_name=roster_dir_name)
+
+
+def update_roster(path: Path | str | None = None) -> None:
+    base = Path.cwd()
+    targets = _managed_roots(base) if path is None else [_update_target(base, path)]
+    if not targets:
+        print(f"No managed downloads found under {_display_path(base, _agents_root(base))}.", file=sys.stderr)
+        exit(1)
+    for destination in targets:
+        metadata = _require_source_metadata(destination)
+        _install_roster_tree(
+            base=base,
+            destination=destination,
+            repo=metadata["repo"],
+            roster_dir_name=metadata["roster"],
+            ref=metadata["ref"],
+            replace_existing=True,
+        )
 
 
 def list_available_rosters(repo: str = DEFAULT_REPO):

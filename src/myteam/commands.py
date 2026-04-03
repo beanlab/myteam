@@ -11,7 +11,7 @@ from myteam.utils import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, i
 
 from . import __version__
 from .paths import APP_NAME, BUILTIN_ROOT_NAME, ENCODING, agents_root, base_dir, role_dir
-from .rosters import download_roster, list_available_rosters
+from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import write_tracked_version
 
@@ -168,5 +168,6 @@ __all__ = [
     "new_role",
     "new_skill",
     "remove",
+    "update_roster",
     "version",
 ]

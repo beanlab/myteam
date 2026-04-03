@@ -284,6 +284,14 @@ If the destination already exists, `myteam download` fails instead of merging in
 - if the existing folder is the same managed source, run `myteam update <path>` instead
 - if the existing folder is unrelated content, delete it or choose a different destination
 
+### `myteam update [path]`
+
+Refreshes one managed roster install or all managed installs under `.myteam/` from their recorded
+source metadata.
+
+This uses the same managed-install behavior as `myteam download` after replacing the existing
+managed subtree root.
+
 Single-file roster downloads are not supported.
 
 Useful when you want to seed an agent system from a reusable template instead of authoring it from scratch.

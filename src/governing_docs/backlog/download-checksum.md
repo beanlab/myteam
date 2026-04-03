@@ -54,6 +54,8 @@ Outcomes:
 
 - The checksum should be computed from a canonical traversal of the managed subtree.
 - The checksum format should be straightforward to recompute during future update and migration flows.
+- Revisit the shipped `myteam update` behavior and define exactly how checksum results should change its
+  overwrite semantics, messaging, and any eventual force option.
 - The eventual dirty-content handling should align with the existing migration philosophy: clear
   explanation, no silent overwrite, explicit operator action required.
 
