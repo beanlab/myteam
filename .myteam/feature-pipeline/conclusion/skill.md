@@ -60,6 +60,13 @@ Please update the changelog to include a helpful description of the changes made
 The Readme and other documentation (if relevant) must be up-to-date.
 Inspect the code changes and update the documentation accordingly.
 
+### Completed Backlog Items
+
+If the feature branch completes one or more backlog items, move those backlog documents from
+`src/governing_docs/backlog/` into `src/governing_docs/backlog/completed/`.
+
+Only move backlog docs that are clearly complete from shipped behavior in the branch.
+
 ### Final commit
 
 Commit any additional changes.

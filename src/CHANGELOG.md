@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.2.8
+
+- Added `myteam update [path]` for refreshing managed roster installs from recorded source
+  metadata.
+- `myteam update` now supports updating a single managed subtree or scanning `.myteam/` for all
+  managed installs.
+- Refactored roster installation so `download` and `update` share the same managed-install path.
+
 ## 0.2.7
 
 - `myteam download` now installs only folder rosters as managed local folders instead of flattening

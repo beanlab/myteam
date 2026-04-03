@@ -45,6 +45,7 @@ At the black-box level, `myteam` provides these categories of behavior:
 - It can remove a previously created node.
 - It can list downloadable rosters from a remote repository.
 - It can download a roster into a local destination.
+- It can update a previously downloaded managed roster install from its recorded source metadata.
 - It can report its version string.
 
 Successful commands either:
@@ -268,6 +269,41 @@ User-visible result:
 
 - The caller can verify which installed version of `myteam` is running.
 
+### `myteam update [path]`
+
+Refreshes one or more managed downloaded folders from their recorded source metadata.
+
+Inputs:
+
+- With a `path`, the command updates the managed folder rooted at `.myteam/<path>` or at the provided
+  path if the caller passes an explicit `.myteam/...` path.
+- With no path, the command scans `.myteam/` recursively for managed download roots and updates each
+  one independently.
+
+Expected outcome on success:
+
+- Reads `.source.yml` from each targeted managed folder.
+- Re-downloads the folder content from the recorded repository, roster path, and ref.
+- Existing content at the managed target is deleted before re-download.
+- After deletion, the command performs the same managed install behavior as `myteam download` using the
+  recorded source metadata.
+
+User-visible result:
+
+- Managed downloaded content can be refreshed without re-specifying its remote source.
+- A project with multiple managed downloaded folders can refresh all of them in one command.
+
+Failure conditions that matter at the interface:
+
+- If the requested path does not identify a managed downloaded folder with `.source.yml`, the command
+  exits with an error.
+- If `myteam update` is run with no path and no managed downloaded folders are found, the command exits
+  with an error.
+- If a targeted managed folder has invalid or incomplete source metadata, the command exits with an
+  error.
+- If the recorded remote roster no longer exists, resolves to a file, or cannot be fetched, the command
+  exits with an error.
+
 ## Observable Conventions
 
 The following behavior is part of the current application contract:
@@ -283,6 +319,7 @@ The following behavior is part of the current application contract:
 - A `.myteam/` tree may carry a stored `myteam` version used for upgrade notices and migration guidance.
 - Upgrade guidance is surfaced through the generated root role and built-in maintenance skills, not through a dedicated migration CLI command.
 - If the tracked version file is missing, upgrade-related built-in loaders treat the tree as a legacy untracked `.myteam` tree rather than failing.
+- Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
 - Errors are communicated as command failure plus an error message on standard error.
 
 ## Out of Scope
