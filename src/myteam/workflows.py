@@ -37,6 +37,30 @@ class WorkflowError(RuntimeError):
     """Raised when a workflow cannot be loaded or executed."""
 
 
+def _zero_token_usage() -> dict[str, int]:
+    return {
+        "total_tokens": 0,
+        "input_tokens": 0,
+        "cached_input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_output_tokens": 0,
+    }
+
+
+def _add_token_usage(current: dict[str, int], update: dict[str, int]) -> dict[str, int]:
+    merged = dict(current)
+    for key in merged:
+        merged[key] += int(update.get(key, 0))
+    return merged
+
+
+def _format_token_usage(token_usage: dict[str, int]) -> str:
+    return (
+        "total={total_tokens}, input={input_tokens}, cached_input={cached_input_tokens}, "
+        "output={output_tokens}, reasoning_output={reasoning_output_tokens}"
+    ).format(**token_usage)
+
+
 @dataclass(frozen=True)
 class WorkflowStep:
     id: str
@@ -419,6 +443,7 @@ def _run_workflow(
         run_state.updated_at = _utc_now()
         _save_run_state(base_dir(), run_state)
         print(f"Workflow {run_state.run_id} completed successfully.")
+        print(f"Workflow Tokens: {_format_token_usage(_workflow_token_usage(run_state))}")
     except WorkflowError as exc:
         run_state.status = "failed"
         run_state.last_error = str(exc)
@@ -463,6 +488,7 @@ def _run_step(
         "final_message": None,
         "output": None,
         "error": None,
+        "token_usage": _zero_token_usage(),
     }
     run_state.attempts.setdefault(step.id, []).append(attempt)
     _save_run_state(base_dir(), run_state)
@@ -499,6 +525,7 @@ def _run_step(
     attempt["finished_at"] = _utc_now()
     _save_run_state(base_dir(), run_state)
     print(f"Completed step {step.id}")
+    print(f"Step Tokens ({step.id}): {_format_token_usage(attempt['token_usage'])}")
     return output
 
 
@@ -540,6 +567,7 @@ def _await_turn_completion(
     run_state: WorkflowRunState,
 ) -> str:
     latest_agent_message: str | None = None
+    latest_token_usage = _zero_token_usage()
     printed_delta = False
 
     while True:
@@ -558,6 +586,16 @@ def _await_turn_completion(
             item = params.get("item", {})
             if item.get("type") == "agentMessage":
                 latest_agent_message = item.get("text")
+        elif method == "thread/tokenUsage/updated" and params.get("turnId") == turn_id:
+            latest_token_usage = {
+                "total_tokens": int(params.get("tokenUsage", {}).get("last", {}).get("totalTokens", 0)),
+                "input_tokens": int(params.get("tokenUsage", {}).get("last", {}).get("inputTokens", 0)),
+                "cached_input_tokens": int(params.get("tokenUsage", {}).get("last", {}).get("cachedInputTokens", 0)),
+                "output_tokens": int(params.get("tokenUsage", {}).get("last", {}).get("outputTokens", 0)),
+                "reasoning_output_tokens": int(
+                    params.get("tokenUsage", {}).get("last", {}).get("reasoningOutputTokens", 0)
+                ),
+            }
         elif method == "error" and params.get("turnId") == turn_id:
             message = params.get("error", {}).get("message", "workflow step failed")
             attempt["status"] = "failed"
@@ -584,6 +622,8 @@ def _await_turn_completion(
         attempt["finished_at"] = _utc_now()
         _save_run_state(base_dir(), run_state)
         raise WorkflowError(attempt["error"])
+    attempt["token_usage"] = _add_token_usage(attempt["token_usage"], latest_token_usage)
+    _save_run_state(base_dir(), run_state)
     return latest_agent_message
 
 
@@ -721,6 +761,18 @@ def _build_output_property_schema(output_spec: Any) -> dict[str, Any]:
         "type": "string",
         "description": str(output_spec),
     }
+
+
+def _workflow_token_usage(run_state: WorkflowRunState) -> dict[str, int]:
+    total = _zero_token_usage()
+    for attempts in run_state.attempts.values():
+        for attempt in attempts:
+            if attempt.get("status") != "completed":
+                continue
+            token_usage = attempt.get("token_usage")
+            if isinstance(token_usage, dict):
+                total = _add_token_usage(total, token_usage)
+    return total
 
 
 def _resolve_inputs(inputs: dict[str, Any], completed_outputs: dict[str, dict[str, Any]]) -> dict[str, Any]:

@@ -340,6 +340,8 @@ review:
 - it keeps the current step thread open so you can send follow-up input on additional turns
 - it persists run state under `.myteam/workflow_runs/`
 - it advances after you type `/done` for the current step in interactive use
+- after each finalized step, it prints the token usage for that step
+- after the workflow completes, it prints the total token usage across all completed steps
 
 For `outputs`:
 

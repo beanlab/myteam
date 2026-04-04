@@ -283,6 +283,7 @@ Expected outcome on success:
 - Keeps the active step thread open for additional user follow-up turns before finalization.
 - In interactive use, advances only after the caller types `/done` for the current step.
 - Requires the final assistant message for each completed step to be a JSON object whose keys exactly match the step's declared `outputs`.
+- Prints token-usage totals for each finalized step and for the completed workflow.
 - Persists run state under `.myteam/workflow_runs/<run_id>/run.json`.
 
 User-visible result:

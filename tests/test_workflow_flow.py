@@ -57,6 +57,28 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "def send_notification(method, params):\n"
         "    sys.stdout.write(json.dumps({'jsonrpc': '2.0', 'method': method, 'params': params}) + '\\n')\n"
         "    sys.stdout.flush()\n\n"
+        "def send_token_usage(thread_id, turn_id, total_tokens, input_tokens, output_tokens, cached_input_tokens=0, reasoning_output_tokens=0):\n"
+        "    send_notification('thread/tokenUsage/updated', {\n"
+        "        'threadId': thread_id,\n"
+        "        'turnId': turn_id,\n"
+        "        'tokenUsage': {\n"
+        "            'total': {\n"
+        "                'totalTokens': total_tokens,\n"
+        "                'inputTokens': input_tokens,\n"
+        "                'cachedInputTokens': cached_input_tokens,\n"
+        "                'outputTokens': output_tokens,\n"
+        "                'reasoningOutputTokens': reasoning_output_tokens,\n"
+        "            },\n"
+        "            'last': {\n"
+        "                'totalTokens': total_tokens,\n"
+        "                'inputTokens': input_tokens,\n"
+        "                'cachedInputTokens': cached_input_tokens,\n"
+        "                'outputTokens': output_tokens,\n"
+        "                'reasoningOutputTokens': reasoning_output_tokens,\n"
+        "            },\n"
+        "            'modelContextWindow': None,\n"
+        "        },\n"
+        "    })\n\n"
         "def parse_payload(params):\n"
         "    text = params['input'][0]['text']\n"
         "    _, _, payload = text.partition('\\n\\n')\n"
@@ -89,6 +111,7 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "            'text': json.dumps(output),\n"
         "        },\n"
         "    })\n"
+        "    send_token_usage(thread_id, turn_id, 12, 7, 5)\n"
         "    send_notification('turn/completed', {\n"
         "        'threadId': thread_id,\n"
         "        'turn': {'id': turn_id, 'items': [], 'status': 'completed', 'error': None},\n"
@@ -103,6 +126,7 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "            'text': text,\n"
         "        },\n"
         "    })\n"
+        "    send_token_usage(thread_id, turn_id, 6, 4, 2)\n"
         "    send_notification('turn/completed', {\n"
         "        'threadId': thread_id,\n"
         "        'turn': {'id': turn_id, 'items': [], 'status': 'completed', 'error': None},\n"
@@ -254,6 +278,9 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
 
     assert result.exit_code == 0, result.stderr
     assert "completed successfully" in result.stdout
+    assert "Step Tokens (plan): total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout
+    assert "Step Tokens (review): total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout
+    assert "Workflow Tokens: total=36, input=22, cached_input=0, output=14, reasoning_output=0" in result.stdout
 
     run_dirs = list((initialized_project / ".myteam" / "workflow_runs").iterdir())
     assert len(run_dirs) == 1
@@ -262,6 +289,13 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
     assert run_state["completed_outputs"]["plan"] == {
         "summary": "plan-summary",
         "plandoc": "/plan.md",
+    }
+    assert run_state["attempts"]["plan"][0]["token_usage"] == {
+        "total_tokens": 18,
+        "input_tokens": 11,
+        "cached_input_tokens": 0,
+        "output_tokens": 7,
+        "reasoning_output_tokens": 0,
     }
     assert run_state["completed_outputs"]["review"] == {
         "verdict": "looks-good",
@@ -305,6 +339,7 @@ def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_proje
 
     assert result.exit_code == 0, result.stderr
     assert "Need clarification" in result.stdout
+    assert "Step Tokens (plan): total=24, input=15, cached_input=0, output=9, reasoning_output=0" in result.stdout
 
     run_dirs = list((initialized_project / ".myteam" / "workflow_runs").iterdir())
     run_state = json.loads((run_dirs[0] / "run.json").read_text(encoding="utf-8"))
