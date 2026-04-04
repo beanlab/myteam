@@ -27,9 +27,9 @@ DEFAULT_WORKFLOW_SERVER_COMMAND = "codex app-server"
 
 WORKFLOW_DEVELOPER_INSTRUCTIONS = (
     "You are executing one deterministic myteam workflow step. "
-    "Return only a JSON object matching the required outputs. "
-    "Do not wrap the JSON in markdown fences. "
-    "Treat any later user follow-up messages as additional guidance for this same step."
+    "Treat later user follow-up messages as additional guidance for this same step. "
+    "Only return final structured JSON when explicitly asked to finalize the step. "
+    "When finalizing, return only a JSON object matching the required outputs and do not wrap it in markdown fences."
 )
 
 
@@ -250,9 +250,13 @@ class UserInputPump:
     def __init__(self) -> None:
         self._queue: queue.Queue[str] = queue.Queue()
         self._thread: threading.Thread | None = None
+        self.is_interactive = not sys.stdin.closed and sys.stdin.isatty()
 
     def start(self) -> None:
-        if self._thread is not None or sys.stdin.closed:
+        # Interactive sessions should have exactly one stdin consumer: the
+        # foreground prompt in the step interaction loop. The background reader
+        # is only for non-interactive input such as tests or piped commands.
+        if self.is_interactive or self._thread is not None or sys.stdin.closed:
             return
         self._thread = threading.Thread(target=self._read_loop, daemon=True)
         self._thread.start()
@@ -260,6 +264,12 @@ class UserInputPump:
     def next_input(self) -> str | None:
         try:
             return self._queue.get_nowait()
+        except queue.Empty:
+            return None
+
+    def wait_for_input(self, *, timeout: float | None = None) -> str | None:
+        try:
+            return self._queue.get(timeout=timeout)
         except queue.Empty:
             return None
 
@@ -441,29 +451,12 @@ def _run_step(
         },
     )
     thread_id = thread_result["thread"]["id"]
-    prompt = _build_step_prompt(step, step_inputs, previous_outputs)
-    turn_result = client.request(
-        "turn/start",
-        {
-            "threadId": thread_id,
-            "input": [
-                {
-                    "type": "text",
-                    "text": prompt,
-                    "textElements": [],
-                }
-            ],
-            "outputSchema": _build_output_schema(step.outputs),
-        },
-    )
-    turn = turn_result["turn"]
-    turn_id = turn["id"]
     print(f"\n== Step {step.id} ==")
     print(f"thread: {thread_id}")
-    print(f"turn: {turn_id}")
     attempt = {
         "thread_id": thread_id,
-        "turn_id": turn_id,
+        "turn_id": None,
+        "turn_ids": [],
         "status": "in_progress",
         "started_at": _utc_now(),
         "resolved_inputs": step_inputs,
@@ -474,59 +467,116 @@ def _run_step(
     run_state.attempts.setdefault(step.id, []).append(attempt)
     _save_run_state(base_dir(), run_state)
 
+    initial_message = _run_thread_turn(
+        client,
+        thread_id,
+        _build_step_prompt(step, step_inputs, previous_outputs),
+        attempt,
+        run_state,
+    )
+    _enter_step_interaction_loop(
+        client,
+        step,
+        thread_id,
+        attempt,
+        run_state,
+        input_pump,
+        initial_message,
+    )
+    final_message = _run_thread_turn(
+        client,
+        thread_id,
+        _build_finalize_prompt(step, step_inputs, previous_outputs),
+        attempt,
+        run_state,
+        output_schema=_build_output_schema(step.outputs),
+    )
+
+    output = _parse_step_output(final_message, step.outputs)
+    attempt["status"] = "completed"
+    attempt["final_message"] = final_message
+    attempt["output"] = output
+    attempt["finished_at"] = _utc_now()
+    _save_run_state(base_dir(), run_state)
+    print(f"Completed step {step.id}")
+    return output
+
+
+def _run_thread_turn(
+    client: JsonRpcProcessClient,
+    thread_id: str,
+    text: str,
+    attempt: dict[str, Any],
+    run_state: WorkflowRunState,
+    *,
+    output_schema: dict[str, Any] | None = None,
+) -> str:
+    params = {
+        "threadId": thread_id,
+        "input": [
+            {
+                "type": "text",
+                "text": text,
+                "textElements": [],
+            }
+        ],
+    }
+    if output_schema is not None:
+        params["outputSchema"] = output_schema
+
+    turn_result = client.request("turn/start", params)
+    turn_id = turn_result["turn"]["id"]
+    attempt["turn_id"] = turn_id
+    attempt["turn_ids"].append(turn_id)
+    _save_run_state(base_dir(), run_state)
+    print(f"turn: {turn_id}")
+    return _await_turn_completion(client, turn_id, attempt, run_state)
+
+
+def _await_turn_completion(
+    client: JsonRpcProcessClient,
+    turn_id: str,
+    attempt: dict[str, Any],
+    run_state: WorkflowRunState,
+) -> str:
     latest_agent_message: str | None = None
     printed_delta = False
 
     while True:
         notification = client.next_notification(timeout=0.1)
-        if notification is not None:
-            method = notification.get("method")
-            params = notification.get("params", {})
-            if method == "item/agentMessage/delta" and params.get("turnId") == turn_id:
-                delta = params.get("delta", "")
-                if delta:
-                    print(delta, end="", flush=True)
-                    printed_delta = True
-            elif method == "item/completed" and params.get("turnId") == turn_id:
-                item = params.get("item", {})
-                if item.get("type") == "agentMessage":
-                    latest_agent_message = item.get("text")
-            elif method == "error" and params.get("turnId") == turn_id:
-                message = params.get("error", {}).get("message", "workflow step failed")
+        if notification is None:
+            continue
+
+        method = notification.get("method")
+        params = notification.get("params", {})
+        if method == "item/agentMessage/delta" and params.get("turnId") == turn_id:
+            delta = params.get("delta", "")
+            if delta:
+                print(delta, end="", flush=True)
+                printed_delta = True
+        elif method == "item/completed" and params.get("turnId") == turn_id:
+            item = params.get("item", {})
+            if item.get("type") == "agentMessage":
+                latest_agent_message = item.get("text")
+        elif method == "error" and params.get("turnId") == turn_id:
+            message = params.get("error", {}).get("message", "workflow step failed")
+            attempt["status"] = "failed"
+            attempt["error"] = message
+            attempt["finished_at"] = _utc_now()
+            _save_run_state(base_dir(), run_state)
+            raise WorkflowError(message)
+        elif method == "turn/completed" and params.get("turn", {}).get("id") == turn_id:
+            turn_status = params.get("turn", {}).get("status")
+            if printed_delta:
+                print()
+            if turn_status != "completed":
+                message = f"workflow step ended with turn status {turn_status}"
                 attempt["status"] = "failed"
                 attempt["error"] = message
                 attempt["finished_at"] = _utc_now()
                 _save_run_state(base_dir(), run_state)
                 raise WorkflowError(message)
-            elif method == "turn/completed" and params.get("turn", {}).get("id") == turn_id:
-                turn_status = params.get("turn", {}).get("status")
-                if printed_delta:
-                    print()
-                if turn_status != "completed":
-                    message = f"workflow step ended with turn status {turn_status}"
-                    attempt["status"] = "failed"
-                    attempt["error"] = message
-                    attempt["finished_at"] = _utc_now()
-                    _save_run_state(base_dir(), run_state)
-                    raise WorkflowError(message)
-                break
-
-        follow_up = input_pump.next_input()
-        if follow_up is not None:
-            client.request(
-                "turn/steer",
-                {
-                    "threadId": thread_id,
-                    "expectedTurnId": turn_id,
-                    "input": [
-                        {
-                            "type": "text",
-                            "text": follow_up,
-                            "textElements": [],
-                        }
-                    ],
-                },
-            )
+            break
 
     if latest_agent_message is None:
         attempt["status"] = "failed"
@@ -534,15 +584,48 @@ def _run_step(
         attempt["finished_at"] = _utc_now()
         _save_run_state(base_dir(), run_state)
         raise WorkflowError(attempt["error"])
+    return latest_agent_message
 
-    output = _parse_step_output(latest_agent_message, step.outputs)
-    attempt["status"] = "completed"
-    attempt["final_message"] = latest_agent_message
-    attempt["output"] = output
-    attempt["finished_at"] = _utc_now()
-    _save_run_state(base_dir(), run_state)
-    print(f"Completed step {step.id}")
-    return output
+
+def _enter_step_interaction_loop(
+    client: JsonRpcProcessClient,
+    step: WorkflowStep,
+    thread_id: str,
+    attempt: dict[str, Any],
+    run_state: WorkflowRunState,
+    input_pump: UserInputPump,
+    initial_message: str,
+) -> None:
+    attempt["last_conversation_message"] = initial_message
+    pending_message = input_pump.next_input()
+    if not input_pump.is_interactive and pending_message is None:
+        return
+
+    print(f"[{step.id}] Type feedback to keep chatting on this thread. Type /done to finalize.")
+
+    while True:
+        follow_up = pending_message
+        pending_message = None
+        if follow_up is None:
+            if input_pump.is_interactive:
+                follow_up = input("> ").strip()
+            else:
+                follow_up = input_pump.wait_for_input(timeout=0.1)
+                if follow_up is None:
+                    return
+
+        if not follow_up:
+            continue
+        if follow_up == "/done":
+            return
+
+        conversational_prompt = (
+            "Continue working on the same workflow step. "
+            "Do not finalize structured JSON yet.\n\n"
+            f"User feedback:\n{follow_up}"
+        )
+        response = _run_thread_turn(client, thread_id, conversational_prompt, attempt, run_state)
+        attempt["last_conversation_message"] = response
 
 
 def _build_step_prompt(
@@ -557,7 +640,26 @@ def _build_step_prompt(
         "required_outputs": step.outputs,
     }
     return (
-        "Execute the workflow step and return only a JSON object with the required outputs.\n\n"
+        "Start working on this workflow step. "
+        "You may ask questions or provide draft work, but do not finalize structured JSON yet.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _build_finalize_prompt(
+    step: WorkflowStep,
+    step_inputs: dict[str, Any],
+    previous_outputs: dict[str, dict[str, Any]],
+) -> str:
+    payload = {
+        "step": step.id,
+        "inputs": step_inputs,
+        "previous_outputs": previous_outputs,
+        "required_outputs": step.outputs,
+    }
+    return (
+        "Finalize this workflow step now. "
+        "Return only a JSON object whose keys exactly match the required outputs.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
     )
 

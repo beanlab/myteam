@@ -29,7 +29,7 @@ Planned refactors:
    - loading and validating workflow YAML
    - persisting run state under `.myteam/workflow_runs/`
    - talking to a line-delimited JSON-RPC AppServer subprocess
-   - handling live step steering and resumable failures
+   - handling multi-turn step conversations and resumable failures
 3. Keep the CLI wiring thin by exposing `workflows start`, `workflows resume`, and
    `workflows status` through `src/myteam/cli.py`.
 
@@ -49,18 +49,19 @@ Behavior details:
 1. `myteam workflows start <path>` runs steps strictly in order.
 2. Each step loads the declared role instructions, creates a fresh AppServer thread, and starts one
    turn.
-3. The active step streams live output and accepts follow-up user input through `turn/steer`.
-4. A step is only complete when the final assistant message is valid JSON and its keys exactly match
+3. The active step streams live output and can accept additional user follow-up turns on the same thread before finalization.
+4. In interactive use, the user types `/done` to finalize the current step and advance.
+5. A step is only complete when the final assistant message is valid JSON and its keys exactly match
    the declared `outputs`.
-5. Completed step outputs are stored and may be referenced by later steps using
+6. Completed step outputs are stored and may be referenced by later steps using
    `{from: prior_step.output}`.
-6. Failed runs can be resumed from the first incomplete step with `myteam workflows resume <run_id>`.
+7. Failed runs can be resumed from the first incomplete step with `myteam workflows resume <run_id>`.
 
 ## Test Plan
 
 Add high-level CLI tests that prove:
 
 - ordered workflow execution succeeds and persists outputs
-- step steering works while a turn is in progress
+- step conversation works on the same thread before finalization
 - failed runs can be resumed without rerunning already successful steps
 - workflow status can be read from disk after a run completes or fails

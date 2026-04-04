@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import io
 import json
 import shlex
 import sys
 from pathlib import Path
+
+from myteam.workflows import UserInputPump
 
 
 def _write_role(project: Path, role: str, instructions: str) -> None:
@@ -34,7 +37,7 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "from pathlib import Path\n\n"
         "mode = os.environ.get('FAKE_WORKFLOW_MODE', 'success')\n"
         "state_file = os.environ.get('FAKE_WORKFLOW_STATE_FILE')\n"
-        "pending = None\n"
+        "thread_state = {}\n"
         "step_counter = 0\n"
         "turn_counter = 0\n\n"
         "def invocation_count() -> int:\n"
@@ -57,17 +60,24 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "def parse_payload(params):\n"
         "    text = params['input'][0]['text']\n"
         "    _, _, payload = text.partition('\\n\\n')\n"
-        "    return json.loads(payload)\n\n"
-        "def complete_turn(thread_id, turn_id, required_keys, payload):\n"
+        "    if not payload.strip():\n"
+        "        return {}\n"
+        "    try:\n"
+        "        return json.loads(payload)\n"
+        "    except json.JSONDecodeError:\n"
+        "        return {}\n\n"
+        "def complete_structured_turn(thread_id, turn_id, required_keys, payload):\n"
+        "    state = thread_state.setdefault(thread_id, {})\n"
         "    if required_keys == ['summary', 'plandoc']:\n"
-        "        output = {'summary': 'plan-summary', 'plandoc': '/plan.md'}\n"
+        "        summary = state.get('last_feedback', 'plan-summary')\n"
+        "        output = {'summary': summary, 'plandoc': '/plan.md'}\n"
         "    elif required_keys == ['verdict']:\n"
         "        summary = payload['inputs']['summary']\n"
         "        previous = payload['previous_outputs']['plan']['summary']\n"
         "        if summary != 'plan-summary' or previous != 'plan-summary':\n"
-        "            output = {'unexpected': 'bad'}\n"
+            "            output = {'unexpected': 'bad'}\n"
         "        else:\n"
-        "            output = {'verdict': 'looks-good'}\n"
+            "            output = {'verdict': 'looks-good'}\n"
         "    else:\n"
         "        output = {key: f'{key}-value' for key in required_keys}\n"
         "    send_notification('item/completed', {\n"
@@ -77,6 +87,20 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "            'type': 'agentMessage',\n"
         "            'id': f'item-{turn_id}',\n"
         "            'text': json.dumps(output),\n"
+        "        },\n"
+        "    })\n"
+        "    send_notification('turn/completed', {\n"
+        "        'threadId': thread_id,\n"
+        "        'turn': {'id': turn_id, 'items': [], 'status': 'completed', 'error': None},\n"
+        "    })\n\n"
+        "def complete_conversation_turn(thread_id, turn_id, text):\n"
+        "    send_notification('item/completed', {\n"
+        "        'threadId': thread_id,\n"
+        "        'turnId': turn_id,\n"
+        "        'item': {\n"
+        "            'type': 'agentMessage',\n"
+        "            'id': f'item-{turn_id}',\n"
+        "            'text': text,\n"
         "        },\n"
         "    })\n"
         "    send_notification('turn/completed', {\n"
@@ -100,6 +124,7 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "    elif method == 'thread/start':\n"
         "        step_counter += 1\n"
         "        thread_id = f'thread-{step_counter}'\n"
+        "        thread_state[thread_id] = {}\n"
         "        send_response(message['id'], {\n"
         "            'thread': {\n"
         "                'id': thread_id,\n"
@@ -132,65 +157,61 @@ def _write_fake_workflow_server(script_path: Path) -> None:
         "    elif method == 'turn/start':\n"
         "        turn_counter += 1\n"
         "        turn_id = f'turn-{turn_counter}'\n"
-        "        properties = params.get('outputSchema', {}).get('properties', {})\n"
+        "        output_schema = params.get('outputSchema') or {}\n"
+        "        properties = output_schema.get('properties', {})\n"
         "        missing_type = next((key for key, schema in properties.items() if 'type' not in schema), None)\n"
         "        if missing_type is not None:\n"
         "            sys.stdout.write(json.dumps({'jsonrpc': '2.0', 'id': message['id'], 'error': {'message': f'missing type for output {missing_type}'}}) + '\\n')\n"
         "            sys.stdout.flush()\n"
         "            continue\n"
-        "        required_keys = list(params.get('outputSchema', {}).get('required', []))\n"
+        "        required_keys = list(output_schema.get('required', []))\n"
         "        payload = parse_payload(params)\n"
+        "        thread_id = params['threadId']\n"
+        "        state = thread_state.setdefault(thread_id, {})\n"
         "        send_response(message['id'], {'turn': {'id': turn_id, 'items': [], 'status': 'in_progress', 'error': None}})\n"
-        "        send_notification('turn/started', {'threadId': params['threadId'], 'turn': {'id': turn_id, 'items': [], 'status': 'in_progress', 'error': None}})\n"
-        "        if mode == 'needs-steer':\n"
-        "            pending = {\n"
-        "                'thread_id': params['threadId'],\n"
-        "                'turn_id': turn_id,\n"
-        "                'required_keys': required_keys,\n"
-        "                'payload': payload,\n"
-        "            }\n"
+        "        send_notification('turn/started', {'threadId': thread_id, 'turn': {'id': turn_id, 'items': [], 'status': 'in_progress', 'error': None}})\n"
+        "        if required_keys:\n"
+        "            if mode == 'fail-once' and invocation == 1:\n"
+        "                complete_conversation_turn(thread_id, turn_id, 'not json')\n"
+        "                continue\n"
+        "            complete_structured_turn(thread_id, turn_id, required_keys, payload)\n"
+        "            continue\n"
+        "        input_text = params['input'][0]['text']\n"
+        "        if mode == 'needs-steer' and not state.get('asked_for_clarification'):\n"
+        "            state['asked_for_clarification'] = True\n"
         "            send_notification('item/agentMessage/delta', {\n"
-        "                'threadId': params['threadId'],\n"
+        "                'threadId': thread_id,\n"
         "                'turnId': turn_id,\n"
         "                'itemId': f'item-{turn_id}',\n"
         "                'delta': 'Need clarification',\n"
         "            })\n"
+        "            complete_conversation_turn(thread_id, turn_id, 'Need clarification')\n"
         "            continue\n"
-        "        if mode == 'fail-once' and invocation == 1:\n"
-        "            send_notification('item/completed', {\n"
-        "                'threadId': params['threadId'],\n"
-        "                'turnId': turn_id,\n"
-        "                'item': {'type': 'agentMessage', 'id': f'item-{turn_id}', 'text': 'not json'},\n"
-        "            })\n"
-        "            send_notification('turn/completed', {\n"
-        "                'threadId': params['threadId'],\n"
-        "                'turn': {'id': turn_id, 'items': [], 'status': 'completed', 'error': None},\n"
-        "            })\n"
+        "        if 'User feedback:' in input_text:\n"
+        "            feedback = input_text.split('User feedback:\\n', 1)[1]\n"
+        "            state['last_feedback'] = feedback\n"
+        "            complete_conversation_turn(thread_id, turn_id, f'Updated draft using: {feedback}')\n"
         "            continue\n"
-        "        complete_turn(params['threadId'], turn_id, required_keys, payload)\n"
-        "        continue\n"
-        "    elif method == 'turn/steer':\n"
-        "        send_response(message['id'], {'turnId': params['expectedTurnId']})\n"
-        "        if pending is None:\n"
-        "            continue\n"
-        "        steer_text = params['input'][0]['text']\n"
-        "        output = {'summary': steer_text, 'plandoc': '/plan.md'}\n"
-        "        send_notification('item/completed', {\n"
-        "            'threadId': pending['thread_id'],\n"
-        "            'turnId': pending['turn_id'],\n"
-        "            'item': {'type': 'agentMessage', 'id': f\"item-{pending['turn_id']}\", 'text': json.dumps(output)},\n"
-        "        })\n"
-        "        send_notification('turn/completed', {\n"
-        "            'threadId': pending['thread_id'],\n"
-        "            'turn': {'id': pending['turn_id'], 'items': [], 'status': 'completed', 'error': None},\n"
-        "        })\n"
-        "        pending = None\n",
+        "        complete_conversation_turn(thread_id, turn_id, 'Draft ready')\n",
         encoding="utf-8",
     )
 
 
 def _server_command(script_path: Path) -> str:
     return f"{shlex.quote(sys.executable)} {shlex.quote(str(script_path))}"
+
+
+def test_user_input_pump_does_not_start_background_reader_in_interactive_mode(monkeypatch):
+    class InteractiveInput(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    monkeypatch.setattr(sys, "stdin", InteractiveInput())
+    pump = UserInputPump()
+    pump.start()
+
+    assert pump.is_interactive is True
+    assert pump._thread is None
 
 
 def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized_project: Path):
@@ -224,6 +245,7 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
         "workflows",
         "start",
         str(workflow),
+        input_text="/done\n",
         env_overrides={
             "MYTEAM_WORKFLOW_APP_SERVER_COMMAND": _server_command(fake_server),
             "FAKE_WORKFLOW_MODE": "success",
@@ -251,7 +273,7 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
     assert '"verdict": "looks-good"' in status_result.stdout
 
 
-def test_workflows_start_can_steer_running_step(run_myteam, initialized_project: Path):
+def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_project: Path):
     _write_role(initialized_project, "plan", "Plan the work")
 
     workflow = initialized_project / "workflow.yaml"
@@ -274,7 +296,7 @@ def test_workflows_start_can_steer_running_step(run_myteam, initialized_project:
         "workflows",
         "start",
         str(workflow),
-        input_text="extra detail\n",
+        input_text="extra detail\n/done\n",
         env_overrides={
             "MYTEAM_WORKFLOW_APP_SERVER_COMMAND": _server_command(fake_server),
             "FAKE_WORKFLOW_MODE": "needs-steer",
@@ -318,6 +340,7 @@ def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: P
         "workflows",
         "start",
         str(workflow),
+        input_text="/done\n",
         env_overrides=env_overrides,
     )
     assert start_result.exit_code == 1
@@ -332,6 +355,7 @@ def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: P
         "workflows",
         "resume",
         run_state["run_id"],
+        input_text="/done\n",
         env_overrides=env_overrides,
     )
     assert resume_result.exit_code == 0, resume_result.stderr

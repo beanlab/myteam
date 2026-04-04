@@ -279,15 +279,16 @@ Expected outcome on success:
 - Loads each step role from `.myteam/`.
 - Starts a local Codex AppServer subprocess session.
 - Creates one fresh AppServer thread per workflow step attempt.
-- Starts one turn per step, streaming progress while the step runs.
-- Allows the caller to send follow-up input to the active step while it is still running.
+- Starts a conversational turn for the step and streams its progress.
+- Keeps the active step thread open for additional user follow-up turns before finalization.
+- In interactive use, advances only after the caller types `/done` for the current step.
 - Requires the final assistant message for each completed step to be a JSON object whose keys exactly match the step's declared `outputs`.
 - Persists run state under `.myteam/workflow_runs/<run_id>/run.json`.
 
 User-visible result:
 
 - The caller can watch each step progress in real time.
-- The caller can steer the active step without abandoning deterministic step outputs.
+- The caller can keep chatting with the active step thread before finalizing it.
 - On success, the workflow's validated step outputs are stored for later inspection and downstream steps.
 
 Failure conditions that matter at the interface:

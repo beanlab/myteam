@@ -337,8 +337,9 @@ review:
 - it launches a local Codex AppServer session
 - it creates one fresh thread per step attempt
 - it streams the active step live
-- it lets you send follow-up input to the active step while it is still running
+- it keeps the current step thread open so you can send follow-up input on additional turns
 - it persists run state under `.myteam/workflow_runs/`
+- it advances after you type `/done` for the current step in interactive use
 
 For `outputs`:
 
