@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.2.9
+
+- Added `myteam workflows start <path>`, `myteam workflows resume <run_id>`, and
+  `myteam workflows status <run_id>` for deterministic workflow execution on top of a local Codex
+  AppServer session.
+- Added workflow-run persistence under `.myteam/workflow_runs/`, including validated step outputs,
+  retry history, and resumable failed runs.
+- Added workflow YAML support for ordered role-based steps with declared `inputs`, declared
+  `outputs`, and `{from: prior_step.output}` references.
+
 ## 0.2.8
 
 - Added `myteam update [path]` for refreshing managed roster installs from recorded source

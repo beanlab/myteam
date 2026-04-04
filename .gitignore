@@ -52,3 +52,11 @@ htmlcov/
 # Local scratch space
 scratch/
 .cache
+
+# Temporary test files
+.myteam/free_verse
+.myteam/haiku
+.myteam/sonnet
+
+workflow_runs/
+workflows/

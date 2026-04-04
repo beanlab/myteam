@@ -28,10 +28,17 @@ class CommandResult:
 
 @pytest.fixture
 def run_myteam(monkeypatch):
-    def runner(project_dir: Path, *args: str) -> CommandResult:
+    def runner(
+        project_dir: Path,
+        *args: str,
+        input_text: str | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> CommandResult:
         env = os.environ.copy()
         existing_pythonpath = env.get("PYTHONPATH")
         env["PYTHONPATH"] = str(SRC) if not existing_pythonpath else f"{SRC}{os.pathsep}{existing_pythonpath}"
+        if env_overrides:
+            env.update(env_overrides)
 
         completed = subprocess.run(
             [sys.executable, "-m", "myteam", *args],
@@ -39,6 +46,7 @@ def run_myteam(monkeypatch):
             env=env,
             text=True,
             capture_output=True,
+            input=input_text,
             check=False,
         )
 
@@ -53,11 +61,21 @@ def run_myteam(monkeypatch):
 
 @pytest.fixture
 def run_myteam_inprocess(monkeypatch):
-    def runner(project_dir: Path, *args: str) -> CommandResult:
+    def runner(
+        project_dir: Path,
+        *args: str,
+        input_text: str | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> CommandResult:
         stdout = io.StringIO()
         stderr = io.StringIO()
         monkeypatch.chdir(project_dir)
         monkeypatch.setattr(sys, "argv", ["myteam", *args])
+        if input_text is not None:
+            monkeypatch.setattr(sys, "stdin", io.StringIO(input_text))
+        if env_overrides:
+            for key, value in env_overrides.items():
+                monkeypatch.setenv(key, value)
 
         exit_code = 0
         with redirect_stdout(stdout), redirect_stderr(stderr):

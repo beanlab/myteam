@@ -14,6 +14,9 @@ from .commands import (
     remove,
     update_roster,
     version,
+    workflow_resume,
+    workflow_start,
+    workflow_status,
 )
 
 
@@ -32,6 +35,11 @@ def main(argv: list[str] | None = None):
         "download": download_roster,
         "update": update_roster,
         "list": list_available_rosters,
+        "workflows": {
+            "start": workflow_start,
+            "resume": workflow_resume,
+            "status": workflow_status,
+        },
         "--version": version,
     }
 

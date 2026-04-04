@@ -16,6 +16,7 @@ The intended workflow is:
 2. A human author creates or downloads roles and skills.
 3. Agents run `myteam get role ...` and `myteam get skill ...` to load the instructions relevant to their current task.
 4. Each loaded role or skill reveals the next level of roles, skills, and tools that are available from that point in the hierarchy.
+5. A project may also define a deterministic workflow YAML and run it with `myteam workflows start <path>`, letting `myteam` orchestrate role-based steps on top of a Codex AppServer session.
 
 ## Operating Model
 
@@ -46,6 +47,8 @@ At the black-box level, `myteam` provides these categories of behavior:
 - It can list downloadable rosters from a remote repository.
 - It can download a roster into a local destination.
 - It can update a previously downloaded managed roster install from its recorded source metadata.
+- It can execute a deterministic YAML workflow by running ordered role-based steps through a local Codex AppServer session.
+- It can persist workflow-run state under `.myteam/workflow_runs/` so a failed run can later be resumed or inspected.
 - It can report its version string.
 
 Successful commands either:
@@ -53,6 +56,7 @@ Successful commands either:
 - create or remove files and directories in or under the current working directory,
 - print instructions or listings to standard output,
 - download roster files into a destination directory,
+- execute or resume a workflow while streaming progress to standard output and recording run-state files under `.myteam/`,
 - or return a version string.
 
 When a command cannot complete, it exits with an error and reports the failure on standard error.
@@ -257,6 +261,87 @@ Failure conditions that matter at the interface:
   different destination instead of merging.
 - If the remote metadata or file downloads fail, the command exits with an error.
 
+### `myteam workflows start <path>`
+
+Loads a deterministic workflow YAML and executes its steps in order.
+
+Inputs:
+
+- `<path>` is a filesystem path to a YAML mapping whose top-level keys are workflow step names.
+- Each step must define a `role`, may define `inputs`, and must define `outputs`.
+- Step input values may include `{from: prior_step.output_name}` references to previously completed step outputs.
+- Scalar `outputs` values are treated as string-typed outputs with a human-readable description.
+- An `outputs` entry may instead be a JSON Schema property mapping so the workflow can require a non-string type.
+
+Expected outcome on success:
+
+- Reads the workflow YAML from disk.
+- Loads each step role from `.myteam/`.
+- Starts a local Codex AppServer subprocess session.
+- Creates one fresh AppServer thread per workflow step attempt.
+- Starts one turn per step, streaming progress while the step runs.
+- Allows the caller to send follow-up input to the active step while it is still running.
+- Requires the final assistant message for each completed step to be a JSON object whose keys exactly match the step's declared `outputs`.
+- Persists run state under `.myteam/workflow_runs/<run_id>/run.json`.
+
+User-visible result:
+
+- The caller can watch each step progress in real time.
+- The caller can steer the active step without abandoning deterministic step outputs.
+- On success, the workflow's validated step outputs are stored for later inspection and downstream steps.
+
+Failure conditions that matter at the interface:
+
+- If the workflow file is missing, malformed, or not a valid mapping, the command exits with an error.
+- If a step references an unavailable prior output, the command exits with an error before execution.
+- If a referenced role is not a valid `.myteam/` role directory, the command exits with an error.
+- If the AppServer subprocess cannot be started or initialized, the command exits with an error.
+- If a step finishes without a valid final JSON object matching its declared `outputs`, the run is marked failed and the command exits with an error.
+
+### `myteam workflows resume <run_id>`
+
+Resumes a previously failed workflow run from the first incomplete step.
+
+Inputs:
+
+- `<run_id>` identifies a run previously recorded under `.myteam/workflow_runs/`.
+
+Expected outcome on success:
+
+- Loads the persisted run state.
+- Re-runs the first incomplete step in a fresh AppServer thread attempt.
+- Preserves previously completed step outputs.
+
+User-visible result:
+
+- The caller can continue a failed workflow run without rerunning successful earlier steps.
+
+Failure conditions that matter at the interface:
+
+- If the run id does not exist or its persisted state is invalid, the command exits with an error.
+- If the resumed step fails again, the run remains failed and the command exits with an error.
+
+### `myteam workflows status <run_id>`
+
+Reports the persisted state of a workflow run without launching the AppServer.
+
+Inputs:
+
+- `<run_id>` identifies a run previously recorded under `.myteam/workflow_runs/`.
+
+Expected outcome on success:
+
+- Reads the persisted run state from disk.
+- Prints the current workflow status, the next step index, and any completed outputs.
+
+User-visible result:
+
+- The caller can inspect workflow progress and the latest failure without mutating the run.
+
+Failure conditions that matter at the interface:
+
+- If the run id does not exist or its persisted state is unreadable, the command exits with an error.
+
 ### `myteam --version`
 
 Reports the application version.
@@ -320,6 +405,8 @@ The following behavior is part of the current application contract:
 - Upgrade guidance is surfaced through the generated root role and built-in maintenance skills, not through a dedicated migration CLI command.
 - If the tracked version file is missing, upgrade-related built-in loaders treat the tree as a legacy untracked `.myteam` tree rather than failing.
 - Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
+- Workflow runs are identified by folders under `.myteam/workflow_runs/`.
+- Workflow step outputs become downstream workflow state only after `myteam workflows` validates the final step JSON against the declared `outputs` keys.
 - Errors are communicated as command failure plus an error message on standard error.
 
 ## Out of Scope

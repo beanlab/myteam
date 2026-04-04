@@ -26,6 +26,7 @@ Typical flow:
 3. That sub-agent runs `myteam get role developer`.
 4. `myteam` prints the role instructions plus any immediately available child roles, child skills, and tools.
 5. If the agent needs a skill, it runs `myteam get skill <skill>`.
+6. If the project wants deterministic multi-step orchestration, it can define a workflow YAML and run `myteam workflows start <path>`.
 
 In other words, roles and skills are loaded by the agent that is assuming them.
 
@@ -303,6 +304,57 @@ For upgrade work:
 - load `myteam get skill builtins/migration` to review packaged migration guidance
 - load `myteam get skill builtins/changelog` to review newer release notes
 - apply approved project-specific edits manually, including any `.myteam` version-file update
+
+### `myteam workflows start <path>`
+
+Runs a deterministic workflow YAML whose top-level step names map to:
+
+- `role`: the `.myteam/` role to load for that step
+- `inputs`: structured input values for the step
+- `outputs`: the required final JSON keys for the step
+
+Example shape:
+
+```yaml
+plan:
+  role: .myteam/plan
+  inputs:
+    request: draft a plan
+  outputs:
+    summary: short plan summary
+    plandoc: /plan.md
+review:
+  role: review
+  inputs:
+    summary:
+      from: plan.summary
+  outputs:
+    verdict: review result
+```
+
+`myteam workflows start` hides the AppServer mechanics under the hood:
+
+- it launches a local Codex AppServer session
+- it creates one fresh thread per step attempt
+- it streams the active step live
+- it lets you send follow-up input to the active step while it is still running
+- it persists run state under `.myteam/workflow_runs/`
+
+For `outputs`:
+
+- a scalar value like `poem: final poem text` means that output is a `string`
+- if you need a non-string JSON type, use a mapping such as
+  `count: {type: integer, description: line count}`
+
+Only the final validated JSON object from a completed step becomes workflow state for later steps.
+
+### `myteam workflows resume <run_id>`
+
+Resumes the first incomplete step from a failed workflow run while preserving earlier completed outputs.
+
+### `myteam workflows status <run_id>`
+
+Prints the saved workflow run state without starting the AppServer.
 
 ## Why Use Myteam
 

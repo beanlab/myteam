@@ -1,19 +1,19 @@
 """Command implementations for the myteam CLI."""
 from __future__ import annotations
 
-import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-from myteam.utils import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
+from myteam.loader import run_loader
+from myteam.utils import builtin_skill_dir, is_role_dir, is_skill_dir
 
 from . import __version__
 from .paths import APP_NAME, BUILTIN_ROOT_NAME, ENCODING, agents_root, base_dir, role_dir
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import write_tracked_version
+from .workflows import workflow_resume, workflow_start, workflow_status
 
 
 def ensure_dir(path: Path) -> None:
@@ -115,11 +115,7 @@ def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: P
         raise SystemExit(1)
 
     try:
-        env = None
-        if project_root is not None:
-            env = dict(os.environ)
-            env[PROJECT_ROOT_ENV_VAR] = str(project_root)
-        result = subprocess.run([sys.executable, str(load_py)], cwd=name_dir, env=env, check=False)
+        result = run_loader(load_py, cwd=name_dir, project_root=project_root, capture_output=False)
         raise SystemExit(result.returncode)
     except OSError as exc:
         print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
@@ -170,4 +166,7 @@ __all__ = [
     "remove",
     "update_roster",
     "version",
+    "workflow_resume",
+    "workflow_start",
+    "workflow_status",
 ]
