@@ -13,7 +13,7 @@ from .paths import APP_NAME, BUILTIN_ROOT_NAME, ENCODING, agents_root, base_dir,
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import write_tracked_version
-from .workflows import workflow_resume, workflow_start, workflow_status
+from .workflows import WorkflowError, workflow_path_for_name, workflow_resume, workflow_start, workflow_status
 
 
 def ensure_dir(path: Path) -> None:
@@ -81,6 +81,21 @@ def new_skill(skill: str) -> None:
         get_template("skill_definition_template.md"),
         get_template("skill_load_template.py"),
     )
+
+
+def new_workflow(name: str) -> None:
+    try:
+        workflow_path = workflow_path_for_name(base_dir(), name)
+    except WorkflowError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    if workflow_path.exists():
+        print(f"Workflow '{name}' already exists at {workflow_path}", file=sys.stderr)
+        raise SystemExit(1)
+
+    ensure_dir(workflow_path.parent)
+    workflow_path.write_text(get_template("workflow_template.yaml"), encoding=ENCODING)
 
 
 def remove(name: str) -> None:
@@ -163,6 +178,7 @@ __all__ = [
     "list_available_rosters",
     "new_role",
     "new_skill",
+    "new_workflow",
     "remove",
     "update_roster",
     "version",

@@ -1,0 +1,26 @@
+name:
+  role: path/to/role
+  inputs:
+    input1: value1
+    input2: value2
+  outputs:
+    output1: could be a string or a file path. or anything relevant for the output
+    output2: could be a string or a file path. or anything relevant for the output
+
+name2:
+  role: path/to/role2
+  inputs:
+    input1: value1
+    input2: value2
+    input3: value3
+  outputs:
+    output1: could be a string or a file path. or anything relevant for the output
+    output2: could be a string or a file path. or anything relevant for the output
+
+plan:
+  role: .myteam/plan
+  inputs:
+    request: a request for a plan, could be a string or a file path. or anything relevant for the input
+  outputs:
+    plandoc: /plan.md
+    summary: a summary of the plan

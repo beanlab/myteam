@@ -16,7 +16,7 @@ The intended workflow is:
 2. A human author creates or downloads roles and skills.
 3. Agents run `myteam get role ...` and `myteam get skill ...` to load the instructions relevant to their current task.
 4. Each loaded role or skill reveals the next level of roles, skills, and tools that are available from that point in the hierarchy.
-5. A project may also define a deterministic workflow YAML and run it with `myteam workflows start <path>`, letting `myteam` orchestrate role-based steps on top of a Codex AppServer session.
+5. A project may also define a deterministic workflow YAML under `.myteam/workflows/` and run it with `myteam workflows start <name>`, letting `myteam` orchestrate role-based steps on top of a Codex AppServer session.
 
 ## Operating Model
 
@@ -129,23 +129,23 @@ Failure conditions that matter at the interface:
 
 - If the target directory already exists, the command exits with an error and does not overwrite it.
 
-### `myteam new workflow <path>`
+### `myteam new workflow <name>`
 
 Creates a new workflow YAML below `.myteam/workflows/`.
 
 Inputs:
 
-- `<path>` is slash-delimited and may describe a nested workflow such as `planning/release`.
+- `<name>` is slash-delimited and may describe a nested workflow such as `planning/release`.
 
 Expected outcome on success:
 
 - Creates the parent directories for the target workflow under `.myteam/workflows/`.
-- Creates a `.yaml` workflow file at `.myteam/workflows/<path>.yaml`.
+- Creates a `.yaml` workflow file at `.myteam/workflows/<name>.yaml`.
 - Populates the file using the project's workflow template shape.
 
 User-visible result:
 
-- The new workflow becomes startable with `myteam workflows start <path>`.
+- The new workflow becomes startable with `myteam workflows start <name>`.
 - The created file gives the caller a valid starting point for defining step `role`, `inputs`, and `outputs`.
 
 Failure conditions that matter at the interface:
@@ -286,15 +286,13 @@ Failure conditions that matter at the interface:
   different destination instead of merging.
 - If the remote metadata or file downloads fail, the command exits with an error.
 
-### `myteam workflows start <path-or-name>`
+### `myteam workflows start <name>`
 
 Loads a deterministic workflow YAML and executes its steps in order.
 
 Inputs:
 
-- `<path-or-name>` is either:
-  - a filesystem path to a workflow YAML file, or
-  - a slash-delimited workflow name resolved from `.myteam/workflows/<name>.yaml`.
+- `<name>` is a slash-delimited workflow name resolved from `.myteam/workflows/<name>.yaml`.
 - Each step must define a `role`, may define `inputs`, and must define `outputs`.
 - Step input values may include `{from: prior_step.output_name}` references to previously completed step outputs.
 - Scalar `outputs` values are treated as string-typed outputs with a human-readable description.
@@ -302,7 +300,7 @@ Inputs:
 
 Expected outcome on success:
 
-- Resolves the requested workflow from disk.
+- Resolves the requested workflow from `.myteam/workflows/`.
 - Loads each step role from `.myteam/`.
 - Starts a local Codex AppServer subprocess session.
 - Creates one fresh AppServer thread per workflow step attempt.

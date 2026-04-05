@@ -11,6 +11,7 @@ from .commands import (
     list_available_rosters,
     new_role,
     new_skill,
+    new_workflow,
     remove,
     update_roster,
     version,
@@ -25,7 +26,8 @@ def main(argv: list[str] | None = None):
         "init": init,
         "new": {
             "role": new_role,
-            "skill": new_skill
+            "skill": new_skill,
+            "workflow": new_workflow,
         },
         "remove": remove,
         "get": {

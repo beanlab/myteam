@@ -35,6 +35,7 @@ from .workflow_runs import (
     add_token_usage,
 )
 
+WORKFLOWS_DIRNAME = "workflows"
 WORKFLOW_SERVER_COMMAND_ENV_VAR = "MYTEAM_WORKFLOW_APP_SERVER_COMMAND"
 DEFAULT_WORKFLOW_SERVER_COMMAND = "codex app-server"
 
@@ -80,26 +81,44 @@ class UserInputPump:
                 self._queue.put(text)
 
 
-def workflow_start(path: str, app_server_command: str | None = None) -> None:
+def workflow_path_for_name(project_root: Path, name: str) -> Path:
+    parts = _workflow_name_parts(name)
+    workflow_root = agents_root(project_root) / WORKFLOWS_DIRNAME
+    return workflow_root.joinpath(*parts[:-1], f"{parts[-1]}.yaml")
+
+
+def workflow_start(name: str, app_server_command: str | None = None) -> None:
     project_root = base_dir()
-    workflow_path = _resolve_workflow_path(project_root, path)
-    workflow = load_workflow_definition(workflow_path)
-    run_state = create_run_state(workflow)
-    save_run_state(project_root, run_state)
-    print(f"Starting workflow run {run_state.run_id}")
-    _run_workflow(project_root, workflow, run_state, app_server_command=app_server_command)
+    try:
+        workflow_path = workflow_path_for_name(project_root, name)
+        workflow = load_workflow_definition(workflow_path)
+        run_state = create_run_state(workflow)
+        save_run_state(project_root, run_state)
+        print(f"Starting workflow run {run_state.run_id}")
+        _run_workflow(project_root, workflow, run_state, app_server_command=app_server_command)
+    except WorkflowError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 def workflow_resume(run_id: str, app_server_command: str | None = None) -> None:
     project_root = base_dir()
-    run_state = load_run_state(project_root, run_id)
-    workflow = load_workflow_definition(Path(run_state.workflow_path))
-    print(f"Resuming workflow run {run_state.run_id}")
-    _run_workflow(project_root, workflow, run_state, app_server_command=app_server_command)
+    try:
+        run_state = load_run_state(project_root, run_id)
+        workflow = load_workflow_definition(Path(run_state.workflow_path))
+        print(f"Resuming workflow run {run_state.run_id}")
+        _run_workflow(project_root, workflow, run_state, app_server_command=app_server_command)
+    except WorkflowError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 def workflow_status(run_id: str) -> None:
-    run_state = load_run_state(base_dir(), run_id)
+    try:
+        run_state = load_run_state(base_dir(), run_id)
+    except WorkflowError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
     print(f"Run ID: {run_state.run_id}")
     print(f"Workflow: {run_state.workflow_path}")
     print(f"Status: {run_state.status}")
@@ -423,9 +442,15 @@ def _load_role_instructions(project_root: Path, role_path: str) -> str:
     except RuntimeError as exc:
         raise WorkflowError(f"failed to load workflow role '{role_path or AGENTS_DIRNAME}': {exc}") from exc
 
-
-def _resolve_workflow_path(project_root: Path, path: str) -> Path:
-    workflow_path = Path(path)
-    if not workflow_path.is_absolute():
-        workflow_path = project_root / workflow_path
-    return workflow_path.resolve()
+def _workflow_name_parts(name: str) -> list[str]:
+    normalized = name.strip()
+    if not normalized:
+        raise WorkflowError("workflow name must be a non-empty slash-delimited name")
+    if normalized.endswith(".yaml"):
+        raise WorkflowError("workflow names must not include the .yaml extension")
+    if normalized.startswith("/") or normalized.startswith("./") or normalized.startswith(".myteam/"):
+        raise WorkflowError("workflow names must be slash-delimited names, not filesystem paths")
+    parts = normalized.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise WorkflowError(f"workflow name '{name}' is invalid")
+    return parts

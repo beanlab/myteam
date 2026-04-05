@@ -9,6 +9,11 @@
   retry history, and resumable failed runs.
 - Added workflow YAML support for ordered role-based steps with declared `inputs`, declared
   `outputs`, and `{from: prior_step.output}` references.
+- Added `myteam new workflow <name>` to scaffold named workflows inside `.myteam/workflows/`.
+- Changed workflow startup to `myteam workflows start <name>`, resolving named workflows from
+  `.myteam/workflows/<name>.yaml`.
+- Added `src/myteam/templates/workflow_template.yaml` and updated docs/tests for the named-workflow
+  layout.
 
 ## 0.2.8
 

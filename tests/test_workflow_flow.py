@@ -27,6 +27,14 @@ def _write_role(project: Path, role: str, instructions: str) -> None:
     )
 
 
+def _write_workflow(project: Path, name: str, contents: str) -> Path:
+    workflow_path = project / ".myteam" / "workflows" / Path(*name.split("/"))
+    workflow_path = workflow_path.parent / f"{workflow_path.name}.yaml"
+    workflow_path.parent.mkdir(parents=True, exist_ok=True)
+    workflow_path.write_text(contents, encoding="utf-8")
+    return workflow_path
+
+
 def _write_fake_workflow_server(script_path: Path) -> None:
     script_path.write_text(
         "#!/usr/bin/env python3\n"
@@ -242,8 +250,9 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
     _write_role(initialized_project, "plan", "Plan the work")
     _write_role(initialized_project, "review", "Review the work")
 
-    workflow = initialized_project / "workflow.yaml"
-    workflow.write_text(
+    _write_workflow(
+        initialized_project,
+        "demo",
         "plan:\n"
         "  role: .myteam/plan\n"
         "  inputs:\n"
@@ -258,7 +267,6 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
         "      from: plan.summary\n"
         "  outputs:\n"
         "    verdict: review result\n",
-        encoding="utf-8",
     )
 
     fake_server = initialized_project / "fake_workflow_server.py"
@@ -268,7 +276,7 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
         initialized_project,
         "workflows",
         "start",
-        str(workflow),
+        "demo",
         input_text="/done\n",
         env_overrides={
             "MYTEAM_WORKFLOW_APP_SERVER_COMMAND": _server_command(fake_server),
@@ -310,8 +318,9 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
 def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_project: Path):
     _write_role(initialized_project, "plan", "Plan the work")
 
-    workflow = initialized_project / "workflow.yaml"
-    workflow.write_text(
+    _write_workflow(
+        initialized_project,
+        "plan/demo",
         "plan:\n"
         "  role: plan\n"
         "  inputs:\n"
@@ -319,7 +328,6 @@ def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_proje
         "  outputs:\n"
         "    summary: short plan summary\n"
         "    plandoc: /plan.md\n",
-        encoding="utf-8",
     )
 
     fake_server = initialized_project / "fake_workflow_server.py"
@@ -329,7 +337,7 @@ def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_proje
         initialized_project,
         "workflows",
         "start",
-        str(workflow),
+        "plan/demo",
         input_text="extra detail\n/done\n",
         env_overrides={
             "MYTEAM_WORKFLOW_APP_SERVER_COMMAND": _server_command(fake_server),
@@ -349,8 +357,9 @@ def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_proje
 def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: Path):
     _write_role(initialized_project, "plan", "Plan the work")
 
-    workflow = initialized_project / "workflow.yaml"
-    workflow.write_text(
+    _write_workflow(
+        initialized_project,
+        "retry-plan",
         "plan:\n"
         "  role: plan\n"
         "  inputs:\n"
@@ -358,7 +367,6 @@ def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: P
         "  outputs:\n"
         "    summary: short plan summary\n"
         "    plandoc: /plan.md\n",
-        encoding="utf-8",
     )
 
     fake_server = initialized_project / "fake_workflow_server.py"
@@ -374,7 +382,7 @@ def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: P
         initialized_project,
         "workflows",
         "start",
-        str(workflow),
+        "retry-plan",
         input_text="/done\n",
         env_overrides=env_overrides,
     )
@@ -398,3 +406,15 @@ def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: P
     resumed_state = json.loads((run_dirs[0] / "run.json").read_text(encoding="utf-8"))
     assert resumed_state["status"] == "completed"
     assert len(resumed_state["attempts"]["plan"]) == 2
+
+
+def test_new_workflow_scaffolds_named_workflow(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "workflow", "planning/release")
+
+    assert result.exit_code == 0, result.stderr
+
+    workflow_path = initialized_project / ".myteam" / "workflows" / "planning" / "release.yaml"
+    assert workflow_path.exists()
+    contents = workflow_path.read_text(encoding="utf-8")
+    assert "plan:" in contents
+    assert "role: .myteam/plan" in contents

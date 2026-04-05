@@ -26,7 +26,7 @@ Typical flow:
 3. That sub-agent runs `myteam get role developer`.
 4. `myteam` prints the role instructions plus any immediately available child roles, child skills, and tools.
 5. If the agent needs a skill, it runs `myteam get skill <skill>`.
-6. If the project wants deterministic multi-step orchestration, it can define a workflow YAML and run `myteam workflows start <path>`.
+6. If the project wants deterministic multi-step orchestration, it can define a named workflow under `.myteam/workflows/` and run `myteam workflows start <name>`.
 
 In other words, roles and skills are loaded by the agent that is assuming them.
 
@@ -110,6 +110,7 @@ Create a sub-role and a skill:
 myteam new role developer
 myteam new skill python
 myteam new skill python/testing
+myteam new workflow planning/release
 ```
 
 That agent system now supports commands like:
@@ -305,9 +306,13 @@ For upgrade work:
 - load `myteam get skill builtins/changelog` to review newer release notes
 - apply approved project-specific edits manually, including any `.myteam` version-file update
 
-### `myteam workflows start <path>`
+### `myteam new workflow <name>`
 
-Runs a deterministic workflow YAML whose top-level step names map to:
+Creates `.myteam/workflows/<name>.yaml` from the built-in workflow template.
+
+### `myteam workflows start <name>`
+
+Runs a deterministic workflow YAML from `.myteam/workflows/<name>.yaml` whose top-level step names map to:
 
 - `role`: the `.myteam/` role to load for that step
 - `inputs`: structured input values for the step
