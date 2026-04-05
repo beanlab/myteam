@@ -25,6 +25,7 @@ The intended workflow is:
 - The application treats the current directory as the project root.
 - The root agent system lives in `.myteam/`.
 - Roles and skills are organized as nested directories under `.myteam/`.
+- Workflow definitions may also be stored under `.myteam/workflows/`.
 - A loadable role directory contains `role.md` or `ROLE.md` and a `load.py`.
 - A loadable skill directory contains `skill.md` or `SKILL.md` and a `load.py`.
 - Packaged built-in skills also exist under the reserved `builtins/` namespace and are loadable even
@@ -37,6 +38,7 @@ At the black-box level, `myteam` provides these categories of behavior:
 
 - It can scaffold a new `.myteam/` tree.
 - It can scaffold new role and skill nodes inside that tree.
+- It can scaffold new workflow YAML files inside `.myteam/workflows/`.
 - It can record which `myteam` version last initialized or refreshed a `.myteam/` tree.
 - It can load and print instructions for a role or skill.
 - It can resolve skills from either the project `.myteam/` tree or the packaged built-in tree,
@@ -126,6 +128,29 @@ User-visible result:
 Failure conditions that matter at the interface:
 
 - If the target directory already exists, the command exits with an error and does not overwrite it.
+
+### `myteam new workflow <path>`
+
+Creates a new workflow YAML below `.myteam/workflows/`.
+
+Inputs:
+
+- `<path>` is slash-delimited and may describe a nested workflow such as `planning/release`.
+
+Expected outcome on success:
+
+- Creates the parent directories for the target workflow under `.myteam/workflows/`.
+- Creates a `.yaml` workflow file at `.myteam/workflows/<path>.yaml`.
+- Populates the file using the project's workflow template shape.
+
+User-visible result:
+
+- The new workflow becomes startable with `myteam workflows start <path>`.
+- The created file gives the caller a valid starting point for defining step `role`, `inputs`, and `outputs`.
+
+Failure conditions that matter at the interface:
+
+- If the target workflow file already exists, the command exits with an error and does not overwrite it.
 
 ### `myteam get role [path]`
 
@@ -261,13 +286,15 @@ Failure conditions that matter at the interface:
   different destination instead of merging.
 - If the remote metadata or file downloads fail, the command exits with an error.
 
-### `myteam workflows start <path>`
+### `myteam workflows start <path-or-name>`
 
 Loads a deterministic workflow YAML and executes its steps in order.
 
 Inputs:
 
-- `<path>` is a filesystem path to a YAML mapping whose top-level keys are workflow step names.
+- `<path-or-name>` is either:
+  - a filesystem path to a workflow YAML file, or
+  - a slash-delimited workflow name resolved from `.myteam/workflows/<name>.yaml`.
 - Each step must define a `role`, may define `inputs`, and must define `outputs`.
 - Step input values may include `{from: prior_step.output_name}` references to previously completed step outputs.
 - Scalar `outputs` values are treated as string-typed outputs with a human-readable description.
@@ -275,7 +302,7 @@ Inputs:
 
 Expected outcome on success:
 
-- Reads the workflow YAML from disk.
+- Resolves the requested workflow from disk.
 - Loads each step role from `.myteam/`.
 - Starts a local Codex AppServer subprocess session.
 - Creates one fresh AppServer thread per workflow step attempt.
@@ -294,7 +321,8 @@ User-visible result:
 
 Failure conditions that matter at the interface:
 
-- If the workflow file is missing, malformed, or not a valid mapping, the command exits with an error.
+- If the named workflow does not exist under `.myteam/workflows/`, the command exits with an error.
+- If the resolved workflow file is malformed or not a valid mapping, the command exits with an error.
 - If a step references an unavailable prior output, the command exits with an error before execution.
 - If a referenced role is not a valid `.myteam/` role directory, the command exits with an error.
 - If the AppServer subprocess cannot be started or initialized, the command exits with an error.
@@ -408,6 +436,7 @@ The following behavior is part of the current application contract:
 - If the tracked version file is missing, upgrade-related built-in loaders treat the tree as a legacy untracked `.myteam` tree rather than failing.
 - Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
 - Workflow runs are identified by folders under `.myteam/workflow_runs/`.
+- Project-local workflow definitions may live under `.myteam/workflows/` and are startable by slash-delimited name.
 - Workflow step outputs become downstream workflow state only after `myteam workflows` validates the final step JSON against the declared `outputs` keys.
 - Errors are communicated as command failure plus an error message on standard error.
 
