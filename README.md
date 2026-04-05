@@ -119,6 +119,7 @@ That agent system now supports commands like:
 myteam get role
 myteam get role developer
 myteam get skill python/testing
+myteam get workflow planning/release
 ```
 
 ## Directory Structure
@@ -260,6 +261,16 @@ Examples:
 ```bash
 myteam get skill python/testing
 myteam get skill research/literature-review
+```
+
+### `myteam get workflow <name>`
+
+Prints the stored workflow YAML from `.myteam/workflows/<name>.yaml`.
+
+Example:
+
+```bash
+myteam get workflow planning/release
 ```
 
 ### `myteam remove <path>`

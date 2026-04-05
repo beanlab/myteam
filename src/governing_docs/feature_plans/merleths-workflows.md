@@ -43,6 +43,7 @@ Planned refactors:
 5. Integrate workflow creation and lookup into the existing command framework by:
    - adding `myteam new workflow <name>`
    - resolving `.myteam/workflows/<name>.yaml` from `myteam workflows start <name>`
+   - adding `myteam get workflow <name>` to print the stored YAML by name
    - using the same slash-delimited naming style as roles and skills
 
 The existing role/skill loading behavior should remain unchanged after this refactor.
@@ -70,7 +71,9 @@ Behavior details:
 7. Failed runs can be resumed from the first incomplete step with `myteam workflows resume <run_id>`.
 8. `myteam new workflow <name>` scaffolds `.myteam/workflows/<name>.yaml` from `planning_files/template.yaml`.
 9. `myteam workflows start <name>` resolves the named workflow from `.myteam/workflows/`.
-10. Workflow naming should follow the same slash-delimited convention as roles and skills and avoid
+10. `myteam get workflow <name>` prints the named workflow definition from `.myteam/workflows/`
+    without introducing role or skill loader behavior.
+11. Workflow naming should follow the same slash-delimited convention as roles and skills and avoid
     extension-heavy or path-heavy invocation.
 
 ## Test Plan
@@ -83,3 +86,4 @@ Add high-level CLI tests that prove:
 - workflow status can be read from disk after a run completes or fails
 - `myteam new workflow <name>` scaffolds the expected file in `.myteam/workflows/`
 - `myteam workflows start <name>` resolves a named workflow from `.myteam/workflows/`
+- `myteam get workflow <name>` prints the named workflow contents from `.myteam/workflows/`

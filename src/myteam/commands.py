@@ -13,7 +13,14 @@ from .paths import APP_NAME, BUILTIN_ROOT_NAME, ENCODING, agents_root, base_dir,
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import write_tracked_version
-from .workflows import WorkflowError, workflow_path_for_name, workflow_resume, workflow_start, workflow_status
+from .workflows import (
+    WorkflowError,
+    workflow_contents_for_name,
+    workflow_path_for_name,
+    workflow_resume,
+    workflow_start,
+    workflow_status,
+)
 
 
 def ensure_dir(path: Path) -> None:
@@ -166,6 +173,15 @@ def get_skill(skill: str) -> None:
     raise SystemExit(1)
 
 
+def get_workflow(name: str) -> None:
+    """Print the stored YAML for the given named workflow."""
+    try:
+        print(workflow_contents_for_name(base_dir(), name), end="")
+    except WorkflowError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
 def version() -> str:
     return f"{APP_NAME} {__version__}"
 
@@ -174,6 +190,7 @@ __all__ = [
     "download_roster",
     "get_role",
     "get_skill",
+    "get_workflow",
     "init",
     "list_available_rosters",
     "new_role",

@@ -139,7 +139,7 @@ class WorkflowRunState:
 def create_run_state(workflow: WorkflowDefinition) -> WorkflowRunState:
     now = utc_now()
     return WorkflowRunState(
-        run_id=uuid.uuid4().hex[:12],
+        run_id=f"wr_{uuid.uuid4().hex[:10]}",
         workflow_path=str(workflow.path),
         status="in_progress",
         next_step_index=0,

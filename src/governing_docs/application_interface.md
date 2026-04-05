@@ -41,6 +41,7 @@ At the black-box level, `myteam` provides these categories of behavior:
 - It can scaffold new workflow YAML files inside `.myteam/workflows/`.
 - It can record which `myteam` version last initialized or refreshed a `.myteam/` tree.
 - It can load and print instructions for a role or skill.
+- It can load and print a named workflow definition.
 - It can resolve skills from either the project `.myteam/` tree or the packaged built-in tree,
   depending on the requested namespace.
 - It can alert the caller when the installed `myteam` version is newer than the tracked `.myteam` version.
@@ -210,6 +211,30 @@ Failure conditions that matter at the interface:
 - If the target path is not a valid skill in the selected source tree, the command exits with an error.
 - If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
 - If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
+
+### `myteam get workflow <path>`
+
+Loads and prints a workflow definition from `.myteam/workflows/`.
+
+Inputs:
+
+- `<name>` is a slash-delimited workflow name resolved from `.myteam/workflows/<name>.yaml`.
+
+Expected outcome on success:
+
+- Resolves the named workflow from `.myteam/workflows/`.
+- Reads the workflow YAML from disk.
+- Prints the workflow file contents exactly as stored.
+
+User-visible result:
+
+- The caller can inspect the current workflow definition by name, using the same naming style as
+  roles and skills.
+
+Failure conditions that matter at the interface:
+
+- If the named workflow does not exist under `.myteam/workflows/`, the command exits with an error.
+- If the workflow file cannot be read, the command exits with an error.
 
 ### `myteam remove <path>`
 

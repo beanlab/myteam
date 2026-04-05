@@ -87,6 +87,14 @@ def workflow_path_for_name(project_root: Path, name: str) -> Path:
     return workflow_root.joinpath(*parts[:-1], f"{parts[-1]}.yaml")
 
 
+def workflow_contents_for_name(project_root: Path, name: str) -> str:
+    workflow_path = workflow_path_for_name(project_root, name)
+    try:
+        return workflow_path.read_text()
+    except OSError as exc:
+        raise WorkflowError(f"failed to read workflow '{name}': {exc}") from exc
+
+
 def workflow_start(name: str, app_server_command: str | None = None) -> None:
     project_root = base_dir()
     try:

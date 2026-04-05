@@ -418,3 +418,35 @@ def test_new_workflow_scaffolds_named_workflow(run_myteam, initialized_project: 
     contents = workflow_path.read_text(encoding="utf-8")
     assert "plan:" in contents
     assert "role: .myteam/plan" in contents
+
+
+def test_get_workflow_prints_named_workflow_contents(run_myteam, initialized_project: Path):
+    _write_workflow(
+        initialized_project,
+        "planning/release",
+        "plan:\n"
+        "  role: plan\n"
+        "  inputs:\n"
+        "    request: release plan\n"
+        "  outputs:\n"
+        "    summary: release summary\n",
+    )
+
+    result = run_myteam(initialized_project, "get", "workflow", "planning/release")
+
+    assert result.exit_code == 0, result.stderr
+    assert result.stdout == (
+        "plan:\n"
+        "  role: plan\n"
+        "  inputs:\n"
+        "    request: release plan\n"
+        "  outputs:\n"
+        "    summary: release summary\n"
+    )
+
+
+def test_get_workflow_fails_for_missing_named_workflow(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "get", "workflow", "missing/demo")
+
+    assert result.exit_code == 1
+    assert "failed to read workflow 'missing/demo'" in result.stderr

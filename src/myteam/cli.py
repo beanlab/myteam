@@ -7,6 +7,7 @@ from .commands import (
     download_roster,
     get_role,
     get_skill,
+    get_workflow,
     init,
     list_available_rosters,
     new_role,
@@ -33,6 +34,7 @@ def main(argv: list[str] | None = None):
         "get": {
             "role": get_role,
             "skill": get_skill,
+            "workflow": get_workflow,
         },
         "download": download_roster,
         "update": update_roster,
