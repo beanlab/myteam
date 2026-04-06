@@ -49,7 +49,7 @@ as an action to be taken without human review and approval.
 
 1. Read the file creation timestamp from the source audio file.
    On macOS, `stat -f '%SB' -t '%Y-%m-%d-%H%M' <file>` works.
-2. Check that `meetings/` and `meetings/raw/` exist; create them if needed.
+2. Check that `meetings/` exists; create it if needed.
 3. Run transcription locally and save an intermediate raw output if
    needed.
 4. Clean the transcript before saving it:
@@ -58,8 +58,7 @@ as an action to be taken without human review and approval.
    - correct obvious recognition mistakes
    - do not invent missing content
    - if a phrase is too garbled to recover, mark it as `[unclear]`
-5. Save the cleaned raw transcript to
-   `meetings/raw/YYYY-MM-DD-HHMM.raw.md`.
+5. Save the cleaned raw transcript to the raw transcripts folder.
 6. Write a separate summary to `meetings/YYYY-MM-DD-HHMM.md`.
 7. Review agent-assigned tasks with the user.
 
