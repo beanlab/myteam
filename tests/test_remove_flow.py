@@ -36,3 +36,15 @@ def test_remove_non_directory_path_fails(run_myteam, initialized_project: Path):
 
     assert result.exit_code == 1
     assert "is not a directory" in result.stderr
+
+
+def test_remove_accepts_custom_prefix(run_myteam, tmp_path: Path):
+    init_result = run_myteam(tmp_path, "init", "--prefix", ".agents")
+    assert init_result.exit_code == 0
+    create_result = run_myteam(tmp_path, "new", "role", "developer", "--prefix", ".agents")
+    assert create_result.exit_code == 0
+
+    result = run_myteam(tmp_path, "remove", "developer", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert not (tmp_path / ".agents" / "developer").exists()
