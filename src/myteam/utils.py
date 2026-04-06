@@ -13,6 +13,9 @@ PROJECT_ROOT_ENV_VAR = "MYTEAM_PROJECT_ROOT"
 
 
 def get_myteam_root(cur_dir: Path):
+    configured_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    if configured_root:
+        return Path(configured_root)
     d = cur_dir
     while d.parent != d:  # i.e. not at root
         if d.name == '.myteam':

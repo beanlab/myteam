@@ -99,6 +99,29 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
     assert "lint.py" in result.stdout
 
 
+def test_get_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
+    init_result = run_myteam(tmp_path, "init", "--prefix", ".agents")
+    assert init_result.exit_code == 0
+    create_result = run_myteam(tmp_path, "new", "skill", "python", "--prefix", ".agents")
+    assert create_result.exit_code == 0
+
+    result = run_myteam(tmp_path, "get", "skill", "python", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert "The skill content goes here." in result.stdout
+
+
+def test_builtin_skill_uses_custom_prefix_project_root(run_myteam, tmp_path: Path):
+    init_result = run_myteam(tmp_path, "init", "--prefix", ".agents")
+    assert init_result.exit_code == 0
+    (tmp_path / ".agents" / ".myteam-version").write_text("0.2.5\n", encoding="utf-8")
+
+    result = run_myteam(tmp_path, "get", "skill", "builtins/changelog", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert "New `myteam` features since 0.2.5" in result.stdout
+
+
 def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project: Path):
     role_dir = initialized_project / ".myteam" / "developer"
     role_dir.mkdir()

@@ -11,22 +11,26 @@ from pathlib import Path
 
 import yaml
 
-APP_NAME = "myteam"
-AGENTS_DIRNAME = ".myteam"
+from .paths import APP_NAME, DEFAULT_LOCAL_ROOT, agents_root, normalize_local_root
+
 DEFAULT_REPO = "beanlab/rosters"
 SOURCE_METADATA = ".source.yml"
 DEFAULT_REF = "main"
 
 
-def _agents_root(base: Path) -> Path:
-    return base / AGENTS_DIRNAME
+def _selected_root(base: Path, prefix: str | Path | None = None) -> Path:
+    try:
+        return agents_root(base, prefix)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        exit(1)
 
 
-def _download_destination(base: Path, roster: str, destination: Path | str | None) -> Path:
-    agents_root = _agents_root(base)
+def _download_destination(base: Path, roster: str, destination: Path | str | None, prefix: str | Path | None = None) -> Path:
+    local_root = _selected_root(base, prefix)
     if destination is None:
-        return agents_root / Path(roster)
-    return agents_root / Path(destination)
+        return local_root / Path(roster)
+    return local_root / Path(destination)
 
 
 def _display_path(base: Path, path: Path) -> str:
@@ -237,41 +241,46 @@ def _require_source_metadata(destination: Path) -> dict[str, str]:
     return metadata
 
 
-def _managed_roots(base: Path) -> list[Path]:
-    root = _agents_root(base)
+def _managed_roots(base: Path, prefix: str | Path | None = None) -> list[Path]:
+    root = _selected_root(base, prefix)
     if not root.exists():
         return []
     return sorted(metadata_path.parent for metadata_path in root.rglob(SOURCE_METADATA))
 
 
-def _update_target(base: Path, path: Path | str) -> Path:
+def _update_target(base: Path, path: Path | str, prefix: str | Path | None = None) -> Path:
+    local_root = _selected_root(base, prefix)
+    local_root_relative = normalize_local_root(prefix)
     raw_path = Path(path)
     if raw_path.is_absolute():
         try:
-            return raw_path.relative_to(_agents_root(base))
+            raw_path.relative_to(local_root)
+            return raw_path
         except ValueError:
-            print(f"Managed download paths must live under {_display_path(base, _agents_root(base))}.", file=sys.stderr)
+            print(f"Managed download paths must live under {_display_path(base, local_root)}.", file=sys.stderr)
             exit(1)
-    if raw_path.parts and raw_path.parts[0] == AGENTS_DIRNAME:
+    if raw_path.parts[: len(local_root_relative.parts)] == local_root_relative.parts:
         return base / raw_path
-    return _agents_root(base) / raw_path
+    return local_root / raw_path
 
 
 def download_roster(
     roster_dir_name: str,
     destination: Path | str | None = None,
     repo: str = DEFAULT_REPO,
+    prefix: str = DEFAULT_LOCAL_ROOT,
 ):
     base = Path.cwd()
-    destination = _download_destination(base, roster_dir_name, destination)
+    destination = _download_destination(base, roster_dir_name, destination, prefix)
     _install_roster_tree(base=base, destination=destination, repo=repo, roster_dir_name=roster_dir_name)
 
 
-def update_roster(path: Path | str | None = None) -> None:
+def update_roster(path: Path | str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     base = Path.cwd()
-    targets = _managed_roots(base) if path is None else [_update_target(base, path)]
+    local_root = _selected_root(base, prefix)
+    targets = _managed_roots(base, prefix) if path is None else [_update_target(base, path, prefix)]
     if not targets:
-        print(f"No managed downloads found under {_display_path(base, _agents_root(base))}.", file=sys.stderr)
+        print(f"No managed downloads found under {_display_path(base, local_root)}.", file=sys.stderr)
         exit(1)
     for destination in targets:
         metadata = _require_source_metadata(destination)

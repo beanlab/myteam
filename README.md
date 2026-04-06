@@ -90,6 +90,9 @@ AGENTS.md
 
 The root `.myteam/` directory is the default root role.
 
+If you want a different project-local root, pass `--prefix <path>` to the supported commands. For
+example, `myteam init --prefix .agents` creates the root role under `.agents/`.
+
 The packaged `builtins/` skill tree is available to load, but it is not created inside `.myteam/`.
 
 Edit `.myteam/role.md` with the instructions that should be given to the default agent. Then that agent can load its
@@ -188,18 +191,20 @@ Behavior:
 
 ## Commands
 
-### `myteam init`
+### `myteam init [--prefix <path>]`
 
-Creates the root `.myteam/` role and `AGENTS.md` in the current directory.
+Creates the root role in the selected local root and `AGENTS.md` in the current directory.
 
 It also:
 
-- stores the current `myteam` version in `.myteam/.myteam-version`
+- stores the current `myteam` version in the local root's `.myteam-version`
 - makes the packaged `builtins/` maintenance skills available to load later
 
-### `myteam new role <path>`
+Use `--prefix <path>` to scaffold the local tree somewhere other than `.myteam/`.
 
-Creates a new role under `.myteam/` with:
+### `myteam new role <path> [--prefix <path>]`
+
+Creates a new role under the selected local root with:
 
 - `role.md`
 - `load.py`
@@ -209,11 +214,12 @@ Examples:
 ```bash
 myteam new role developer
 myteam new role engineer/frontend
+myteam new role developer --prefix .agents
 ```
 
-### `myteam new skill <path>`
+### `myteam new skill <path> [--prefix <path>]`
 
-Creates a new skill under `.myteam/` with:
+Creates a new skill under the selected local root with:
 
 - `skill.md`
 - `load.py`
@@ -227,16 +233,17 @@ myteam new skill python
 myteam new skill python/testing
 myteam new skill research
 myteam new skill research/literature-review
+myteam new skill python/testing --prefix .agents
 ```
 
-### `myteam get role [path]`
+### `myteam get role [path] [--prefix <path>]`
 
 Loads a role's instructions.
 
-- omit `path` to load the root role at `.myteam/`
+- omit `path` to load the root role at the selected local root
 - use slash-delimited paths for nested roles
 - when the root role was scaffolded by `myteam init`, it may print an upgrade notice if the installed
-  `myteam` version is newer than the tracked `.myteam` version
+  `myteam` version is newer than the tracked version for that local root
 
 Examples:
 
@@ -244,37 +251,44 @@ Examples:
 myteam get role
 myteam get role developer
 myteam get role engineer/frontend
+myteam get role developer --prefix .agents
 ```
 
-### `myteam get skill <path>`
+### `myteam get skill <path> [--prefix <path>]`
 
 Loads a skill's instructions.
 
 Paths under `builtins/` resolve from the packaged built-in skill tree. All other skill paths resolve
-from the project's `.myteam/` tree.
+from the selected project-local tree.
 
 Examples:
 
 ```bash
 myteam get skill python/testing
 myteam get skill research/literature-review
+myteam get skill python/testing --prefix .agents
 ```
 
-### `myteam remove <path>`
+### `myteam remove <path> [--prefix <path>]`
 
-Deletes a role or skill directory from `.myteam/`.
+Deletes a role or skill directory from the selected local root.
+
+Use `--prefix <path>` to remove from a different local root.
 
 ### `myteam list`
 
 Lists available downloadable rosters from the default roster repository.
 
-### `myteam download <roster>`
+### `myteam download <roster> [destination] [--prefix <path>]`
 
-Downloads a folder roster into `.myteam/` by default.
+Downloads a folder roster into the selected local root by default.
 
 By default, the roster path is preserved under `.myteam/`, so `myteam download skills/foo` installs
 into `.myteam/skills/foo/`. If you provide a destination path, that path becomes the managed install
 root under `.myteam/`.
+
+Use `--prefix <path>` to change that default managed root. For example,
+`myteam download skills/foo --prefix .agents` installs into `.agents/skills/foo/`.
 
 Each downloaded folder gets a `.source.yml` file at its root so future commands can track where it
 came from.
@@ -284,10 +298,12 @@ If the destination already exists, `myteam download` fails instead of merging in
 - if the existing folder is the same managed source, run `myteam update <path>` instead
 - if the existing folder is unrelated content, delete it or choose a different destination
 
-### `myteam update [path]`
+### `myteam update [path] [--prefix <path>]`
 
-Refreshes one managed roster install or all managed installs under `.myteam/` from their recorded
-source metadata.
+Refreshes one managed roster install or all managed installs under the selected local root from their
+recorded source metadata.
+
+Use `--prefix <path>` to scan or resolve managed installs under a different local root.
 
 This uses the same managed-install behavior as `myteam download` after replacing the existing
 managed subtree root.

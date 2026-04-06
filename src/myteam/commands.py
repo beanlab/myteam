@@ -10,7 +10,7 @@ from pathlib import Path
 from myteam.utils import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
 
 from . import __version__
-from .paths import APP_NAME, BUILTIN_ROOT_NAME, ENCODING, agents_root, base_dir, role_dir
+from .paths import APP_NAME, BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, ENCODING, agents_root, base_dir, role_dir
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import write_tracked_version
@@ -22,6 +22,14 @@ def ensure_dir(path: Path) -> None:
 
 def write_py_script(path: Path, contents: str) -> None:
     path.write_text(contents, encoding=ENCODING)
+
+
+def _selected_root(prefix: str | None) -> Path:
+    try:
+        return agents_root(base_dir(), prefix)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1)
 
 
 def new_dir(
@@ -42,27 +50,27 @@ def new_dir(
     write_py_script(name_dir / "load.py", load_text)
 
 
-def init() -> None:
+def init(prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Initialize the myteam directory with default role."""
+    root = _selected_root(prefix)
     new_dir(
         base_dir(),
         "role",
-        [".myteam"],
+        list(root.relative_to(base_dir()).parts),
         "",
         get_template("root_role_load_template.py"),
     )
-    myteam_root = agents_root(base_dir())
-    write_tracked_version(myteam_root)
+    write_tracked_version(root)
 
     agents_md = base_dir() / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(get_template("agents_md_template.md"), encoding=ENCODING)
 
 
-def new_role(role: str) -> None:
+def new_role(role: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Create a new role directory with placeholder files."""
     new_dir(
-        agents_root(base_dir()),
+        _selected_root(prefix),
         "role",
         role.split("/"),
         get_template("role_definition_template.md"),
@@ -70,12 +78,12 @@ def new_role(role: str) -> None:
     )
 
 
-def new_skill(skill: str) -> None:
+def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
         print(f"Skill path '{skill}' uses the reserved built-in namespace '{BUILTIN_ROOT_NAME}'.", file=sys.stderr)
         raise SystemExit(1)
     new_dir(
-        agents_root(base_dir()),
+        _selected_root(prefix),
         "skill",
         skill.split("/"),
         get_template("skill_definition_template.md"),
@@ -83,9 +91,9 @@ def new_skill(skill: str) -> None:
     )
 
 
-def remove(name: str) -> None:
+def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Delete the directory for a role or skill if it exists."""
-    target_dir = role_dir(base_dir(), name)  # TODO fix for skills
+    target_dir = role_dir(base_dir(), name, prefix)  # TODO fix for skills
     if not target_dir.exists():
         print(f"'{name}' not found at {target_dir}", file=sys.stderr)
         raise SystemExit(1)
@@ -101,7 +109,7 @@ def remove(name: str) -> None:
         raise SystemExit(1)
 
 
-def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path | None = None) -> None:
+def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path) -> None:
     if not name_dir.exists():
         print(
             f"{dir_type.title()} '{name}' not found. Run 'myteam new {dir_type} {name}' to create it.",
@@ -115,10 +123,8 @@ def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: P
         raise SystemExit(1)
 
     try:
-        env = None
-        if project_root is not None:
-            env = dict(os.environ)
-            env[PROJECT_ROOT_ENV_VAR] = str(project_root)
+        env = dict(os.environ)
+        env[PROJECT_ROOT_ENV_VAR] = str(project_root)
         result = subprocess.run([sys.executable, str(load_py)], cwd=name_dir, env=env, check=False)
         raise SystemExit(result.returncode)
     except OSError as exc:
@@ -126,21 +132,22 @@ def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: P
         raise SystemExit(1)
 
 
-def get_role(role: str | None = None) -> None:
+def get_role(role: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Print the instructions for the given role if available."""
-    folder = agents_root(base_dir())
+    project_root = _selected_root(prefix)
+    folder = project_root
     if role is not None:
         folder = folder.joinpath(*role.split("/"))
 
     if not is_role_dir(folder):
         print(f"Not a role: {role}", file=sys.stderr)
         raise SystemExit(1)
-    get_name("role", folder, role)
+    get_name("role", folder, role, project_root=project_root)
 
 
-def get_skill(skill: str) -> None:
+def get_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Print the instructions for the given skill if available."""
-    project_root = agents_root(base_dir())
+    project_root = _selected_root(prefix)
     if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
         folder = builtin_skill_dir(skill)
         if not is_skill_dir(folder):

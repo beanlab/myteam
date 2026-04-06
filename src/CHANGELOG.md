@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.2.9
+
+- Added `--prefix <path>` support to the local-tree commands so `init`, `new`, `get`, and `remove`
+  can operate against a project-local root other than `.myteam/`.
+- Extended `myteam download` and `myteam update` so their default managed-install root also honors
+  `--prefix <path>`.
+- Refactored project-local root resolution into shared helpers so custom prefixes work consistently
+  across command execution, generated loaders, and managed roster updates.
+
 ## 0.2.8
 
 - Added `myteam update [path]` for refreshing managed roster installs from recorded source

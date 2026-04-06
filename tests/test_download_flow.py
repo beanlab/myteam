@@ -88,6 +88,35 @@ def test_download_tree_roster_writes_to_explicit_destination(
     assert metadata["local_path"] == ".myteam/bar/baz"
 
 
+def test_download_tree_roster_uses_custom_prefix_by_default(
+    run_myteam_inprocess,
+    initialized_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url, _ref="main": [{"path": "starter", "type": "tree", "sha": "abc"}])
+    monkeypatch.setattr(
+        rosters,
+        "_fetch_json",
+        lambda url: {"tree": [{"path": "role.md", "type": "blob"}]}
+        if "abc" in url
+        else {"tree": [{"path": "starter", "type": "tree", "sha": "abc"}]},
+    )
+
+    def fake_download(url: str, output_path: Path):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(f"downloaded from {url}\n", encoding="utf-8")
+
+    monkeypatch.setattr(rosters, "_download_file", fake_download)
+
+    result = run_myteam_inprocess(initialized_project, "download", "starter", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    managed_root = initialized_project / ".agents" / "starter"
+    assert (managed_root / "role.md").exists()
+    metadata = yaml.safe_load((managed_root / ".source.yml").read_text(encoding="utf-8"))
+    assert metadata["local_path"] == ".agents/starter"
+
+
 def test_download_single_file_roster_fails(run_myteam_inprocess, initialized_project: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url, _ref="main": [{"path": "starter.md", "type": "blob"}])
 
@@ -224,6 +253,31 @@ def test_update_accepts_explicit_agents_path(run_myteam_inprocess, initialized_p
     assert (managed_root / "role.md").read_text(encoding="utf-8") == "ok\n"
 
 
+def test_update_accepts_explicit_custom_prefix_path(run_myteam_inprocess, initialized_project: Path, monkeypatch: pytest.MonkeyPatch):
+    managed_root = initialized_project / ".agents" / "starter"
+    managed_root.mkdir(parents=True)
+    (managed_root / ".source.yml").write_text("repo: beanlab/rosters\nroster: starter\nref: main\n", encoding="utf-8")
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url, _ref="main": [{"path": "starter", "type": "tree", "sha": "abc"}])
+    monkeypatch.setattr(
+        rosters,
+        "_fetch_json",
+        lambda url: {"tree": [{"path": "role.md", "type": "blob"}]}
+        if "abc" in url
+        else {"tree": [{"path": "starter", "type": "tree", "sha": "abc"}]},
+    )
+
+    def fake_download(_url: str, output_path: Path):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("ok\n", encoding="utf-8")
+
+    monkeypatch.setattr(rosters, "_download_file", fake_download)
+
+    result = run_myteam_inprocess(initialized_project, "update", ".agents/starter", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert (managed_root / "role.md").read_text(encoding="utf-8") == "ok\n"
+
+
 def test_update_without_path_refreshes_multiple_managed_subtrees(
     run_myteam_inprocess,
     initialized_project: Path,
@@ -269,6 +323,35 @@ def test_update_without_path_refreshes_multiple_managed_subtrees(
     assert result.exit_code == 0
     assert (first / "role.md").exists()
     assert (second / "skill.md").exists()
+
+
+def test_update_without_path_uses_custom_prefix_root(
+    run_myteam_inprocess,
+    initialized_project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    managed_root = initialized_project / ".agents" / "starter"
+    managed_root.mkdir(parents=True)
+    (managed_root / ".source.yml").write_text("repo: beanlab/rosters\nroster: starter\nref: main\n", encoding="utf-8")
+    monkeypatch.setattr(rosters, "_fetch_available_rosters", lambda _repo_url, _ref="main": [{"path": "starter", "type": "tree", "sha": "abc"}])
+    monkeypatch.setattr(
+        rosters,
+        "_fetch_json",
+        lambda url: {"tree": [{"path": "role.md", "type": "blob"}]}
+        if "abc" in url
+        else {"tree": [{"path": "starter", "type": "tree", "sha": "abc"}]},
+    )
+
+    def fake_download(_url: str, output_path: Path):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("ok\n", encoding="utf-8")
+
+    monkeypatch.setattr(rosters, "_download_file", fake_download)
+
+    result = run_myteam_inprocess(initialized_project, "update", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert (managed_root / "role.md").read_text(encoding="utf-8") == "ok\n"
 
 
 def test_update_missing_managed_target_fails(run_myteam_inprocess, initialized_project: Path):

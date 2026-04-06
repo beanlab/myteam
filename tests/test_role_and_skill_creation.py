@@ -19,6 +19,28 @@ def test_new_skill_supports_nested_paths(run_myteam, initialized_project: Path):
     assert (initialized_project / ".myteam" / "python" / "testing" / "load.py").exists()
 
 
+def test_new_role_accepts_custom_prefix(run_myteam, tmp_path: Path):
+    init_result = run_myteam(tmp_path, "init", "--prefix", ".agents")
+    assert init_result.exit_code == 0
+
+    result = run_myteam(tmp_path, "new", "role", "developer", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert (tmp_path / ".agents" / "developer" / "role.md").exists()
+    assert (tmp_path / ".agents" / "developer" / "load.py").exists()
+
+
+def test_new_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
+    init_result = run_myteam(tmp_path, "init", "--prefix", ".agents")
+    assert init_result.exit_code == 0
+
+    result = run_myteam(tmp_path, "new", "skill", "python/testing", "--prefix", ".agents")
+
+    assert result.exit_code == 0
+    assert (tmp_path / ".agents" / "python" / "testing" / "skill.md").exists()
+    assert (tmp_path / ".agents" / "python" / "testing" / "load.py").exists()
+
+
 def test_creating_existing_role_fails_clearly(run_myteam, initialized_project: Path):
     first = run_myteam(initialized_project, "new", "role", "developer")
     second = run_myteam(initialized_project, "new", "role", "developer")
