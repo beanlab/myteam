@@ -123,6 +123,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           REPO: ${{ github.repository }}
+          DISCORD_ROLE_ID: "1458551430691422389"
         run: |
           python - <<'PY' > discord-payload.json
           import json
@@ -150,9 +151,10 @@ jobs:
 
           note_lines = [line for line in notes if line.strip()]
           formatted_notes = "\n".join(note_lines) if note_lines else "- No changelog notes found."
+          role_mention = f"<@&{os.environ['DISCORD_ROLE_ID']}>"
 
           content = (
-              f"myteam {version} was pushed to `main` and built successfully.\n"
+              f"{role_mention} myteam {version} was pushed to `main` and built successfully.\n"
               f"{os.environ['COMMIT_URL']}\n\n"
               f"Changelog\n{formatted_notes}\n\n"
               f"Commit: `{os.environ['COMMIT_SHA'][:7]}` in `{os.environ['REPO']}`"
@@ -162,13 +164,23 @@ jobs:
               max_notes_length = max(0, 2000 - len(content) + len(formatted_notes) - 3)
               formatted_notes = formatted_notes[:max_notes_length].rstrip() + "..."
               content = (
-                  f"myteam {version} was pushed to `main` and built successfully.\n"
+                  f"{role_mention} myteam {version} was pushed to `main` and built successfully.\n"
                   f"{os.environ['COMMIT_URL']}\n\n"
                   f"Changelog\n{formatted_notes}\n\n"
                   f"Commit: `{os.environ['COMMIT_SHA'][:7]}` in `{os.environ['REPO']}`"
               )
 
-          print(json.dumps({"content": content}))
+          print(
+              json.dumps(
+                  {
+                      "content": content,
+                      "allowed_mentions": {
+                          "parse": [],
+                          "roles": [os.environ["DISCORD_ROLE_ID"]],
+                      },
+                  }
+              )
+          )
           PY
 
       - name: Post to Discord
