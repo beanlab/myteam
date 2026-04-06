@@ -335,6 +335,25 @@ The following behavior is part of the current application contract:
 - Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
 - Errors are communicated as command failure plus an error message on standard error.
 
+## Developer Concerns
+
+The following notes describe internal implementation constraints that support the public interface.
+
+### `load.py`
+
+- `myteam get role ...` and `myteam get skill ...` execute the target `load.py` as a separate Python
+  process rather than importing it in-process.
+- This process boundary is intentional. It keeps loader execution isolated from the main CLI process
+  and lets loader exit status propagate naturally as command success or failure.
+- When one invocation selects a non-default local root with `--prefix`, the CLI passes that selected
+  project-local root to the loader process through the internal `MYTEAM_PROJECT_ROOT` environment
+  variable.
+- Loader helpers such as `get_active_myteam_root()` and the compatibility helper
+  `get_myteam_root()` consult that environment variable so generated loaders, packaged built-in
+  loaders, and older project loaders can all resolve the active local root consistently.
+- `MYTEAM_PROJECT_ROOT` is an internal loader-execution mechanism, not part of the user-facing CLI
+  contract.
+
 ## Out of Scope
 
 This interface document does not define:
