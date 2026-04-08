@@ -6,6 +6,7 @@ import shlex
 import sys
 from pathlib import Path
 
+import myteam.workflows as workflow_module
 from myteam.workflows import UserInputPump
 
 
@@ -244,6 +245,23 @@ def test_user_input_pump_does_not_start_background_reader_in_interactive_mode(mo
 
     assert pump.is_interactive is True
     assert pump._thread is None
+
+
+def test_print_panel_can_render_bordered_panel_when_styling_is_enabled(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_module, "_supports_styling", lambda: True)
+
+    workflow_module._print_panel(
+        "Panel Title",
+        ["Role: plan", "Commands: [/help] [/done]"],
+        border=workflow_module.PANEL_BORDER_META,
+    )
+
+    output = capsys.readouterr().out
+    assert workflow_module.PANEL_BORDER_META in output
+    assert "┌ " in output
+    assert "│ " in output
+    assert "Panel Title" in output
+    assert "Commands: [/help] [/done]" in output
 
 
 def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized_project: Path):

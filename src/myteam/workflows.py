@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
+import shutil
 import sys
 import threading
 from pathlib import Path
@@ -54,6 +56,8 @@ ANSI_GREEN = "\033[32m"
 ANSI_YELLOW = "\033[33m"
 ANSI_BLUE = "\033[34m"
 ANSI_CYAN = "\033[36m"
+PANEL_BORDER_META = "\033[38;2;94;112;128m"
+PANEL_BORDER_HELP = "\033[38;2;111;122;133m"
 
 
 class UserInputPump:
@@ -509,12 +513,13 @@ def _print_step_banner(step: WorkflowStep, *, step_index: int, total_steps: int,
     _print_panel(
         f"Step {step_index + 1}/{total_steps}: {step.id}",
         [
-            _key_value_line("Role", role_name),
-            _key_value_line("Thread", thread_id),
-            _key_value_line("Mode", "conversation"),
-            _command_bar("/help", "/status", "/outputs", "/done"),
+            _plain_key_value_line("Role", role_name),
+            _plain_key_value_line("Thread", thread_id),
+            _plain_key_value_line("Mode", "conversation"),
+            _plain_command_bar("/help", "/status", "/outputs", "/done"),
         ],
         accent=ANSI_CYAN,
+        border=PANEL_BORDER_META,
     )
 
 
@@ -528,6 +533,7 @@ def _print_step_commands(step_id: str) -> None:
             "/done    Finalize this step and request structured JSON",
         ],
         accent=ANSI_BLUE,
+        border=PANEL_BORDER_HELP,
     )
 
 
@@ -637,8 +643,28 @@ def _command_bar(*commands: str) -> str:
     return f"{_styled('Commands:', ANSI_DIM)} {' '.join(tokens)}"
 
 
-def _print_panel(title: str, lines: list[str], *, accent: str = "") -> None:
+def _plain_key_value_line(label: str, value: str) -> str:
+    return f"{label}: {value}"
+
+
+def _plain_command_bar(*commands: str) -> str:
+    return f"Commands: {' '.join(f'[{command}]' for command in commands)}"
+
+
+def _print_panel(
+    title: str,
+    lines: list[str],
+    *,
+    accent: str = "",
+    border: str = "",
+) -> None:
     print()
+    if _supports_styling() and border:
+        width = _panel_width(title, lines)
+        print(_bordered_panel_title(title, width, border))
+        for line in lines:
+            print(_bordered_panel_line(line, width, border))
+        return
     print(_rule(title, accent=accent))
     for line in lines:
         print(_panel_line(line))
@@ -646,6 +672,33 @@ def _print_panel(title: str, lines: list[str], *, accent: str = "") -> None:
 
 def _panel_line(text: str) -> str:
     return f"  {text}" if text else ""
+
+
+def _panel_width(title: str, lines: list[str]) -> int:
+    max_visible = max([_visible_length(title), *(_visible_length(line) for line in lines)], default=0)
+    terminal_width = shutil.get_terminal_size((80, 20)).columns
+    return min(max_visible + 4, max(terminal_width - 2, max_visible + 4))
+
+
+def _bordered_panel_title(text: str, width: int, border: str) -> str:
+    visible = _visible_length(text)
+    inner_width = max(width - 4, visible)
+    padding = max(inner_width - visible, 0)
+    left = "┌ "
+    right = " ┐"
+    return (
+        f"{_styled(left, border)}"
+        f"{_styled(text, ANSI_BOLD)}"
+        f"{' ' * padding}"
+        f"{_styled(right, border)}"
+    )
+
+
+def _bordered_panel_line(text: str, width: int, border: str) -> str:
+    visible = _visible_length(text)
+    inner_width = max(width - 4, visible)
+    padding = max(inner_width - visible, 0)
+    return f"{_styled('│ ', border)}{text}{' ' * padding}{_styled(' │', border)}"
 
 
 def _indented_json_lines(value: Any) -> list[str]:
@@ -659,6 +712,10 @@ def _print_turn_started(turn_id: str) -> None:
 def _print_stream_label() -> None:
     label = _styled("Assistant:", ANSI_BOLD, ANSI_CYAN)
     print(_panel_line(label), end=" ", flush=True)
+
+
+def _visible_length(text: str) -> int:
+    return len(re.sub(r"\x1b\[[0-9;]*m", "", text))
 
 
 def _workflow_name_parts(name: str) -> list[str]:
