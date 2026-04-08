@@ -1,6 +1,7 @@
 """Helpers for tracking and explaining `.myteam` upgrades."""
 from __future__ import annotations
 
+from importlib.resources import files
 import re
 from pathlib import Path
 
@@ -79,6 +80,11 @@ def _migration_text(version: str) -> str:
     return migration_file.read_text(encoding=ENCODING).rstrip()
 
 
+def _packaged_changelog_text() -> str:
+    packaged_changelog = files("myteam").joinpath("CHANGELOG.md")
+    return packaged_changelog.read_text(encoding=ENCODING)
+
+
 def format_pending_migrations(myteam_root: Path) -> str:
     tracked_version, tracked_label = tracked_version_info(myteam_root)
     pending_versions = pending_migration_versions(tracked_version)
@@ -96,8 +102,7 @@ def format_pending_migrations(myteam_root: Path) -> str:
 
 
 def _parse_changelog_sections() -> list[tuple[str, str]]:
-    changelog = Path(__file__).resolve().parents[1] / "CHANGELOG.md"
-    lines = changelog.read_text(encoding=ENCODING).splitlines()
+    lines = _packaged_changelog_text().splitlines()
 
     sections: list[tuple[str, str]] = []
     current_version: str | None = None

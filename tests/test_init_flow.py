@@ -39,9 +39,10 @@ def test_get_role_succeeds_after_init(run_myteam, initialized_project: Path):
     result = run_myteam(initialized_project, "get", "role")
 
     assert result.exit_code == 0
-    assert "## Roles" in result.stdout
-    assert "## Skills" in result.stdout
-    assert "## Tools" in result.stdout
+    assert "# Skills" in result.stdout
+    assert "# Tools" in result.stdout
+    assert "# Roles" in result.stdout
+    assert result.stdout.index("# Skills") < result.stdout.index("# Tools") < result.stdout.index("# Roles")
 
 
 def test_get_role_succeeds_after_init_with_custom_prefix(run_myteam, tmp_path: Path):
@@ -51,6 +52,7 @@ def test_get_role_succeeds_after_init_with_custom_prefix(run_myteam, tmp_path: P
     result = run_myteam(tmp_path, "get", "role", "--prefix", ".agents")
 
     assert result.exit_code == 0
-    assert "## Roles" in result.stdout
-    assert "## Skills" in result.stdout
-    assert "## Tools" in result.stdout
+    assert "# Skills" in result.stdout
+    assert "# Tools" in result.stdout
+    assert "# Roles" in result.stdout
+    assert result.stdout.index("# Skills") < result.stdout.index("# Tools") < result.stdout.index("# Roles")

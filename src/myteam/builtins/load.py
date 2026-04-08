@@ -11,9 +11,9 @@ def main() -> int:
     display_root = base.parent
 
     print_instructions(base)
-    list_roles(base, display_root, [])
     list_skills(base, display_root, [])
     list_tools(base, display_root, [])
+    list_roles(base, display_root, [])
 
     return 0
 
