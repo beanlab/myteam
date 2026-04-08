@@ -52,6 +52,8 @@ At the black-box level, `myteam` provides these categories of behavior:
 - It can update a previously downloaded managed roster install from its recorded source metadata.
 - It can execute a deterministic YAML workflow by running ordered role-based steps through a local Codex AppServer session.
 - It can persist workflow-run state under `.myteam/workflow_runs/` so a failed run can later be resumed or inspected.
+- It can provide an interactive terminal workflow experience that clearly distinguishes step
+  conversation, step finalization, and run completion while a workflow is running.
 - It can report its version string.
 
 Successful commands either:
@@ -330,8 +332,15 @@ Expected outcome on success:
 - Starts a local Codex AppServer subprocess session.
 - Creates one fresh AppServer thread per workflow step attempt.
 - Starts a conversational turn for the step and streams its progress.
+- Prints a small step banner that identifies the current workflow step and the commands available
+  while that step is active.
 - Keeps the active step thread open for additional user follow-up turns before finalization.
-- In interactive use, advances only after the caller types `/done` for the current step.
+- In interactive use, accepts slash commands for workflow-step control and inspection, including
+  `/help`, `/status`, `/outputs`, and `/done`.
+- In interactive use, clearly distinguishes conversation mode from finalization so the caller can
+  tell whether the active step is still accepting feedback or is being asked to emit its final
+  structured result.
+- Advances only after the caller finalizes the current step with `/done`.
 - Requires the final assistant message for each completed step to be a JSON object whose keys exactly match the step's declared `outputs`.
 - Prints token-usage totals for each finalized step and for the completed workflow.
 - Persists run state under `.myteam/workflow_runs/<run_id>/run.json`.
@@ -340,6 +349,8 @@ User-visible result:
 
 - The caller can watch each step progress in real time.
 - The caller can keep chatting with the active step thread before finalizing it.
+- The caller can inspect the active run state from inside the workflow session without leaving the
+  current step prompt.
 - On success, the workflow's validated step outputs are stored for later inspection and downstream steps.
 
 Failure conditions that matter at the interface:
@@ -364,6 +375,7 @@ Expected outcome on success:
 - Loads the persisted run state.
 - Re-runs the first incomplete step in a fresh AppServer thread attempt.
 - Preserves previously completed step outputs.
+- Re-enters the same interactive workflow-step terminal experience used by `myteam workflows start`.
 
 User-visible result:
 
@@ -385,7 +397,8 @@ Inputs:
 Expected outcome on success:
 
 - Reads the persisted run state from disk.
-- Prints the current workflow status, the next step index, and any completed outputs.
+- Prints the current workflow status, the current step when present, the next step index, any
+  completed outputs, and the latest failure when present.
 
 User-visible result:
 

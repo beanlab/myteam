@@ -1,89 +1,108 @@
-# Feature Plan: Deterministic Workflow Runner
+# Feature Plan: Interactive Workflow TUI
 
 ## Pipeline Status
 
 - [x] Create the git branch
-- [x] Plan the feature
-- [x] Update the interface document
-- [x] Refactor the framework
-- [x] Update the test suite
-- [x] Implement the feature
+- [x] Understand the feature and update the interface document
+- [ ] Design the feature
+- [ ] Refactor the framework
+- [ ] Update the test suite
+- [ ] Implement the feature
 - [ ] Conclude the feature
 
 ## Goal
 
-Add a deterministic workflow runner to `myteam` that can execute a simple YAML workflow through
-role-based Codex AppServer threads while preserving structured step outputs and allowing live
-communication with the currently running step.
+Improve the terminal experience for `myteam workflows` so users can understand what is happening
+while a workflow step runs, what commands are available during a step, and how to inspect the
+current run without leaving the active workflow session.
 
-Extend that runner so workflows feel like a native `myteam` asset instead of a path-only advanced
-feature.
+The workflow runner should stay deterministic:
+
+- roles remain the source of step behavior
+- workflows remain responsible for orchestration
+- step outputs must still be finalized through the existing structured JSON contract
+- resuming a failed workflow should preserve already-completed outputs
 
 ## Framework Refactor
 
-Introduce reusable support code so workflow execution fits the existing CLI cleanly instead of
-hard-coding behavior in one command function.
+The current workflow runner mixes display text, input command parsing, and step execution inside
+`src/myteam/workflows.py`. The main refactor is to separate "workflow state rendering" from "turn
+execution" so richer terminal behavior can be added without scattering `print(...)` statements and
+command parsing across the runner.
 
 Planned refactors:
 
-1. Extract loader execution into a shared helper that can either stream or capture role/skill loader
-   output.
-2. Add a workflow runner module responsible for:
-   - loading and validating workflow YAML
-   - persisting run state under `.myteam/workflow_runs/`
-   - talking to a line-delimited JSON-RPC AppServer subprocess
-   - handling multi-turn step conversations and resumable failures
-3. Keep the CLI wiring thin by exposing `workflows start`, `workflows resume`, and
-   `workflows status` through `src/myteam/cli.py`.
-4. Keep the workflow coordinator thin by separating:
-   - workflow-definition loading and validation
-   - workflow run-state persistence and token accounting
-   - AppServer JSON-RPC process transport
-   - console interaction for the active step
-5. Integrate workflow creation and lookup into the existing command framework by:
-   - adding `myteam new workflow <name>`
-   - resolving `.myteam/workflows/<name>.yaml` from `myteam workflows start <name>`
-   - adding `myteam get workflow <name>` to print the stored YAML by name
-   - using the same slash-delimited naming style as roles and skills
+1. Introduce small workflow-TUI helper functions in `src/myteam/workflows.py` for:
+   - rendering a step header
+   - rendering command help text
+   - rendering workflow/run status snapshots
+   - rendering finalized/completed output summaries
+   - rendering mode transitions such as conversation, finalization, and completion
+2. Refactor the step interaction loop so slash-command handling is centralized instead of being
+   mixed into the generic follow-up message flow.
+3. Add a small status summary helper in the workflow run-state layer or workflow module so both:
+   - `myteam workflows status <run_id>`
+   - interactive in-step `/status`
+   can reuse the same formatting logic.
+4. Keep the step-execution path unchanged in its core responsibilities:
+   - load role instructions
+   - start a thread
+   - run turns
+   - validate final JSON outputs
+   - persist attempts and outputs
+5. Preserve non-interactive behavior for tests and piped input by keeping the `UserInputPump`
+   contract intact and making slash commands work through both tty and non-tty input paths.
 
-The existing role/skill loading behavior should remain unchanged after this refactor.
+The goal of this refactor is to make the runner easier to extend while keeping existing workflow
+execution semantics intact.
 
 ## Feature Addition
 
-Implement the first workflow format using the `template.yaml` shape:
-
-- top-level ordered step names
-- per-step `role`
-- per-step `inputs`
-- per-step `outputs`
+Add a clearer interactive workflow-step terminal experience.
 
 Behavior details:
 
-1. `myteam workflows start <name>` runs steps strictly in order.
-2. Each step loads the declared role instructions, creates a fresh AppServer thread, and starts one
-   turn.
-3. The active step streams live output and can accept additional user follow-up turns on the same thread before finalization.
-4. In interactive use, the user types `/done` to finalize the current step and advance.
-5. A step is only complete when the final assistant message is valid JSON and its keys exactly match
-   the declared `outputs`.
-6. Completed step outputs are stored and may be referenced by later steps using
-   `{from: prior_step.output}`.
-7. Failed runs can be resumed from the first incomplete step with `myteam workflows resume <run_id>`.
-8. `myteam new workflow <name>` scaffolds `.myteam/workflows/<name>.yaml` from `planning_files/template.yaml`.
-9. `myteam workflows start <name>` resolves the named workflow from `.myteam/workflows/`.
-10. `myteam get workflow <name>` prints the named workflow definition from `.myteam/workflows/`
-    without introducing role or skill loader behavior.
-11. Workflow naming should follow the same slash-delimited convention as roles and skills and avoid
-    extension-heavy or path-heavy invocation.
+1. When a step starts, print a compact banner that includes:
+   - the step name
+   - the step position within the workflow
+   - the role used for that step
+   - the active thread id
+   - the commands available while the step is active
+2. The step prompt should clearly indicate conversation mode while the user may still provide
+   follow-up guidance to the active thread.
+3. Support the following in-step commands:
+   - `/help` to print the available commands again
+   - `/status` to print a concise workflow status snapshot for the current run
+   - `/outputs` to print completed outputs that are already available from earlier steps
+   - `/done` to finalize the current step and request the required JSON object
+4. When `/done` is used, print a clear finalization handoff message before the final structured turn
+   starts so the user can tell the workflow is no longer in conversation mode.
+5. After step completion, print a concise completion summary before moving to the next step.
+6. On workflow completion, continue printing total token usage, but make the end-of-run message feel
+   like the close of an interactive session rather than just another log line.
+7. `myteam workflows status <run_id>` should show richer persisted state, including:
+   - current step when present
+   - last failure when present
+   - completed outputs
+   - token totals when available
+8. `myteam workflows resume <run_id>` should explain that it is resuming from the first incomplete
+   step and then re-enter the same interactive step UI.
+
+Non-goals for this feature:
+
+- changing the workflow YAML format
+- changing how structured output validation works
+- adding workflow graph execution or parallel step execution
+- changing role loading behavior
 
 ## Test Plan
 
-Add high-level CLI tests that prove:
+Update the workflow CLI tests to prove:
 
-- ordered workflow execution succeeds and persists outputs
-- step conversation works on the same thread before finalization
-- failed runs can be resumed without rerunning already successful steps
-- workflow status can be read from disk after a run completes or fails
-- `myteam new workflow <name>` scaffolds the expected file in `.myteam/workflows/`
-- `myteam workflows start <name>` resolves a named workflow from `.myteam/workflows/`
-- `myteam get workflow <name>` prints the named workflow contents from `.myteam/workflows/`
+- workflow start prints the new step banner and command help text
+- `/help` prints the in-step command list without advancing the step
+- `/status` prints a useful run snapshot from inside the active workflow session
+- `/outputs` prints completed outputs from prior steps while a later step is active
+- `/done` transitions the step into finalization and the output still validates correctly
+- workflow status reports richer persisted state after completed and failed runs
+- workflow resume prints clearer resume messaging and still retries only the first incomplete step
