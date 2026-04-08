@@ -123,7 +123,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           REPO: ${{ github.repository }}
-          DISCORD_ROLE_ID: "1458551430691422389"
+          DISCORD_ROLE_ID: "1482135435990929540"
         run: |
           python - <<'PY' > discord-payload.json
           import json
