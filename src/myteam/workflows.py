@@ -381,7 +381,7 @@ def _enter_step_interaction_loop(
         pending_message = None
         if follow_up is None:
             if input_pump.is_interactive:
-                follow_up = input("> ").strip()
+                follow_up = input("User >> ").strip()
             else:
                 follow_up = input_pump.wait_for_input(timeout=0.1)
                 if follow_up is None:
