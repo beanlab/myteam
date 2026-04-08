@@ -114,7 +114,7 @@ def workflow_resume(run_id: str, app_server_command: str | None = None) -> None:
     try:
         run_state = load_run_state(project_root, run_id)
         workflow = load_workflow_definition(Path(run_state.workflow_path))
-        print(f"Resuming workflow run {run_state.run_id}")
+        print(_resume_message(run_state, workflow))
         _run_workflow(project_root, workflow, run_state, app_server_command=app_server_command)
     except WorkflowError as exc:
         print(str(exc), file=sys.stderr)
@@ -127,19 +127,7 @@ def workflow_status(run_id: str) -> None:
     except WorkflowError as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from exc
-    print(f"Run ID: {run_state.run_id}")
-    print(f"Workflow: {run_state.workflow_path}")
-    print(f"Status: {run_state.status}")
-    if run_state.current_step_id:
-        print(f"Current Step: {run_state.current_step_id}")
-    print(f"Next Step Index: {run_state.next_step_index}")
-    print("Completed Outputs:")
-    if not run_state.completed_outputs:
-        print("  (none)")
-    else:
-        print(json.dumps(run_state.completed_outputs, indent=2, sort_keys=True))
-    if run_state.last_error:
-        print(f"Last Error: {run_state.last_error}")
+    _print_lines(_status_lines(run_state))
 
 
 def _run_workflow(
@@ -169,7 +157,15 @@ def _run_workflow(
                 run_state.current_step_id = step.id
                 run_state.updated_at = utc_now()
                 save_run_state(project_root, run_state)
-                output = _run_step(project_root, client, step, run_state, input_pump)
+                output = _run_step(
+                    project_root,
+                    client,
+                    step,
+                    run_state,
+                    input_pump,
+                    step_index=step_index,
+                    total_steps=len(workflow.steps),
+                )
                 run_state.completed_outputs[step.id] = output
                 run_state.next_step_index = step_index + 1
                 run_state.current_step_id = None
@@ -179,6 +175,7 @@ def _run_workflow(
         run_state.status = "completed"
         run_state.updated_at = utc_now()
         save_run_state(project_root, run_state)
+        print("Workflow session complete.")
         print(f"Workflow {run_state.run_id} completed successfully.")
         print(f"Workflow Tokens: {format_token_usage(workflow_token_usage(run_state))}")
     except WorkflowError as exc:
@@ -187,6 +184,7 @@ def _run_workflow(
         run_state.updated_at = utc_now()
         save_run_state(project_root, run_state)
         print(f"Workflow {run_state.run_id} failed: {exc}", file=sys.stderr)
+        print(f"Resume with: myteam workflows resume {run_state.run_id}", file=sys.stderr)
         raise SystemExit(1) from exc
 
 
@@ -196,6 +194,9 @@ def _run_step(
     step: WorkflowStep,
     run_state: WorkflowRunState,
     input_pump: UserInputPump,
+    *,
+    step_index: int,
+    total_steps: int,
 ) -> dict[str, Any]:
     role_instructions = _load_role_instructions(project_root, step.role)
     step_inputs = resolve_inputs(step.inputs, run_state.completed_outputs)
@@ -214,11 +215,10 @@ def _run_step(
         },
     )
     thread_id = thread_result["thread"]["id"]
-    print(f"\n== Step {step.id} ==")
-    print(f"thread: {thread_id}")
     attempt = WorkflowStepAttempt(thread_id=thread_id, resolved_inputs=step_inputs)
     run_state.attempts.setdefault(step.id, []).append(attempt)
     save_run_state(project_root, run_state)
+    _print_step_banner(step, step_index=step_index, total_steps=total_steps, thread_id=thread_id)
 
     initial_message = _run_thread_turn(
         project_root,
@@ -236,8 +236,10 @@ def _run_step(
         attempt,
         run_state,
         input_pump,
+        previous_outputs,
         initial_message,
     )
+    _print_finalization_handoff(step.id)
     final_message = _run_thread_turn(
         project_root,
         client,
@@ -254,7 +256,7 @@ def _run_step(
     attempt.output = output
     attempt.finished_at = utc_now()
     save_run_state(project_root, run_state)
-    print(f"Completed step {step.id}")
+    _print_step_completion(step.id, output)
     print(f"Step Tokens ({step.id}): {format_token_usage(attempt.token_usage)}")
     return output
 
@@ -367,21 +369,26 @@ def _enter_step_interaction_loop(
     attempt: WorkflowStepAttempt,
     run_state: WorkflowRunState,
     input_pump: UserInputPump,
+    previous_outputs: dict[str, dict[str, Any]],
     initial_message: str,
 ) -> None:
     attempt.last_conversation_message = initial_message
+    save_run_state(project_root, run_state)
     pending_message = input_pump.next_input()
     if not input_pump.is_interactive and pending_message is None:
         return
 
-    print(f"[{step.id}] Type feedback to keep chatting on this thread. Type /done to finalize.")
+    _print_conversation_mode(step.id)
 
     while True:
         follow_up = pending_message
         pending_message = None
         if follow_up is None:
             if input_pump.is_interactive:
-                follow_up = input("User >> ").strip()
+                try:
+                    follow_up = input(f"[{step.id} conversation] >> ").strip()
+                except EOFError:
+                    return
             else:
                 follow_up = input_pump.wait_for_input(timeout=0.1)
                 if follow_up is None:
@@ -389,8 +396,16 @@ def _enter_step_interaction_loop(
 
         if not follow_up:
             continue
-        if follow_up == "/done":
-            return
+        if follow_up.startswith("/"):
+            if _handle_step_command(
+                step=step,
+                attempt=attempt,
+                run_state=run_state,
+                previous_outputs=previous_outputs,
+                command_text=follow_up,
+            ):
+                return
+            continue
 
         conversational_prompt = (
             "Continue working on the same workflow step. "
@@ -399,6 +414,7 @@ def _enter_step_interaction_loop(
         )
         response = _run_thread_turn(project_root, client, thread_id, conversational_prompt, attempt, run_state)
         attempt.last_conversation_message = response
+        save_run_state(project_root, run_state)
 
 
 def _build_step_prompt(
@@ -449,6 +465,113 @@ def _load_role_instructions(project_root: Path, role_path: str) -> str:
         return capture_loader_output(load_py, cwd=folder, project_root=role_root)
     except RuntimeError as exc:
         raise WorkflowError(f"failed to load workflow role '{role_path or AGENTS_DIRNAME}': {exc}") from exc
+
+
+def _handle_step_command(
+    *,
+    step: WorkflowStep,
+    attempt: WorkflowStepAttempt,
+    run_state: WorkflowRunState,
+    previous_outputs: dict[str, dict[str, Any]],
+    command_text: str,
+) -> bool:
+    command = command_text.strip()
+    if command == "/done":
+        return True
+    if command == "/help":
+        _print_step_commands(step.id)
+        return False
+    if command == "/status":
+        _print_lines(_status_lines(run_state, mode="conversation"))
+        return False
+    if command == "/outputs":
+        _print_available_outputs(previous_outputs)
+        return False
+
+    print(f"[{step.id}] Unknown command '{command}'. Type /help for available commands.")
+    attempt.last_conversation_message = f"Unknown command: {command}"
+    return False
+
+
+def _print_step_banner(step: WorkflowStep, *, step_index: int, total_steps: int, thread_id: str) -> None:
+    role_name = step.role or AGENTS_DIRNAME
+    print()
+    print(f"== Step {step_index + 1}/{total_steps}: {step.id} ==")
+    print(f"role: {role_name}")
+    print(f"thread: {thread_id}")
+    print("mode: conversation")
+    print("commands: /help /status /outputs /done")
+
+
+def _print_step_commands(step_id: str) -> None:
+    print(f"[{step_id}] Commands:")
+    print("  /help    Show the available step commands")
+    print("  /status  Show the current workflow run status")
+    print("  /outputs Show completed outputs from earlier steps")
+    print("  /done    Finalize this step and request structured JSON")
+
+
+def _print_conversation_mode(step_id: str) -> None:
+    print(f"[{step_id}] Conversation mode. Enter feedback to continue this step.")
+    print(f"[{step_id}] Type /done when the step is ready to finalize, or /help to see commands.")
+
+
+def _print_finalization_handoff(step_id: str) -> None:
+    print(f"[{step_id}] Finalization mode. Requesting the final structured JSON output now.")
+
+
+def _print_step_completion(step_id: str, output: dict[str, Any]) -> None:
+    print(f"Completed step {step_id}.")
+    print("Final outputs:")
+    print(json.dumps(output, indent=2, sort_keys=True))
+
+
+def _print_available_outputs(previous_outputs: dict[str, dict[str, Any]]) -> None:
+    print("Available Outputs:")
+    if not previous_outputs:
+        print("  (none)")
+        return
+    print(json.dumps(previous_outputs, indent=2, sort_keys=True))
+
+
+def _status_lines(run_state: WorkflowRunState, *, mode: str | None = None) -> list[str]:
+    lines = [
+        f"Run ID: {run_state.run_id}",
+        f"Workflow: {run_state.workflow_path}",
+        f"Status: {run_state.status}",
+    ]
+    if mode is not None:
+        lines.append(f"Mode: {mode}")
+    if run_state.current_step_id:
+        lines.append(f"Current Step: {run_state.current_step_id}")
+    lines.append(f"Next Step Index: {run_state.next_step_index}")
+    token_usage = workflow_token_usage(run_state)
+    if any(token_usage.values()):
+        lines.append(f"Workflow Tokens: {format_token_usage(token_usage)}")
+    lines.append("Completed Outputs:")
+    if not run_state.completed_outputs:
+        lines.append("  (none)")
+    else:
+        lines.append(json.dumps(run_state.completed_outputs, indent=2, sort_keys=True))
+    if run_state.last_error:
+        lines.append(f"Last Error: {run_state.last_error}")
+    return lines
+
+
+def _resume_message(run_state: WorkflowRunState, workflow: WorkflowDefinition) -> str:
+    if run_state.next_step_index >= len(workflow.steps):
+        return f"Resuming workflow run {run_state.run_id}"
+    next_step = workflow.steps[run_state.next_step_index]
+    return (
+        f"Resuming workflow run {run_state.run_id} "
+        f"from step {next_step.id} ({run_state.next_step_index + 1}/{len(workflow.steps)})"
+    )
+
+
+def _print_lines(lines: list[str]) -> None:
+    for line in lines:
+        print(line)
+
 
 def _workflow_name_parts(name: str) -> list[str]:
     normalized = name.strip()

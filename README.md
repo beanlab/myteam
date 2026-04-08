@@ -352,9 +352,12 @@ review:
 
 - it launches a local Codex AppServer session
 - it creates one fresh thread per step attempt
+- it prints a compact step banner with the current step, role, thread id, and available commands
 - it streams the active step live
 - it keeps the current step thread open so you can send follow-up input on additional turns
+- it supports `/help`, `/status`, `/outputs`, and `/done` while a step is active
 - it persists run state under `.myteam/workflow_runs/`
+- it clearly distinguishes conversation mode from the final structured-output handoff
 - it advances after you type `/done` for the current step in interactive use
 - after each finalized step, it prints the token usage for that step
 - after the workflow completes, it prints the total token usage across all completed steps
@@ -369,11 +372,13 @@ Only the final validated JSON object from a completed step becomes workflow stat
 
 ### `myteam workflows resume <run_id>`
 
-Resumes the first incomplete step from a failed workflow run while preserving earlier completed outputs.
+Resumes the first incomplete step from a failed workflow run while preserving earlier completed
+outputs and re-entering the same interactive step UI used by `myteam workflows start`.
 
 ### `myteam workflows status <run_id>`
 
-Prints the saved workflow run state without starting the AppServer.
+Prints the saved workflow run state without starting the AppServer, including the current step when
+present, completed outputs, latest failure, and accumulated workflow token usage.
 
 ## Why Use Myteam
 

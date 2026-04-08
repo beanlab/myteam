@@ -12,6 +12,9 @@
 - Added `myteam new workflow <name>` to scaffold named workflows inside `.myteam/workflows/`.
 - Changed workflow startup to `myteam workflows start <name>`, resolving named workflows from
   `.myteam/workflows/<name>.yaml`.
+- Improved the interactive workflow terminal UI with per-step banners, in-session `/help`,
+  `/status`, and `/outputs` commands, clearer finalization messaging, and richer saved run-status
+  reporting.
 - Added `src/myteam/templates/workflow_template.yaml` and updated docs/tests for the named-workflow
   layout.
 

@@ -285,6 +285,12 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
     )
 
     assert result.exit_code == 0, result.stderr
+    assert "== Step 1/2: plan ==" in result.stdout
+    assert "commands: /help /status /outputs /done" in result.stdout
+    assert "[plan] Finalization mode. Requesting the final structured JSON output now." in result.stdout
+    assert "== Step 2/2: review ==" in result.stdout
+    assert "Completed step review." in result.stdout
+    assert "Workflow session complete." in result.stdout
     assert "completed successfully" in result.stdout
     assert "Step Tokens (plan): total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout
     assert "Step Tokens (review): total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout
@@ -312,6 +318,7 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
     status_result = run_myteam(initialized_project, "workflows", "status", run_state["run_id"])
     assert status_result.exit_code == 0
     assert "Status: completed" in status_result.stdout
+    assert "Workflow Tokens: total=36, input=22, cached_input=0, output=14, reasoning_output=0" in status_result.stdout
     assert '"verdict": "looks-good"' in status_result.stdout
 
 
@@ -347,11 +354,60 @@ def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_proje
 
     assert result.exit_code == 0, result.stderr
     assert "Need clarification" in result.stdout
+    assert "[plan] Conversation mode. Enter feedback to continue this step." in result.stdout
     assert "Step Tokens (plan): total=24, input=15, cached_input=0, output=9, reasoning_output=0" in result.stdout
 
     run_dirs = list((initialized_project / ".myteam" / "workflow_runs").iterdir())
     run_state = json.loads((run_dirs[0] / "run.json").read_text(encoding="utf-8"))
     assert run_state["completed_outputs"]["plan"]["summary"] == "extra detail"
+
+
+def test_workflow_step_commands_show_help_status_and_outputs(run_myteam, initialized_project: Path):
+    _write_role(initialized_project, "plan", "Plan the work")
+    _write_role(initialized_project, "review", "Review the work")
+
+    _write_workflow(
+        initialized_project,
+        "commands-demo",
+        "plan:\n"
+        "  role: plan\n"
+        "  inputs:\n"
+        "    request: draft a plan\n"
+        "  outputs:\n"
+        "    summary: short plan summary\n"
+        "    plandoc: /plan.md\n"
+        "review:\n"
+        "  role: review\n"
+        "  inputs:\n"
+        "    summary:\n"
+        "      from: plan.summary\n"
+        "  outputs:\n"
+        "    verdict: review result\n",
+    )
+
+    fake_server = initialized_project / "fake_workflow_server.py"
+    _write_fake_workflow_server(fake_server)
+
+    result = run_myteam(
+        initialized_project,
+        "workflows",
+        "start",
+        "commands-demo",
+        input_text="/status\n/help\n/done\n/outputs\n/status\n/done\n",
+        env_overrides={
+            "MYTEAM_WORKFLOW_APP_SERVER_COMMAND": _server_command(fake_server),
+            "FAKE_WORKFLOW_MODE": "success",
+        },
+    )
+
+    assert result.exit_code == 0, result.stderr
+    assert "Mode: conversation" in result.stdout
+    assert "[plan] Commands:" in result.stdout
+    assert "  /status  Show the current workflow run status" in result.stdout
+    assert "Available Outputs:" in result.stdout
+    assert '"summary": "plan-summary"' in result.stdout
+    assert "Current Step: review" in result.stdout
+    assert "Workflow Tokens: total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout
 
 
 def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: Path):
@@ -402,6 +458,7 @@ def test_workflows_resume_retries_failed_step(run_myteam, initialized_project: P
         env_overrides=env_overrides,
     )
     assert resume_result.exit_code == 0, resume_result.stderr
+    assert f"Resuming workflow run {run_state['run_id']} from step plan (1/1)" in resume_result.stdout
 
     resumed_state = json.loads((run_dirs[0] / "run.json").read_text(encoding="utf-8"))
     assert resumed_state["status"] == "completed"
