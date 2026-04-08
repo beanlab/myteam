@@ -285,11 +285,12 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
     )
 
     assert result.exit_code == 0, result.stderr
-    assert "== Step 1/2: plan ==" in result.stdout
-    assert "commands: /help /status /outputs /done" in result.stdout
-    assert "[plan] Finalization mode. Requesting the final structured JSON output now." in result.stdout
-    assert "== Step 2/2: review ==" in result.stdout
-    assert "Completed step review." in result.stdout
+    assert "\x1b[" not in result.stdout
+    assert "Step 1/2: plan" in result.stdout
+    assert "Commands: [/help] [/status] [/outputs] [/done]" in result.stdout
+    assert "Finalization mode. Requesting the final structured JSON output now." in result.stdout
+    assert "Step 2/2: review" in result.stdout
+    assert "Completed step review" in result.stdout
     assert "Workflow session complete." in result.stdout
     assert "completed successfully" in result.stdout
     assert "Step Tokens (plan): total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout
@@ -317,6 +318,7 @@ def test_workflows_start_runs_steps_and_persists_outputs(run_myteam, initialized
 
     status_result = run_myteam(initialized_project, "workflows", "status", run_state["run_id"])
     assert status_result.exit_code == 0
+    assert "\x1b[" not in status_result.stdout
     assert "Status: completed" in status_result.stdout
     assert "Workflow Tokens: total=36, input=22, cached_input=0, output=14, reasoning_output=0" in status_result.stdout
     assert '"verdict": "looks-good"' in status_result.stdout
@@ -353,8 +355,10 @@ def test_workflows_start_can_chat_with_step_thread(run_myteam, initialized_proje
     )
 
     assert result.exit_code == 0, result.stderr
+    assert "\x1b[" not in result.stdout
     assert "Need clarification" in result.stdout
-    assert "[plan] Conversation mode. Enter feedback to continue this step." in result.stdout
+    assert "plan Conversation" in result.stdout
+    assert "Conversation mode. Enter feedback to continue this step." in result.stdout
     assert "Step Tokens (plan): total=24, input=15, cached_input=0, output=9, reasoning_output=0" in result.stdout
 
     run_dirs = list((initialized_project / ".myteam" / "workflow_runs").iterdir())
@@ -401,10 +405,11 @@ def test_workflow_step_commands_show_help_status_and_outputs(run_myteam, initial
     )
 
     assert result.exit_code == 0, result.stderr
+    assert "\x1b[" not in result.stdout
     assert "Mode: conversation" in result.stdout
-    assert "[plan] Commands:" in result.stdout
+    assert "plan Commands" in result.stdout
     assert "  /status  Show the current workflow run status" in result.stdout
-    assert "Available Outputs:" in result.stdout
+    assert "Available Outputs" in result.stdout
     assert '"summary": "plan-summary"' in result.stdout
     assert "Current Step: review" in result.stdout
     assert "Workflow Tokens: total=18, input=11, cached_input=0, output=7, reasoning_output=0" in result.stdout

@@ -46,6 +46,15 @@ WORKFLOW_DEVELOPER_INSTRUCTIONS = (
     "When finalizing, return only a JSON object matching the required outputs and do not wrap it in markdown fences."
 )
 
+ANSI_RESET = "\033[0m"
+ANSI_BOLD = "\033[1m"
+ANSI_DIM = "\033[2m"
+ANSI_RED = "\033[31m"
+ANSI_GREEN = "\033[32m"
+ANSI_YELLOW = "\033[33m"
+ANSI_BLUE = "\033[34m"
+ANSI_CYAN = "\033[36m"
+
 
 class UserInputPump:
     def __init__(self) -> None:
@@ -127,7 +136,7 @@ def workflow_status(run_id: str) -> None:
     except WorkflowError as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from exc
-    _print_lines(_status_lines(run_state))
+    _print_status(run_state)
 
 
 def _run_workflow(
@@ -289,7 +298,7 @@ def _run_thread_turn(
     attempt.turn_id = turn_id
     attempt.turn_ids.append(turn_id)
     save_run_state(project_root, run_state)
-    print(f"turn: {turn_id}")
+    _print_turn_started(turn_id)
     return _await_turn_completion(project_root, client, turn_id, attempt, run_state)
 
 
@@ -314,6 +323,8 @@ def _await_turn_completion(
         if method == "item/agentMessage/delta" and params.get("turnId") == turn_id:
             delta = params.get("delta", "")
             if delta:
+                if not printed_delta:
+                    _print_stream_label()
                 print(delta, end="", flush=True)
                 printed_delta = True
         elif method == "item/completed" and params.get("turnId") == turn_id:
@@ -482,7 +493,7 @@ def _handle_step_command(
         _print_step_commands(step.id)
         return False
     if command == "/status":
-        _print_lines(_status_lines(run_state, mode="conversation"))
+        _print_status(run_state, mode="conversation")
         return False
     if command == "/outputs":
         _print_available_outputs(previous_outputs)
@@ -495,43 +506,61 @@ def _handle_step_command(
 
 def _print_step_banner(step: WorkflowStep, *, step_index: int, total_steps: int, thread_id: str) -> None:
     role_name = step.role or AGENTS_DIRNAME
-    print()
-    print(f"== Step {step_index + 1}/{total_steps}: {step.id} ==")
-    print(f"role: {role_name}")
-    print(f"thread: {thread_id}")
-    print("mode: conversation")
-    print("commands: /help /status /outputs /done")
+    _print_panel(
+        f"Step {step_index + 1}/{total_steps}: {step.id}",
+        [
+            _key_value_line("Role", role_name),
+            _key_value_line("Thread", thread_id),
+            _key_value_line("Mode", "conversation"),
+            _command_bar("/help", "/status", "/outputs", "/done"),
+        ],
+        accent=ANSI_CYAN,
+    )
 
 
 def _print_step_commands(step_id: str) -> None:
-    print(f"[{step_id}] Commands:")
-    print("  /help    Show the available step commands")
-    print("  /status  Show the current workflow run status")
-    print("  /outputs Show completed outputs from earlier steps")
-    print("  /done    Finalize this step and request structured JSON")
+    _print_panel(
+        f"{step_id} Commands",
+        [
+            "/help    Show the available step commands",
+            "/status  Show the current workflow run status",
+            "/outputs Show completed outputs from earlier steps",
+            "/done    Finalize this step and request structured JSON",
+        ],
+        accent=ANSI_BLUE,
+    )
 
 
 def _print_conversation_mode(step_id: str) -> None:
-    print(f"[{step_id}] Conversation mode. Enter feedback to continue this step.")
-    print(f"[{step_id}] Type /done when the step is ready to finalize, or /help to see commands.")
+    _print_panel(
+        f"{step_id} Conversation",
+        [
+            "Conversation mode. Enter feedback to continue this step.",
+            "Type /done when the step is ready to finalize, or /help to see commands.",
+        ],
+        accent=ANSI_YELLOW,
+    )
 
 
 def _print_finalization_handoff(step_id: str) -> None:
-    print(f"[{step_id}] Finalization mode. Requesting the final structured JSON output now.")
+    _print_panel(
+        f"{step_id} Finalization",
+        ["Finalization mode. Requesting the final structured JSON output now."],
+        accent=ANSI_BOLD + ANSI_YELLOW,
+    )
 
 
 def _print_step_completion(step_id: str, output: dict[str, Any]) -> None:
-    print(f"Completed step {step_id}.")
-    print("Final outputs:")
-    print(json.dumps(output, indent=2, sort_keys=True))
+    _print_panel(
+        f"Completed step {step_id}",
+        ["Final outputs:", *_indented_json_lines(output)],
+        accent=ANSI_GREEN,
+    )
 
 
 def _print_available_outputs(previous_outputs: dict[str, dict[str, Any]]) -> None:
-    print("Available Outputs:")
-    if not previous_outputs:
-        print("  (none)")
-        return
-    print(json.dumps(previous_outputs, indent=2, sort_keys=True))
+    lines = ["(none)"] if not previous_outputs else _indented_json_lines(previous_outputs)
+    _print_panel("Available Outputs", lines, accent=ANSI_BLUE)
 
 
 def _status_lines(run_state: WorkflowRunState, *, mode: str | None = None) -> list[str]:
@@ -571,6 +600,65 @@ def _resume_message(run_state: WorkflowRunState, workflow: WorkflowDefinition) -
 def _print_lines(lines: list[str]) -> None:
     for line in lines:
         print(line)
+
+
+def _print_status(run_state: WorkflowRunState, *, mode: str | None = None) -> None:
+    _print_panel("Workflow Status", _status_lines(run_state, mode=mode), accent=ANSI_BLUE)
+
+
+def _supports_styling() -> bool:
+    return sys.stdout.isatty() and os.environ.get("TERM") != "dumb" and "NO_COLOR" not in os.environ
+
+
+def _styled(text: str, *styles: str) -> str:
+    if not _supports_styling() or not styles:
+        return text
+    return f"{''.join(styles)}{text}{ANSI_RESET}"
+
+
+def _rule(text: str = "", *, accent: str = "") -> str:
+    if text:
+        label = f" {text} "
+        line = f"{'=' * 6}{label}{'=' * 6}"
+    else:
+        line = "=" * 24
+    return _styled(line, accent) if accent else line
+
+
+def _key_value_line(label: str, value: str) -> str:
+    return f"{_styled(label + ':', ANSI_DIM)} {value}"
+
+
+def _command_bar(*commands: str) -> str:
+    tokens = []
+    for command in commands:
+        token = f"[{command}]"
+        tokens.append(_styled(token, ANSI_BOLD, ANSI_CYAN) if _supports_styling() else token)
+    return f"{_styled('Commands:', ANSI_DIM)} {' '.join(tokens)}"
+
+
+def _print_panel(title: str, lines: list[str], *, accent: str = "") -> None:
+    print()
+    print(_rule(title, accent=accent))
+    for line in lines:
+        print(_panel_line(line))
+
+
+def _panel_line(text: str) -> str:
+    return f"  {text}" if text else ""
+
+
+def _indented_json_lines(value: Any) -> list[str]:
+    return [f"  {line}" for line in json.dumps(value, indent=2, sort_keys=True).splitlines()]
+
+
+def _print_turn_started(turn_id: str) -> None:
+    print(_panel_line(_key_value_line("Turn", turn_id)))
+
+
+def _print_stream_label() -> None:
+    label = _styled("Assistant:", ANSI_BOLD, ANSI_CYAN)
+    print(_panel_line(label), end=" ", flush=True)
 
 
 def _workflow_name_parts(name: str) -> list[str]:
