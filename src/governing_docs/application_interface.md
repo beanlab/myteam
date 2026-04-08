@@ -332,6 +332,7 @@ The following behavior is part of the current application contract:
 - A local tree may carry a stored `myteam` version used for upgrade notices and migration guidance.
 - Upgrade guidance is surfaced through the generated root role and built-in maintenance skills, not through a dedicated migration CLI command.
 - If the tracked version file is missing, upgrade-related built-in loaders treat the tree as a legacy untracked local tree rather than failing.
+- Default generated loaders present discoverable skills first, then tools, and roles last.
 - Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
 - Errors are communicated as command failure plus an error message on standard error.
 

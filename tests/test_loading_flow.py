@@ -122,6 +122,54 @@ def test_builtin_skill_uses_custom_prefix_project_root(run_myteam, tmp_path: Pat
     assert "New `myteam` features since 0.2.5" in result.stdout
 
 
+def test_new_role_template_lists_skills_then_tools_then_roles(run_myteam, initialized_project: Path):
+    create_result = run_myteam(initialized_project, "new", "role", "developer")
+    assert create_result.exit_code == 0
+
+    role_dir = initialized_project / ".myteam" / "developer"
+    child_skill = role_dir / "testing"
+    child_skill.mkdir()
+    (child_skill / "skill.md").write_text("Testing skill\n", encoding="utf-8")
+    (child_skill / "load.py").write_text("print('testing')\n", encoding="utf-8")
+
+    child_role = role_dir / "frontend"
+    child_role.mkdir()
+    (child_role / "role.md").write_text("Frontend role\n", encoding="utf-8")
+    (child_role / "load.py").write_text("print('frontend')\n", encoding="utf-8")
+
+    (role_dir / "helper.py").write_text("print('tool')\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "role", "developer")
+
+    assert result.exit_code == 0
+    assert result.stdout.index("# Skills") < result.stdout.index("# Tools")
+    assert result.stdout.index("# Tools") < result.stdout.index("# Roles")
+
+
+def test_new_skill_template_lists_skills_then_tools_then_roles(run_myteam, initialized_project: Path):
+    create_result = run_myteam(initialized_project, "new", "skill", "python")
+    assert create_result.exit_code == 0
+
+    skill_dir = initialized_project / ".myteam" / "python"
+    nested_skill = skill_dir / "testing"
+    nested_skill.mkdir()
+    (nested_skill / "skill.md").write_text("Nested testing skill\n", encoding="utf-8")
+    (nested_skill / "load.py").write_text("print('nested')\n", encoding="utf-8")
+
+    nested_role = skill_dir / "reviewer"
+    nested_role.mkdir()
+    (nested_role / "role.md").write_text("Reviewer role\n", encoding="utf-8")
+    (nested_role / "load.py").write_text("print('reviewer')\n", encoding="utf-8")
+
+    (skill_dir / "lint.py").write_text("print('lint')\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "skill", "python")
+
+    assert result.exit_code == 0
+    assert result.stdout.index("*********** Skills ***********") < result.stdout.index("*********** Tools ***********")
+    assert result.stdout.index("*********** Tools ***********") < result.stdout.index("******** Team Members ********")
+
+
 def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project: Path):
     role_dir = initialized_project / ".myteam" / "developer"
     role_dir.mkdir()

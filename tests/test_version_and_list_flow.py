@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam import __version__
+from myteam.upgrade import _packaged_changelog_text
 
 
 def test_version_reports_app_version(run_myteam, tmp_path: Path):
@@ -17,3 +18,9 @@ def test_migrate_is_not_an_available_command(run_myteam, tmp_path: Path):
 
     assert result.exit_code == 2
     assert "Cannot find key: migrate" in result.stderr
+
+
+def test_packaged_changelog_copy_matches_repo_changelog():
+    repo_changelog = (Path(__file__).resolve().parents[1] / "src" / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert _packaged_changelog_text() == repo_changelog
