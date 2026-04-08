@@ -1,4 +1,4 @@
-## Tools
+# Tools
 
 Tools are scripts you should use to accomplish your tasks.
 

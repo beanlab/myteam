@@ -14,9 +14,9 @@ def main() -> int:
 
     print_instructions(base)
     print_release_notes(myteam)
-    list_roles(base, builtin_root, [])
     list_skills(base, builtin_root, [])
     list_tools(base, builtin_root, [])
+    list_roles(base, builtin_root, [])
 
     return 0
 
