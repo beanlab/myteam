@@ -334,6 +334,10 @@ Expected outcome on success:
 - Starts a conversational turn for the step and streams its progress.
 - Prints a small step banner that identifies the current workflow step and the commands available
   while that step is active.
+- Uses visual hierarchy in the interactive terminal output so workflow chrome, streamed assistant
+  output, and completion summaries are easier to distinguish.
+- May use terminal styling such as ANSI color, bold text, indentation, and divider lines when the
+  terminal supports it, while preserving a readable plain-text fallback when it does not.
 - Keeps the active step thread open for additional user follow-up turns before finalization.
 - In interactive use, accepts slash commands for workflow-step control and inspection, including
   `/help`, `/status`, `/outputs`, and `/done`.
@@ -351,6 +355,8 @@ User-visible result:
 - The caller can keep chatting with the active step thread before finalizing it.
 - The caller can inspect the active run state from inside the workflow session without leaving the
   current step prompt.
+- The caller can visually distinguish workflow metadata, active assistant output, state
+  transitions, and completion summaries without needing to parse a flat stream of log lines.
 - On success, the workflow's validated step outputs are stored for later inspection and downstream steps.
 
 Failure conditions that matter at the interface:

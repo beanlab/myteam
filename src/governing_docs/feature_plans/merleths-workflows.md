@@ -16,6 +16,9 @@ Improve the terminal experience for `myteam workflows` so users can understand w
 while a workflow step runs, what commands are available during a step, and how to inspect the
 current run without leaving the active workflow session.
 
+This polish pass should improve the visual feel of the workflow session without changing the
+underlying workflow protocol or making the terminal output dependent on color support.
+
 The workflow runner should stay deterministic:
 
 - roles remain the source of step behavior
@@ -38,19 +41,24 @@ Planned refactors:
    - rendering workflow/run status snapshots
    - rendering finalized/completed output summaries
    - rendering mode transitions such as conversation, finalization, and completion
+   - rendering optional terminal styling with plain-text fallback
 2. Refactor the step interaction loop so slash-command handling is centralized instead of being
    mixed into the generic follow-up message flow.
 3. Add a small status summary helper in the workflow run-state layer or workflow module so both:
    - `myteam workflows status <run_id>`
    - interactive in-step `/status`
    can reuse the same formatting logic.
-4. Keep the step-execution path unchanged in its core responsibilities:
+4. Introduce a tiny styling layer that:
+   - applies ANSI styling only for interactive terminals
+   - keeps non-interactive output and tests stable
+   - separates content styling from workflow logic so future formatting changes stay local
+5. Keep the step-execution path unchanged in its core responsibilities:
    - load role instructions
    - start a thread
    - run turns
    - validate final JSON outputs
    - persist attempts and outputs
-5. Preserve non-interactive behavior for tests and piped input by keeping the `UserInputPump`
+6. Preserve non-interactive behavior for tests and piped input by keeping the `UserInputPump`
    contract intact and making slash commands work through both tty and non-tty input paths.
 
 The goal of this refactor is to make the runner easier to extend while keeping existing workflow
@@ -68,24 +76,30 @@ Behavior details:
    - the role used for that step
    - the active thread id
    - the commands available while the step is active
+   - clearer visual separation from the streamed assistant output below it
 2. The step prompt should clearly indicate conversation mode while the user may still provide
    follow-up guidance to the active thread.
-3. Support the following in-step commands:
+3. The workflow session should use restrained styling, spacing, and alignment so:
+   - workflow metadata reads differently from assistant text
+   - state transitions such as finalization and completion stand out
+   - status and outputs feel like compact panels rather than raw log lines
+   - the session remains readable when ANSI styling is unavailable
+4. Support the following in-step commands:
    - `/help` to print the available commands again
    - `/status` to print a concise workflow status snapshot for the current run
    - `/outputs` to print completed outputs that are already available from earlier steps
    - `/done` to finalize the current step and request the required JSON object
-4. When `/done` is used, print a clear finalization handoff message before the final structured turn
+5. When `/done` is used, print a clear finalization handoff message before the final structured turn
    starts so the user can tell the workflow is no longer in conversation mode.
-5. After step completion, print a concise completion summary before moving to the next step.
-6. On workflow completion, continue printing total token usage, but make the end-of-run message feel
+6. After step completion, print a concise completion summary before moving to the next step.
+7. On workflow completion, continue printing total token usage, but make the end-of-run message feel
    like the close of an interactive session rather than just another log line.
-7. `myteam workflows status <run_id>` should show richer persisted state, including:
+8. `myteam workflows status <run_id>` should show richer persisted state, including:
    - current step when present
    - last failure when present
    - completed outputs
    - token totals when available
-8. `myteam workflows resume <run_id>` should explain that it is resuming from the first incomplete
+9. `myteam workflows resume <run_id>` should explain that it is resuming from the first incomplete
    step and then re-enter the same interactive step UI.
 
 Non-goals for this feature:
@@ -100,6 +114,7 @@ Non-goals for this feature:
 Update the workflow CLI tests to prove:
 
 - workflow start prints the new step banner and command help text
+- workflow output remains readable and stable in non-interactive plain-text mode
 - `/help` prints the in-step command list without advancing the step
 - `/status` prints a useful run snapshot from inside the active workflow session
 - `/outputs` prints completed outputs from prior steps while a later step is active
