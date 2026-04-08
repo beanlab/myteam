@@ -338,6 +338,8 @@ Expected outcome on success:
   output, and completion summaries are easier to distinguish.
 - May use terminal styling such as ANSI color, bold text, indentation, and divider lines when the
   terminal supports it, while preserving a readable plain-text fallback when it does not.
+- May render selected workflow-chrome sections such as the active step metadata block and `/help`
+  output as filled panels with background color when the terminal supports it.
 - Keeps the active step thread open for additional user follow-up turns before finalization.
 - In interactive use, accepts slash commands for workflow-step control and inspection, including
   `/help`, `/status`, `/outputs`, and `/done`.

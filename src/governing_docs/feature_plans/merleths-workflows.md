@@ -52,6 +52,7 @@ Planned refactors:
    - applies ANSI styling only for interactive terminals
    - keeps non-interactive output and tests stable
    - separates content styling from workflow logic so future formatting changes stay local
+   - can render selected panels with background color without affecting streamed assistant output
 5. Keep the step-execution path unchanged in its core responsibilities:
    - load role instructions
    - start a thread
@@ -84,6 +85,7 @@ Behavior details:
    - state transitions such as finalization and completion stand out
    - status and outputs feel like compact panels rather than raw log lines
    - the session remains readable when ANSI styling is unavailable
+   - filled background panels are reserved for the workflow chrome that benefits most from them
 4. Support the following in-step commands:
    - `/help` to print the available commands again
    - `/status` to print a concise workflow status snapshot for the current run
@@ -101,6 +103,9 @@ Behavior details:
    - token totals when available
 9. `myteam workflows resume <run_id>` should explain that it is resuming from the first incomplete
    step and then re-enter the same interactive step UI.
+10. The active step metadata block and `/help` output should use filled background panels in
+    interactive terminals so they read more like TUI surfaces than plain log sections, while
+    non-interactive output keeps the existing plain-text layout.
 
 Non-goals for this feature:
 
