@@ -4,6 +4,32 @@ This document is the implementation design for the workflow feature.
 It supersedes earlier exploratory design notes in `src/governing_docs/backlog/workflows.md`
 where the two documents differ.
 
+## Progress Notes
+
+Completed:
+
+- Interface document updated and committed.
+- Feature plan created and refined to be the single design doc going forward.
+- Framework refactor completed and committed:
+  - `disclosure/`, `rosters/`, and `workflow/` package boundaries are in place
+  - `utils.py` is now a compatibility layer over `disclosure`
+- `agent_registry.py` sub-milestone completed and committed.
+- `parser.py` sub-milestone completed and committed.
+- Parser contract tests were added to capture the workflow file format as user-facing behavior.
+
+Important decisions already made:
+
+- `WorkflowDefinition` is a plain ordered mapping of `step_name -> step_definition`, not a list wrapper.
+- Authored/config-shaped workflow data uses mapping-oriented types; internal runtime/result objects may still use dataclasses.
+- Workflow output is one dictionary keyed by step name whose values mirror completed step state.
+- Package source under `src/myteam/` should use package-relative imports.
+- Exception: built-in loader entrypoints under `src/myteam/builtins/**/load.py` may keep absolute `myteam...` imports because they run as standalone scripts.
+- The PTY wrapper should not take a separate `quit_sequence` kwarg; callback-returned text is written to the child PTY as input and should trigger normal child exit.
+
+Next suggested sub-milestone:
+
+- Implement `reference_resolver.py`.
+
 ## Context
 
 `myteam` currently has a small, command-centric architecture:
