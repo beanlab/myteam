@@ -50,6 +50,8 @@ Reasons:
 - Fire remains the CLI wiring mechanism.
 - `commands.py` remains the place where command functions translate internal errors into user-visible stderr and exit codes.
 - `commands.py` should contain only minimal plumbing across disclosure, roster, and workflow startup, not domain business logic.
+- Package source files under `src/myteam/` should use package-relative imports rather than absolute `myteam...` imports.
+- Exception: built-in loader entrypoints under `src/myteam/builtins/**/load.py` may continue using absolute `myteam...` imports because they are executed as standalone loader scripts.
 - Project-local root selection continues to flow through `_selected_root(prefix)`.
 - Workflow file lookup should behave like other local-tree features: relative to the selected root and supporting slash-delimited names.
 - High-level CLI tests remain the primary evidence for public behavior.

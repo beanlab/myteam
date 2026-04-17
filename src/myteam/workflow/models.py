@@ -17,13 +17,7 @@ class StepDefinition(TypedDict, total=False):
     agent: str
 
 
-class WorkflowStepEntry(TypedDict):
-    name: str
-    definition: StepDefinition
-
-
-class WorkflowDefinition(TypedDict):
-    steps: list[WorkflowStepEntry]
+WorkflowDefinition = dict[str, StepDefinition]
 
 
 class CompletedStepState(TypedDict, total=False):
