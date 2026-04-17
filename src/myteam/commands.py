@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from myteam.utils import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
+from .disclosure import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
 
 from . import __version__
 from .paths import APP_NAME, BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, ENCODING, agents_root, base_dir, role_dir

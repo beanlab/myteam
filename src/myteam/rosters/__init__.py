@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from .paths import APP_NAME, DEFAULT_LOCAL_ROOT, agents_root, normalize_local_root
+from ..paths import APP_NAME, DEFAULT_LOCAL_ROOT, agents_root, normalize_local_root
 
 DEFAULT_REPO = "beanlab/rosters"
 SOURCE_METADATA = ".source.yml"
@@ -79,13 +79,9 @@ def _fetch_available_rosters(roster_repository_url: str, ref: str = DEFAULT_REF)
 
 def _fetch_roster_entry(roster: str, roster_repository_url: str, ref: str = DEFAULT_REF) -> dict:
     roster_trees = _fetch_available_rosters(roster_repository_url, ref)
-    roster_tree = next(
-        (entry for entry in roster_trees if entry.get("path") == roster),
-        None,
-    )
+    roster_tree = next((entry for entry in roster_trees if entry.get("path") == roster), None)
     if roster_tree is None:
         _handle_missing_roster(roster, roster_trees)
-
     return roster_tree
 
 
@@ -104,7 +100,6 @@ def _fetch_tree_files(roster_tree, roster_repository_url: str):
     if not file_entries:
         print(f"No files found in roster '{roster_tree.get('path')}'.", file=sys.stderr)
         exit(1)
-
     return file_entries
 
 
@@ -166,15 +161,9 @@ def _ensure_destination_available(base: Path, destination: Path, repo: str, rost
         return
     display_path = _display_path(base, destination)
     if _same_source(_read_source_metadata(destination), repo, roster_name):
-        print(
-            f"Managed download already exists at {display_path}. Run `myteam update {display_path}` instead.",
-            file=sys.stderr,
-        )
+        print(f"Managed download already exists at {display_path}. Run `myteam update {display_path}` instead.", file=sys.stderr)
         exit(1)
-    print(
-        f"Unrelated content already exists at {display_path}; delete it or choose a different destination.",
-        file=sys.stderr,
-    )
+    print(f"Unrelated content already exists at {display_path}; delete it or choose a different destination.", file=sys.stderr)
     exit(1)
 
 
@@ -233,10 +222,7 @@ def _require_source_metadata(destination: Path) -> dict[str, str]:
     missing_keys = [key for key in required_keys if not metadata.get(key)]
     if missing_keys:
         missing = ", ".join(missing_keys)
-        print(
-            f"Managed download metadata at {_display_path(Path.cwd(), destination)} is missing required fields: {missing}.",
-            file=sys.stderr,
-        )
+        print(f"Managed download metadata at {_display_path(Path.cwd(), destination)} is missing required fields: {missing}.", file=sys.stderr)
         exit(1)
     return metadata
 
