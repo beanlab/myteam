@@ -40,6 +40,8 @@ class RunContext:
 class StepResult:
     step_name: str
     status: str
+    input: Any | None = None
+    agent: str | None = None
     output: Any | None = None
     error_type: str | None = None
     error_message: str | None = None
