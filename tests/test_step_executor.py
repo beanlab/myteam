@@ -60,6 +60,52 @@ def test_completion_watcher_ignores_non_completion_json_before_final_payload():
     assert watcher.content == {"title": "keep me"}
 
 
+def test_completion_watcher_ignores_stray_unmatched_brace_before_completion_payload():
+    watcher = CompletionWatcher()
+
+    watcher.append(b"Here is some prose with an unmatched brace {\n")
+    watcher.append(b'{"status":"OBJECTIVE_COMPLETE","content":{"title":"final"}}')
+
+    assert watcher.completed is True
+    assert watcher.content == {"title": "final"}
+
+
+def test_completion_watcher_rejects_completion_payload_with_extra_top_level_keys():
+    watcher = CompletionWatcher()
+
+    watcher.append(
+        b'{"status":"OBJECTIVE_COMPLETE","content":{"title":"final"},"extra":"nope"}'
+    )
+
+    assert watcher.completed is False
+    assert watcher.content is None
+
+
+def test_completion_watcher_waits_for_closing_brace_before_accepting_completion():
+    watcher = CompletionWatcher()
+
+    watcher.append(b'{"status":"OBJECTIVE_COMPLETE","content":{"title":"partial"}')
+
+    assert watcher.completed is False
+
+    watcher.append(b"}")
+
+    assert watcher.completed is True
+    assert watcher.content == {"title": "partial"}
+
+
+def test_completion_watcher_prefers_most_recent_completion_attempt():
+    watcher = CompletionWatcher()
+
+    watcher.append(b'{"status":"OBJECTIVE_COMPLETE","content":}\n')
+    assert watcher.completed is False
+
+    watcher.append(b'{"status":"OBJECTIVE_COMPLETE","content":{"title":"fixed"}}')
+
+    assert watcher.completed is True
+    assert watcher.content == {"title": "fixed"}
+
+
 def test_execute_step_returns_completed_result(monkeypatch):
     recorded_initial_input: dict[str, str] = {}
 

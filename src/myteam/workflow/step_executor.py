@@ -48,6 +48,8 @@ def execute_step(
             step_name=step_name,
             transcript=transcript,
             output=accepted_content,
+            resolved_input=resolved_input,
+            agent_name=agent_name,
         )
     except StepExecutionError as exc:
         transcript = transcript or watcher.transcript
@@ -238,11 +240,15 @@ def _build_completed_step_result(
     step_name: str,
     transcript: str,
     output: Any,
+    resolved_input: Any,
+    agent_name: str,
 ) -> StepResult:
     return StepResult(
         step_name=step_name,
         status="completed",
         output=output,
+        resolved_input=resolved_input,
+        agent_name=agent_name,
         transcript=transcript,
     )
 
@@ -321,41 +327,49 @@ class CompletionWatcher:
         """
         Pseudocode:
         1. Skip parsing work until the transcript contains `OBJECTIVE_COMPLETE`.
-        2. Enumerate candidate top-level JSON objects from the transcript in authored order.
-        3. Parse each candidate, including a normalized retry for line-wrapped TTY output.
-        4. Accept the first parsed payload with the required top-level completion shape.
+        2. Anchor on the most recent completion marker in the transcript.
+        3. Find the nearest plausible opening `{` before that marker and try to close one object.
+        4. If the object is incomplete, defer until more output arrives.
+        5. If the object is complete, parse it, including a normalized retry for line-wrapped TTY output.
+        6. Accept the first parsed payload with the exact required top-level completion shape.
         """
         if "OBJECTIVE_COMPLETE" not in self.transcript:
             return
 
-        for candidate_text in self._candidate_json_texts():
-            payload = self._parse_candidate_payload(candidate_text)
-            if self._is_completion_payload(payload):
-                self._accepted_payload = payload
-                return
+        candidate_text = self._candidate_json_text()
+        if candidate_text is None:
+            return
 
-    def _candidate_json_texts(self) -> list[str]:
+        payload = self._parse_candidate_payload(candidate_text)
+        if self._is_completion_payload(payload):
+            self._accepted_payload = payload
+
+    def _candidate_json_text(self) -> str | None:
         """
         Pseudocode:
-        1. Scan the full transcript character by character.
-        2. Track JSON string/escape state plus brace depth.
-        3. Record each top-level brace-delimited object.
-        4. Return only candidates that mention `OBJECTIVE_COMPLETE`.
+        1. Find the most recent `OBJECTIVE_COMPLETE` marker in the transcript.
+        2. Walk backward to the nearest `{` before that marker and treat it as the start.
+        3. From that start, scan forward with JSON string/escape tracking until brace depth returns to zero.
+        4. Return the candidate object text when complete, or None if more output is needed.
         """
         transcript = self.transcript
-        candidates: list[str] = []
-        start_index: int | None = None
+        marker_index = transcript.rfind("OBJECTIVE_COMPLETE")
+        if marker_index < 0:
+            return None
+
+        start_index = transcript.rfind("{", 0, marker_index + 1)
+        if start_index < 0:
+            return None
+
         depth = 0
         in_string = False
         escaping = False
 
-        for index, char in enumerate(transcript):
-            if start_index is None:
-                if char == "{":
-                    start_index = index
-                    depth = 1
-                    in_string = False
-                    escaping = False
+        for index in range(start_index, len(transcript)):
+            char = transcript[index]
+
+            if index == start_index:
+                depth = 1
                 continue
 
             if escaping:
@@ -378,12 +392,9 @@ class CompletionWatcher:
             elif char == "}":
                 depth -= 1
                 if depth == 0:
-                    candidate = transcript[start_index:index + 1]
-                    if "OBJECTIVE_COMPLETE" in candidate:
-                        candidates.append(candidate)
-                    start_index = None
+                    return transcript[start_index:index + 1]
 
-        return candidates
+        return None
 
     def _parse_candidate_payload(self, candidate_text: str) -> dict[str, Any] | None:
         for text in (candidate_text, self._normalize_wrapped_json(candidate_text)):
@@ -442,6 +453,8 @@ class CompletionWatcher:
     def _is_completion_payload(self, payload: dict[str, Any] | None) -> bool:
         if payload is None:
             return False
+        if set(payload) != {"status", "content"}:
+            return False
         if payload.get("status") != "OBJECTIVE_COMPLETE":
             return False
-        return "content" in payload
+        return True

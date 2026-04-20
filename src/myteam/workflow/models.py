@@ -23,7 +23,7 @@ WorkflowDefinition = dict[str, StepDefinition]
 class CompletedStepState(TypedDict, total=False):
     prompt: str
     input: Any
-    agent: str | None
+    agent: str
     output: Any
 
 
@@ -61,6 +61,8 @@ class StepResult:
     step_name: str
     status: str
     output: Any | None = None
+    resolved_input: Any | None = None
+    agent_name: str = ""
     error_type: str | None = None
     error_message: str | None = None
     transcript: str = ""

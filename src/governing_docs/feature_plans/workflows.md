@@ -20,6 +20,11 @@ Completed:
 - `tty_wrapper.py` sub-milestone completed and committed.
 - Direct integration tests were added for `tty_wrapper.py` using a deterministic PTY child helper.
 - A development-only monitored TTY prototype now lives under `scripts/prototypes/`.
+- `step_executor.py` sub-milestone completed.
+- Direct executor tests were added for completion detection, output validation, and failure handling.
+- The workflow completion contract was refined so the first accepted valid completion object wins, the executor triggers agent shutdown immediately after acceptance, and trailing output is still captured.
+- `engine.py` sub-milestone completed.
+- Direct engine tests were added for authored-order execution, fail-fast behavior, completed step state storage, and completed-step invariants.
 
 Important decisions already made:
 
@@ -33,7 +38,7 @@ Important decisions already made:
 
 Next suggested sub-milestone:
 
-- Implement `step_executor.py`.
+- Add the public `start` command and workflow path resolution.
 
 ## Context
 
