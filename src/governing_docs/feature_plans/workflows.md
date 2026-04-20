@@ -16,6 +16,10 @@ Completed:
 - `agent_registry.py` sub-milestone completed and committed.
 - `parser.py` sub-milestone completed and committed.
 - Parser contract tests were added to capture the workflow file format as user-facing behavior.
+- `reference_resolver.py` sub-milestone completed and committed.
+- `tty_wrapper.py` sub-milestone completed and committed.
+- Direct integration tests were added for `tty_wrapper.py` using a deterministic PTY child helper.
+- A development-only monitored TTY prototype now lives under `scripts/prototypes/`.
 
 Important decisions already made:
 
@@ -25,10 +29,11 @@ Important decisions already made:
 - Package source under `src/myteam/` should use package-relative imports.
 - Exception: built-in loader entrypoints under `src/myteam/builtins/**/load.py` may keep absolute `myteam...` imports because they run as standalone scripts.
 - The PTY wrapper should not take a separate `quit_sequence` kwarg; callback-returned text is written to the child PTY as input and should trigger normal child exit.
+- Injected command text should be written first and the terminating Enter should be sent as a later keystroke, because Codex may treat a too-fast combined write as paste instead of command execution.
 
 Next suggested sub-milestone:
 
-- Implement `reference_resolver.py`.
+- Implement `step_executor.py`.
 
 ## Context
 
@@ -231,6 +236,7 @@ Changes:
   - Build the canonical agent prompt from authored `input`, `prompt`, and `output`.
   - Run the configured agent through the PTY wrapper.
   - Detect the final completion payload in streamed output.
+  - Parse the final JSON object from the transcript and include the parsed `content` payload in the returned `StepResult`.
   - Validate the returned output against the authored `output` template.
   - Return a `StepResult` with full transcript.
 - `engine.py`
@@ -374,6 +380,7 @@ Why:
 - If parsing fails, execution continues and the executor keeps reading output.
 - If additional output arrives after valid completion is accepted, append it to the transcript but do not invalidate success.
 - The first accepted valid completion object wins.
+- The PTY wrapper does not parse completion payloads; the executor is responsible for parsing the final JSON object from the transcript and returning the parsed result in `StepResult`.
 
 ### Step state shape for references
 
