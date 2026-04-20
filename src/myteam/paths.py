@@ -32,3 +32,30 @@ def builtin_agents_root() -> Path:
 
 def role_dir(base: Path, role: str, prefix: str | Path | None = None) -> Path:
     return agents_root(base, prefix) / role
+
+
+def workflow_candidates(base: Path, workflow: str, prefix: str | Path | None = None) -> list[Path]:
+    root = agents_root(base, prefix)
+    requested_path = root.joinpath(*workflow.split("/"))
+    candidates: list[Path] = []
+
+    if requested_path.suffix in {".yaml", ".yml"}:
+        if requested_path.exists():
+            candidates.append(requested_path)
+        return candidates
+
+    for suffix in (".yaml", ".yml"):
+        candidate = requested_path.with_suffix(suffix)
+        if candidate.exists():
+            candidates.append(candidate)
+    return candidates
+
+
+def workflow_path(base: Path, workflow: str, prefix: str | Path | None = None) -> Path:
+    candidates = workflow_candidates(base, workflow, prefix)
+    if not candidates:
+        raise ValueError(f"Workflow '{workflow}' not found.")
+    if len(candidates) > 1:
+        matches = ", ".join(str(path) for path in candidates)
+        raise ValueError(f"Workflow '{workflow}' is ambiguous. Matching files: {matches}")
+    return candidates[0]

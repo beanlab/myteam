@@ -29,6 +29,19 @@ def _validate_mapping_keys(value: Any, *, context: str) -> None:
             _validate_mapping_keys(nested, context=f"{context}[{index}]")
 
 
+def _validate_output_template(value: Any, *, context: str) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} must be a mapping.")
+
+    for key, nested in value.items():
+        if not _is_identifier_key(key):
+            raise ValueError(f"{context} contains non-identifier key: {key!r}")
+        if isinstance(nested, list):
+            raise ValueError(f"{context}.{key} must not contain a list.")
+        if isinstance(nested, dict):
+            _validate_output_template(nested, context=f"{context}.{key}")
+
+
 def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition:
     if not isinstance(definition, dict):
         raise ValueError(f"Workflow step '{step_name}' must be a mapping.")
@@ -48,14 +61,12 @@ def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition
         raise ValueError(f"Workflow step '{step_name}' field 'prompt' must be a string.")
 
     output = definition["output"]
-    if not isinstance(output, dict):
-        raise ValueError(f"Workflow step '{step_name}' field 'output' must be a mapping.")
-
-    _validate_mapping_keys(output, context=f"Workflow step '{step_name}'.output")
+    _validate_output_template(output, context=f"Workflow step '{step_name}'.output")
 
     validated: StepDefinition = {
         "prompt": prompt,
         "output": output,
+        "input": None,
     }
 
     if "input" in definition:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from .agent_registry import DEFAULT_AGENT
 from .models import CompletedStepState, StepDefinition, StepResult, WorkflowDefinition, WorkflowOutput, WorkflowRunResult
 from .step_executor import execute_step
@@ -11,6 +13,7 @@ def run_workflow(
     default_agent: str = DEFAULT_AGENT,
     inactivity_timeout_seconds: int = 300,
     graceful_shutdown_timeout_seconds: int = 30,
+    logger: Callable[[str], None] | None = None,
 ) -> WorkflowRunResult:
     """
     Execute a workflow in authored order and stop at the first failing step.
@@ -25,6 +28,8 @@ def run_workflow(
     completed_steps: WorkflowOutput = {}
 
     for step_name, step_definition in workflow.items():
+        if logger is not None:
+            logger(f"Starting step '{step_name}'")
         step_result = execute_step(
             step_name,
             step_definition,
@@ -34,6 +39,11 @@ def run_workflow(
             graceful_shutdown_timeout_seconds=graceful_shutdown_timeout_seconds,
         )
         if step_result.status != "completed":
+            if logger is not None:
+                if step_result.error_message:
+                    logger(f"Step '{step_name}' failed: {step_result.error_message}")
+                else:
+                    logger(f"Step '{step_name}' failed.")
             return WorkflowRunResult(
                 status="failed",
                 output=completed_steps or None,
@@ -44,6 +54,8 @@ def run_workflow(
             step_definition=step_definition,
             step_result=step_result,
         )
+        if logger is not None:
+            logger(f"Completed step '{step_name}'")
 
     return WorkflowRunResult(status="completed", output=completed_steps)
 
@@ -67,11 +79,8 @@ def _build_completed_step_state(
 
     completed_state: CompletedStepState = {
         "prompt": step_definition["prompt"],
+        "input": step_result.resolved_input,
         "agent": step_result.agent_name,
         "output": step_result.output,
     }
-    if "input" in step_definition:
-        if step_result.resolved_input is None:
-            raise ValueError(f"Completed step '{step_result.step_name}' is missing resolved_input.")
-        completed_state["input"] = step_result.resolved_input
     return completed_state

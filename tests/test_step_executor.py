@@ -153,6 +153,51 @@ def test_execute_step_returns_completed_result(monkeypatch):
     assert "Objective:" in recorded_initial_input["value"]
     assert "Output template:" in recorded_initial_input["value"]
     assert "Write a summary." in recorded_initial_input["value"]
+    assert "Input:" not in recorded_initial_input["value"]
+    assert result.resolved_input is None
+
+
+def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatch):
+    recorded_initial_input: dict[str, str] = {}
+
+    def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
+        return {
+            "name": "fake-agent",
+            "argv": ["fake-agent"],
+            "exit_text": "/quit\n",
+        }
+
+    def fake_run_pty_session(
+        argv: list[str],
+        initial_input: str | None,
+        on_output,
+        *,
+        inactivity_timeout_seconds: int,
+        graceful_shutdown_timeout_seconds: int,
+    ) -> PtyRunResult:
+        recorded_initial_input["value"] = initial_input or ""
+        chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
+        on_output(chunk)
+        return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
+
+    monkeypatch.setattr("myteam.workflow.step_executor.get_agent_config", fake_get_agent_config)
+    monkeypatch.setattr("myteam.workflow.step_executor.run_pty_session", fake_run_pty_session)
+
+    result = execute_step(
+        "draft",
+        {
+            "input": None,
+            "prompt": "Write a summary.",
+            "output": {
+                "summary": "short summary",
+            },
+        },
+        prior_steps={},
+    )
+
+    assert result.status == "completed"
+    assert result.resolved_input is None
+    assert "Input:" not in recorded_initial_input["value"]
 
 
 def test_execute_step_returns_failed_result_for_reference_resolution_errors(monkeypatch):

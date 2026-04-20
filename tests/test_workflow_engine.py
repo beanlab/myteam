@@ -101,6 +101,7 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
     assert result.output == {
         "first": {
             "prompt": "one",
+            "input": None,
             "agent": "codex",
             "output": {"value": "first"},
         }
@@ -162,6 +163,7 @@ def test_run_workflow_stores_completed_step_state_for_later_references(monkeypat
         {
             "draft": {
                 "prompt": "Write a draft.",
+                "input": None,
                 "agent": "codex",
                 "output": {"title": "Draft Title"},
             }
@@ -171,6 +173,7 @@ def test_run_workflow_stores_completed_step_state_for_later_references(monkeypat
     assert result.output == {
         "draft": {
             "prompt": "Write a draft.",
+            "input": None,
             "agent": "codex",
             "output": {"title": "Draft Title"},
         },
@@ -250,13 +253,14 @@ def test_run_workflow_rejects_completed_step_without_agent_name(monkeypatch):
             {
                 "draft": {
                     "prompt": "Write a draft.",
+                    "input": None,
                     "output": {"value": "draft"},
                 }
             }
         )
 
 
-def test_run_workflow_rejects_completed_step_with_authored_input_but_no_resolved_input(monkeypatch):
+def test_run_workflow_stores_null_input_for_completed_steps(monkeypatch):
     def fake_execute_step(
         step_name: str,
         step_definition: dict[str, Any],
@@ -271,34 +275,50 @@ def test_run_workflow_rejects_completed_step_with_authored_input_but_no_resolved
                 step_name=step_name,
                 status="completed",
                 output={"title": "Draft Title"},
+                resolved_input=None,
                 agent_name=default_agent,
             )
         return StepResult(
             step_name=step_name,
             status="completed",
             output={"reviewed_title": "Reviewed Draft Title"},
+            resolved_input=None,
             agent_name=default_agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
 
-    with pytest.raises(ValueError, match="missing resolved_input"):
-        run_workflow(
-            {
-                "draft": {
-                    "prompt": "Write a draft.",
-                    "output": {
-                        "title": "draft title",
-                    },
+    result = run_workflow(
+        {
+            "draft": {
+                "prompt": "Write a draft.",
+                "input": None,
+                "output": {
+                    "title": "draft title",
                 },
-                "review": {
-                    "input": {
-                        "title": "$draft.output.title",
-                    },
-                    "prompt": "Review the draft.",
-                    "output": {
-                        "reviewed_title": "reviewed title",
-                    },
+            },
+            "review": {
+                "input": None,
+                "prompt": "Review the draft.",
+                "output": {
+                    "reviewed_title": "reviewed title",
                 },
-            }
-        )
+            },
+        }
+    )
+
+    assert result.status == "completed"
+    assert result.output == {
+        "draft": {
+            "prompt": "Write a draft.",
+            "input": None,
+            "agent": "codex",
+            "output": {"title": "Draft Title"},
+        },
+        "review": {
+            "prompt": "Review the draft.",
+            "input": None,
+            "agent": "codex",
+            "output": {"reviewed_title": "Reviewed Draft Title"},
+        },
+    }

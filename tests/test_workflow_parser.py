@@ -32,6 +32,7 @@ def test_load_workflow_accepts_documented_workflow_shape(tmp_path: Path):
 
     assert list(workflow) == ["step1", "step2"]
     assert workflow["step1"]["prompt"] == "I need three haikus. Please write them for me."
+    assert workflow["step1"]["input"] is None
     assert workflow["step2"]["input"] == "$step1.output"
     assert workflow["step2"]["output"]["best_haiku"]["haiku"] == "the haiku text"
 
@@ -94,4 +95,34 @@ def test_load_workflow_rejects_unknown_agents(tmp_path: Path):
     )
 
     with pytest.raises(ValueError, match="Unknown workflow agent: mystery"):
+        load_workflow(workflow_file)
+
+
+def test_load_workflow_normalizes_missing_input_to_null(tmp_path: Path):
+    workflow_file = tmp_path / "normalized.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    message: hi\n",
+        encoding="utf-8",
+    )
+
+    workflow = load_workflow(workflow_file)
+
+    assert workflow["step1"]["input"] is None
+
+
+def test_load_workflow_rejects_lists_in_output_templates(tmp_path: Path):
+    workflow_file = tmp_path / "lists.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    items:\n"
+        "      - title: item title\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"Workflow step 'step1'\.output\.items must not contain a list\."):
         load_workflow(workflow_file)

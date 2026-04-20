@@ -12,6 +12,7 @@ from .commands import (
     new_role,
     new_skill,
     remove,
+    start,
     update_roster,
     version,
 )
@@ -32,6 +33,7 @@ def main(argv: list[str] | None = None):
         "download": download_roster,
         "update": update_roster,
         "list": list_available_rosters,
+        "start": start,
         "--version": version,
     }
 
