@@ -48,9 +48,10 @@ def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition
         raise ValueError(f"Workflow step '{step_name}' field 'prompt' must be a string.")
 
     output = definition["output"]
-    if not isinstance(output, dict):
-        raise ValueError(f"Workflow step '{step_name}' field 'output' must be a mapping.")
-
+    if isinstance(output, list):
+        raise ValueError(
+            f"Workflow step '{step_name}' field 'output' must be a mapping or scalar, not a list."
+        )
     _validate_mapping_keys(output, context=f"Workflow step '{step_name}'.output")
 
     validated: StepDefinition = {

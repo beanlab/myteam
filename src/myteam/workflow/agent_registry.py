@@ -8,7 +8,8 @@ DEFAULT_AGENT = "codex"
 DEFAULT_AGENT_CONFIG: AgentConfig = {
     "name": DEFAULT_AGENT,
     "argv": ["codex"],
-    "exit_text": "/quit\n",
+    "exit_text": "/quit\r",
+    "prompt_as_argument": False,
 }
 
 _KNOWN_AGENTS: dict[str, AgentConfig] = {

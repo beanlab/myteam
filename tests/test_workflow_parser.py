@@ -36,6 +36,20 @@ def test_load_workflow_accepts_documented_workflow_shape(tmp_path: Path):
     assert workflow["step2"]["output"]["best_haiku"]["haiku"] == "the haiku text"
 
 
+def test_load_workflow_accepts_scalar_output_template(tmp_path: Path):
+    workflow_file = tmp_path / "scalar.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  prompt: hello\n"
+        "  output: concise answer\n",
+        encoding="utf-8",
+    )
+
+    workflow = load_workflow(workflow_file)
+
+    assert workflow["step1"]["output"] == "concise answer"
+
+
 def test_load_workflow_rejects_steps_wrapper(tmp_path: Path):
     workflow_file = tmp_path / "wrapped.yaml"
     workflow_file.write_text(
@@ -94,4 +108,18 @@ def test_load_workflow_rejects_unknown_agents(tmp_path: Path):
     )
 
     with pytest.raises(ValueError, match="Unknown workflow agent: mystery"):
+        load_workflow(workflow_file)
+
+
+def test_load_workflow_rejects_list_output_template(tmp_path: Path):
+    workflow_file = tmp_path / "list-output.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    - nope\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="must be a mapping or scalar, not a list"):
         load_workflow(workflow_file)

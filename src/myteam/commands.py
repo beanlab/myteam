@@ -10,10 +10,21 @@ from pathlib import Path
 from .disclosure import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
 
 from . import __version__
-from .paths import APP_NAME, BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, ENCODING, agents_root, base_dir, role_dir
+from .paths import (
+    APP_NAME,
+    BUILTIN_ROOT_NAME,
+    DEFAULT_LOCAL_ROOT,
+    ENCODING,
+    agents_root,
+    base_dir,
+    role_dir,
+    workflow_file,
+)
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import write_tracked_version
+from .workflow.engine import run_workflow
+from .workflow.parser import load_workflow
 
 
 def ensure_dir(path: Path) -> None:
@@ -166,6 +177,28 @@ def version() -> str:
     return f"{APP_NAME} {__version__}"
 
 
+def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
+    del verbose
+    try:
+        path = workflow_file(base_dir(), workflow, prefix)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1)
+
+    try:
+        definition = load_workflow(path)
+    except (OSError, ValueError) as exc:
+        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+    result = run_workflow(definition)
+    if result.status != "completed":
+        failed_step = result.failed_step_name or "<unknown>"
+        suffix = f": {result.error_message}" if result.error_message else "."
+        print(f"Workflow failed at step '{failed_step}'{suffix}", file=sys.stderr)
+        raise SystemExit(1)
+
+
 __all__ = [
     "download_roster",
     "get_role",
@@ -175,6 +208,7 @@ __all__ = [
     "new_role",
     "new_skill",
     "remove",
+    "start",
     "update_roster",
     "version",
 ]

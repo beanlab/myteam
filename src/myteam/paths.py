@@ -32,3 +32,15 @@ def builtin_agents_root() -> Path:
 
 def role_dir(base: Path, role: str, prefix: str | Path | None = None) -> Path:
     return agents_root(base, prefix) / role
+
+
+def workflow_file(base: Path, workflow: str, prefix: str | Path | None = None) -> Path:
+    root = agents_root(base, prefix)
+    stem = root / workflow
+    matches = [candidate for candidate in (stem.with_suffix(".yaml"), stem.with_suffix(".yml")) if candidate.exists()]
+
+    if not matches:
+        raise ValueError(f"Workflow '{workflow}' not found under {root}.")
+    if len(matches) > 1:
+        raise ValueError(f"Workflow '{workflow}' is ambiguous under {root}; found both .yaml and .yml.")
+    return matches[0]

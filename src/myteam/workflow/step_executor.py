@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from json import JSONDecodeError
 from typing import Any
 
@@ -12,6 +13,8 @@ from .reference_resolver import resolve_references
 from .tty_wrapper import run_pty_session
 
 _COMPLETION_STATUS = "OBJECTIVE_COMPLETE"
+_ANSI_ESCAPE_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 _OUTPUT_INSTRUCTIONS = (
     "When the objective is complete, return only a JSON object in this form:\n"
     '{"status":"OBJECTIVE_COMPLETE","content":<result>}\n'
@@ -21,6 +24,7 @@ _OUTPUT_INSTRUCTIONS = (
     'Then return JSON like: {"status":"OBJECTIVE_COMPLETE","content":{"summary":{"title":"How to Code"}}}\n'
     "The `content` value must match the output template that follows."
 )
+_INTERACTIVE_SUBMIT = "\r"
 
 
 def _render_yaml(value: Any) -> str:
@@ -38,20 +42,68 @@ def _build_prompt(step: StepDefinition, resolved_input: Any) -> str:
     return "\n\n".join(sections) + "\n"
 
 
+def _normalize_interactive_input(text: str | None) -> str | None:
+    if text is None:
+        return None
+    return text.replace("\r\n", "\r").replace("\n", "\r")
+
+
+def _sanitize_terminal_transcript(transcript: str) -> str:
+    without_ansi = _ANSI_ESCAPE_RE.sub("", transcript)
+    return _CONTROL_CHAR_RE.sub("", without_ansi)
+
+
+def _escape_literal_newlines_in_json_strings(text: str) -> str:
+    """Normalize terminal-emitted JSON-ish text with raw newlines inside strings."""
+    result: list[str] = []
+    in_string = False
+    escaping = False
+
+    for char in text:
+        if in_string:
+            if escaping:
+                result.append(char)
+                escaping = False
+                continue
+            if char == "\\":
+                result.append(char)
+                escaping = True
+                continue
+            if char == '"':
+                result.append(char)
+                in_string = False
+                continue
+            if char == "\n":
+                result.append("\\n")
+                continue
+            if char == "\r":
+                result.append("\\r")
+                continue
+            result.append(char)
+            continue
+
+        result.append(char)
+        if char == '"':
+            in_string = True
+
+    return "".join(result)
+
+
 def _extract_completion_payload(transcript: str) -> tuple[bool, Any | None]:
-    if _COMPLETION_STATUS not in transcript:
+    sanitized_transcript = _sanitize_terminal_transcript(transcript)
+    if _COMPLETION_STATUS not in sanitized_transcript:
         return False, None
 
     decoder = json.JSONDecoder()
-    for start in (index for index, char in enumerate(transcript) if char == "{"):
-        candidate = transcript[start:].strip()
+    for start in (index for index, char in enumerate(sanitized_transcript) if char == "{"):
+        candidate = _escape_literal_newlines_in_json_strings(
+            sanitized_transcript[start:].strip()
+        )
         try:
             parsed, end_index = decoder.raw_decode(candidate)
         except JSONDecodeError:
             continue
 
-        if candidate[end_index:].strip():
-            continue
         if (
             isinstance(parsed, dict)
             and parsed.get("status") == _COMPLETION_STATUS
@@ -63,7 +115,10 @@ def _extract_completion_payload(transcript: str) -> tuple[bool, Any | None]:
     return False, None
 
 
-def _validate_output(template: dict[str, Any], value: Any) -> None:
+def _validate_output(template: Any, value: Any) -> None:
+    if not isinstance(template, dict):
+        return
+
     if not isinstance(value, dict):
         raise ValueError("Step output must be a mapping.")
 
@@ -103,6 +158,9 @@ def execute_step(step_name: str, step: StepDefinition, run_context: RunContext) 
         )
 
     prompt = _build_prompt(step, resolved_input)
+    prompt_as_argument = agent_config.get("prompt_as_argument", False)
+    argv = [*agent_config["argv"], prompt] if prompt_as_argument else agent_config["argv"]
+    initial_input = None if prompt_as_argument else f"{prompt}{_INTERACTIVE_SUBMIT}"
 
     accepted_output: Any | None = None
     completion_seen = False
@@ -115,13 +173,13 @@ def execute_step(step_name: str, step: StepDefinition, run_context: RunContext) 
         completion_seen, parsed_output = _extract_completion_payload(transcript)
         if completion_seen and accepted_output is None:
             accepted_output = parsed_output
-            return agent_config["exit_text"]
+            return _normalize_interactive_input(agent_config["exit_text"])
         return None
 
     try:
         pty_result = run_pty_session(
-            agent_config["argv"],
-            prompt,
+            argv,
+            initial_input,
             on_output,
         )
     except Exception as exc:

@@ -8,11 +8,12 @@ class AgentConfig(TypedDict):
     name: str
     argv: list[str]
     exit_text: str | None
+    prompt_as_argument: bool
 
 
 class StepDefinition(TypedDict, total=False):
     prompt: str
-    output: dict[str, Any]
+    output: Any
     input: Any
     agent: str
 
@@ -53,6 +54,8 @@ class WorkflowRunResult:
     status: str
     output: WorkflowOutput | None = None
     failed_step_name: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
 
 
 @dataclass

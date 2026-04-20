@@ -343,6 +343,8 @@ Why:
 - There is no `steps:` wrapper.
 - There are no workflow-level authored fields.
 - Step definitions contain required `prompt`, required `output`, and optional `input` and `agent`.
+- `output` may be either a mapping-shaped template or a scalar descriptive leaf value.
+- Authored `output` lists are out of scope for this feature phase and should be rejected during validation.
 - Step names must use Python-identifier-style names.
 - Authored nested keys that participate in workflow/reference structure should also use identifier-style names.
 
@@ -416,10 +418,10 @@ Validation should be structural only:
 
 - nested mappings in the template require nested mappings and required keys in the returned value
 - leaf template values are descriptive only and do not constrain runtime scalar type
+- if the authored output template is itself a scalar, the returned value may likewise be any scalar, object, list, or null value
+- authored output-template lists are not supported in this feature phase and should fail validation rather than introducing list-template semantics
 
-This keeps the public file format simple and aligned with the documented example.
-
-- Lists are not expected in authored output templates for this feature phase, and no special list-template semantics are needed.
+This keeps the public file format simple and aligned with the documented examples while allowing both structured and scalar step outputs.
 
 ### Error handling
 
