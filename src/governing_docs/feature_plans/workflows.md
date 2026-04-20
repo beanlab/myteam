@@ -372,15 +372,16 @@ Why:
   - an `Objective:` section containing the step `prompt`
   - an `Output template:` section containing the authored `output` block as YAML
   - a final reminder to return only the completion JSON object when done
-- Completion is exact: the agent must finish with one parseable JSON object shaped like `{"status": "OBJECTIVE_COMPLETE", "content": ...}`.
+- Completion is exact: the agent must emit one parseable JSON object shaped like `{"status": "OBJECTIVE_COMPLETE", "content": ...}`.
 - The executor should treat `content` as the step output payload and validate it against the authored `output` template.
 - Completion detection should use the accumulated transcript buffer.
-- After each new chunk, if the transcript contains `OBJECTIVE_COMPLETE`, the executor should attempt to parse the trailing portion as exactly one top-level JSON object.
-- Completion is accepted only if that object has the exact required top-level shape.
+- After each new chunk, if the transcript contains `OBJECTIVE_COMPLETE`, the executor should attempt to parse top-level JSON objects from the accumulated transcript.
+- Completion is accepted only if a parsed object has the exact required top-level shape.
 - If parsing fails, execution continues and the executor keeps reading output.
-- If additional output arrives after valid completion is accepted, append it to the transcript but do not invalidate success.
 - The first accepted valid completion object wins.
-- The PTY wrapper does not parse completion payloads; the executor is responsible for parsing the final JSON object from the transcript and returning the parsed result in `StepResult`.
+- Once valid completion is accepted, the executor should return the agent's configured exit text to trigger normal child shutdown.
+- If additional output arrives after valid completion is accepted, append it to the transcript but do not invalidate success.
+- The PTY wrapper does not parse completion payloads; the executor is responsible for parsing the accepted completion JSON object from the transcript and returning the parsed result in `StepResult`.
 
 ### Step state shape for references
 
