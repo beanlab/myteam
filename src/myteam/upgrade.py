@@ -80,7 +80,7 @@ def _migration_text(version: str) -> str:
     return migration_file.read_text(encoding=ENCODING).rstrip()
 
 
-def _packaged_changelog_text() -> str:
+def packaged_changelog_text() -> str:
     packaged_changelog = files("myteam").joinpath("CHANGELOG.md")
     return packaged_changelog.read_text(encoding=ENCODING)
 
@@ -102,7 +102,7 @@ def format_pending_migrations(myteam_root: Path) -> str:
 
 
 def _parse_changelog_sections() -> list[tuple[str, str]]:
-    lines = _packaged_changelog_text().splitlines()
+    lines = packaged_changelog_text().splitlines()
 
     sections: list[tuple[str, str]] = []
     current_version: str | None = None

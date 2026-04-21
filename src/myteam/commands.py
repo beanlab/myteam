@@ -21,7 +21,7 @@ from .paths import (
 )
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
-from .upgrade import write_tracked_version
+from .upgrade import packaged_changelog_text, write_tracked_version
 from .workflow.engine import run_workflow
 from .workflow.parser import load_workflow
 
@@ -214,6 +214,10 @@ def version() -> str:
     return f"{APP_NAME} {__version__}"
 
 
+def changelog() -> str:
+    return packaged_changelog_text().rstrip()
+
+
 __all__ = [
     "download_roster",
     "get_role",
@@ -225,5 +229,6 @@ __all__ = [
     "remove",
     "start",
     "update_roster",
+    "changelog",
     "version",
 ]

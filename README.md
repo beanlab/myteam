@@ -106,6 +106,12 @@ The generated root role also tracks the `myteam` version that created the tree. 
 `myteam` release is available later, the root role can alert the agent to review
 `builtins/migration` and `builtins/changelog`.
 
+The packaged changelog ships inside the installed `myteam` package and can be printed directly with:
+
+```bash
+myteam changelog
+```
+
 Create a sub-role and a skill:
 
 ```bash
@@ -286,6 +292,12 @@ myteam start dev/frontend
 myteam start release/checklist --prefix .agents
 myteam start dev/frontend --verbose
 ```
+
+### `myteam changelog`
+
+Prints the packaged `myteam` changelog from the installed release.
+
+This command reads the same packaged changelog source used by `builtins/changelog`.
 
 ### `myteam remove <path> [--prefix <path>]`
 

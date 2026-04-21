@@ -4,6 +4,7 @@ from __future__ import annotations
 import fire
 
 from .commands import (
+    changelog,
     download_roster,
     get_role,
     get_skill,
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None):
         "update": update_roster,
         "list": list_available_rosters,
         "start": start,
+        "changelog": changelog,
         "--version": version,
     }
 
