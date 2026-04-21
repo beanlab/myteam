@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.11
+
+- *Note: the workflows feature is experimental and may change in the future*
+- Added `myteam start <workflow>` to load and execute YAML workflow definitions
+
 ## 0.2.10
 
 - Default generated role and skill loaders now present skills first, tools second, and roles last.

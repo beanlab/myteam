@@ -269,6 +269,24 @@ myteam get skill research/literature-review
 myteam get skill python/testing --prefix .agents
 ```
 
+### `myteam start <path> [--prefix <path>] [--verbose]`
+
+Executes a workflow definition from the selected local root.
+
+- use slash-delimited workflow paths such as `dev/frontend`
+- workflow paths are resolved starting from the selected local root, which acts as the reference point for lookup
+- relative segments in workflow paths are allowed
+- workflow files are resolved with standard YAML extensions
+- later workflow steps may reference completed state from earlier steps
+
+Examples:
+
+```bash
+myteam start dev/frontend
+myteam start release/checklist --prefix .agents
+myteam start dev/frontend --verbose
+```
+
 ### `myteam remove <path> [--prefix <path>]`
 
 Deletes a role or skill directory from the selected local root.
@@ -320,6 +338,62 @@ For upgrade work:
 - load `myteam get skill builtins/changelog` to review newer release notes
 - apply approved project-specific edits manually, including any `.myteam` version-file update
 
+## Workflows
+
+*Note: workflows are an experimental feature and are likely to evolve and change*
+
+`myteam` can also run authored workflows from the project-local tree.
+
+Store workflow files under the selected local root. For example, this command:
+
+```bash
+myteam start dev/frontend
+```
+
+looks for a workflow file such as:
+
+```text
+.myteam/dev/frontend.yaml
+```
+
+If you use `--prefix .agents`, the same workflow path is resolved under `.agents/` instead.
+The selected local root is the reference point for resolution, not a containment boundary.
+
+Workflow files are YAML mappings where each top-level key is a step name. Each step defines:
+
+- `prompt`: the objective for that step
+- `agent`: optional agent name; omit it to use the default agent
+- `input`: optional structured input data
+- `output`: the expected shape of the step's final structured result
+
+Example:
+
+```yaml
+gather_context:
+  prompt: Review the current implementation and summarize the relevant files.
+  output:
+    summary: Brief summary
+    files:
+      primary: Main file path
+      tests: Test file path
+
+draft_change:
+  prompt: Propose the implementation plan for the requested change.
+  input:
+    prior_summary: $gather_context.output.summary
+    primary_file: $gather_context.output.files.primary
+  output:
+    plan: Concise implementation plan
+    risks: Key risks or open questions
+```
+
+Notes:
+
+- step names should use identifier-style names such as `gather_context`
+- `$step_name.output...` references pull data from earlier completed steps
+- `myteam start` stops at the first failing step and does not continue to later steps
+- `--verbose` writes workflow lifecycle logs to standard error
+
 ## Why Use Myteam
 
 - agents load their own instructions directly from the filesystem
@@ -327,6 +401,7 @@ For upgrade work:
 - discovery is layered, which fits hierarchical agent systems
 - tools can live next to the roles and skills that use them
 - rosters let you reuse agent-system structures across projects
+- workflows let you create predefined, deterministic agent workflows
 
 ## Installation
 

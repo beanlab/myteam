@@ -199,7 +199,7 @@ Failure conditions that matter at the interface:
 - If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
 - If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
 
-### `myteam start <path> [--prefix <path>]`
+### `myteam start <path> [--prefix <path>] [--verbose]`
 
 Executes a workflow definition from the selected local tree.
 
@@ -209,6 +209,7 @@ Inputs:
 - The command resolves that path relative to the selected local root.
 - The command accepts any standard YAML workflow file extension for the resolved file, including
   `.yaml` and `.yml`.
+- `--verbose` enables workflow lifecycle logging on standard error.
 
 Expected outcome on success:
 

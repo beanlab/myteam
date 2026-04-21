@@ -1,7 +1,7 @@
 # Workflow Runner Feature Plan
 
 This document is the implementation design for the workflow feature.
-It supersedes earlier exploratory design notes in `src/governing_docs/backlog/workflows.md`
+It supersedes earlier exploratory design notes in `src/governing_docs/backlog/completed/workflows.md`
 where the two documents differ.
 
 ## Progress Notes
