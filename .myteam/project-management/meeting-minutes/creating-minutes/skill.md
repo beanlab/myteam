@@ -9,6 +9,8 @@ description: |
 
 Using the meeting transcript, prepare a summary document.
 
+Summary documents should be written in `docs/meetings/`.
+
 Include the date and time at the beginning:
 
 ```markdown
@@ -62,3 +64,6 @@ as an action to be taken without human review and approval.
 ## Other details
 
 Keep line length to less than 70 characters.
+
+Do not link to the transcript file. As this file is 
+not checked in, the link will not be meaningful.
