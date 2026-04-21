@@ -135,7 +135,7 @@ jobs:
           project = tomllib.loads((root / "pyproject.toml").read_text())
           version = project["project"]["version"]
 
-          changelog = (root / "src" / "CHANGELOG.md").read_text().splitlines()
+          changelog = (root / "src" / "myteam" / "CHANGELOG.md").read_text().splitlines()
           header = f"## {version}"
           notes = []
           capture = False
