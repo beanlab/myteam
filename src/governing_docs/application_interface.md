@@ -5,17 +5,18 @@
 `myteam` is a command-line application for building file-based agent systems.
 
 Its public purpose is to let a project define agent instructions in a project-local directory and
-then let agents load those instructions themselves. The tool treats roles, skills, and tools as
-discoverable filesystem objects that can be created, listed, loaded, downloaded, and removed through
-the CLI. It also ships version-aware built-in maintenance skills so agents can surface upgrade
-guidance for older local trees without copying those built-ins into each project.
+then let agents load those instructions themselves. The tool treats roles, skills, workflows, and
+tools as discoverable filesystem objects that can be created, listed, loaded, started, downloaded,
+and removed through the CLI. It also ships version-aware built-in maintenance skills so agents can
+surface upgrade guidance for older local trees without copying those built-ins into each project.
 
 The intended workflow is:
 
 1. A project initializes the local tree.
 2. A human author creates or downloads roles and skills.
 3. Agents run `myteam get role ...` and `myteam get skill ...` to load the instructions relevant to their current task.
-4. Each loaded role or skill reveals the next level of roles, skills, and tools that are available from that point in the hierarchy.
+4. A human may run `myteam start ...` to execute a workflow defined in the project-local tree.
+5. Each loaded role or skill reveals the next level of roles, skills, and tools that are available from that point in the hierarchy.
 
 ## Operating Model
 
@@ -36,7 +37,7 @@ Commands that operate on the project-local tree use one selected local root dire
 invocation.
 
 - The default local root is `.myteam/`.
-- `init`, `new`, `get`, `remove`, `download`, and `update` accept `--prefix <path>` to use a
+- `init`, `new`, `get`, `remove`, `download`, `update`, and `start` accept `--prefix <path>` to use a
   different local root for that command invocation.
 - `--prefix` changes only the project-local root used by that command. It does not change the
   packaged built-in `builtins/` namespace.
@@ -51,6 +52,7 @@ At the black-box level, `myteam` provides these categories of behavior:
 - It can scaffold new role and skill nodes inside that local tree.
 - It can record which `myteam` version last initialized or refreshed a local tree.
 - It can load and print instructions for a role or skill.
+- It can resolve and execute a workflow definition from the selected local tree.
 - It can resolve skills from either the selected project-local tree or the packaged built-in tree,
   depending on the requested namespace.
 - It can alert the caller when the installed `myteam` version is newer than the tracked version for the selected local tree.
@@ -66,6 +68,7 @@ Successful commands either:
 
 - create or remove files and directories in or under the current working directory,
 - print instructions or listings to standard output,
+- execute workflows defined in YAML files under the selected local tree,
 - download roster files into a destination directory,
 - or return a version string.
 
@@ -195,6 +198,106 @@ Failure conditions that matter at the interface:
 - If the target path is not a valid skill in the selected source tree, the command exits with an error.
 - If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
 - If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
+
+### `myteam start <path> [--prefix <path>] [--verbose]`
+
+Executes a workflow definition from the selected local tree.
+
+Inputs:
+
+- `<path>` is a slash-delimited workflow path such as `dev/frontend`.
+- The command resolves that path relative to the selected local root.
+- The command accepts any standard YAML workflow file extension for the resolved file, including
+  `.yaml` and `.yml`.
+- `--verbose` enables workflow lifecycle logging on standard error.
+
+Expected outcome on success:
+
+- Resolves the workflow file from the selected local tree using the requested workflow path.
+- Loads and validates the authored workflow definition.
+- Executes the workflow's steps in order.
+- Allows later steps to reference completed state from earlier steps.
+- Returns success only after all workflow steps complete in order.
+
+User-visible result:
+
+- The caller can invoke a workflow stored at `.myteam/dev/frontend.yaml` with `myteam start dev/frontend`.
+- `--prefix` changes which local root is searched for workflows in the same way it does for other
+  project-local tree commands.
+- Workflow execution emits the workflow's runtime output to standard output and reports failures on
+  standard error.
+
+Failure conditions that matter at the interface:
+
+- If the target path does not resolve to a workflow file with a supported YAML extension in the
+  selected local tree, the command exits with an error.
+- If the workflow definition is malformed or references an unknown agent, the command exits with an error.
+- If any workflow step fails, the command stops at that first failing step, does not execute later
+  steps, and exits with an error.
+
+### Workflow File Format
+
+Workflow definitions are user-authored YAML files stored in the selected local tree.
+
+Expected authored shape:
+
+- A workflow file is a top-level mapping.
+- Each top-level key is a workflow step name.
+- Each step value is a mapping that contains:
+  - `prompt` as the step objective text
+  - optional `input` as a structured YAML value
+  - optional `agent` as the agent name to use for that step
+  - `output` as the required output shape template for that step
+
+Example:
+
+```yaml
+step1:
+  prompt: I need three haikus. Please write them for me.
+  output:
+    haiku_dogs: A haiku about dogs
+    haiku_cats: A haiku about cats
+    haiku_user_choice: A haiku about a topic provided by the user
+step2:
+  input: $step1.output
+  prompt: |
+    Review the provided haikus.
+    Rank them in terms of which best captures the essence and style of haiku.
+  output:
+    best_haiku:
+      haiku: the haiku text
+      reason: why this haiku was chosen over the others
+```
+
+Authoring rules that matter at the interface:
+
+- Workflow files do not use a top-level `steps:` wrapper.
+- Steps execute in the order they are authored in the file.
+- Step names must use valid identifier-style names.
+- Authored nested keys that participate in the workflow format and reference system must also use
+  valid identifier-style names.
+- The `input` field may contain structured YAML data and may reference completed state from earlier steps.
+- If `agent` is omitted, the default shipped agent is used.
+- The `output` field describes the required structure of the step's final result.
+- Nested objects in `output` require the same nested keys to appear in the final result.
+- Output-template leaf values are descriptive placeholders and do not constrain the final JSON value type.
+- Workflow files are validated before execution begins.
+
+Reference semantics:
+
+- References may appear inside the `input` field.
+- A string is treated as a reference only when the entire string value is a reference expression.
+- Reference expressions start with `$`.
+- The token immediately after `$` is the earlier step name.
+- Additional dotted path components select nested keys from that step's stored completed state.
+- References resolve only against previously completed steps.
+- Resolved values are inserted as structured data rather than stringified text.
+- Objects and arrays remain objects and arrays when inserted through a reference.
+- `$$` escapes a literal leading dollar in an exact-string scalar value.
+- Missing paths are errors.
+- Reference traversal supports object keys, not array indexes.
+- Partial string interpolation is not supported.
+- Forward references and self-references are invalid at execution time.
 
 ### `myteam remove <path> [--prefix <path>]`
 

@@ -7,13 +7,23 @@ import subprocess
 import sys
 from pathlib import Path
 
-from myteam.utils import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
-
 from . import __version__
-from .paths import APP_NAME, BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, ENCODING, agents_root, base_dir, role_dir
+from .disclosure import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
+from .paths import (
+    APP_NAME,
+    BUILTIN_ROOT_NAME,
+    DEFAULT_LOCAL_ROOT,
+    ENCODING,
+    agents_root,
+    base_dir,
+    role_dir,
+    workflow_path,
+)
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
-from .upgrade import write_tracked_version
+from .upgrade import packaged_changelog_text, write_tracked_version
+from .workflow.engine import run_workflow
+from .workflow.parser import load_workflow
 
 
 def ensure_dir(path: Path) -> None:
@@ -33,11 +43,11 @@ def _selected_root(prefix: str | None) -> Path:
 
 
 def new_dir(
-    base: Path,
-    dir_type: str,
-    name_parts: list[str],
-    instruction_text: str,
-    load_text: str,
+        base: Path,
+        dir_type: str,
+        name_parts: list[str],
+        instruction_text: str,
+        load_text: str,
 ) -> None:
     name_dir = base.joinpath(*name_parts)
     name = "/".join(name_parts)
@@ -162,8 +172,50 @@ def get_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     raise SystemExit(1)
 
 
+def _log(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
+def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
+    logger = _log if verbose else (lambda msg: None)
+
+    try:
+        path = workflow_path(base_dir(), workflow, prefix)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1)
+
+    logger(f"Resolved workflow '{workflow}' to {path}")
+
+    try:
+        workflow_definition = load_workflow(path)
+    except (OSError, ValueError) as exc:
+        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+    logger(f"Loaded workflow with {len(workflow_definition)} step(s)")
+
+    result = run_workflow(workflow_definition, logger=logger)
+    if result.status != "completed":
+        failed_step = result.failed_step_name or "<unknown>"
+        if result.error_message:
+            print(
+                f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
+        raise SystemExit(1)
+
+    logger(f"Workflow '{workflow}' completed successfully.")
+
+
 def version() -> str:
     return f"{APP_NAME} {__version__}"
+
+
+def changelog() -> str:
+    return packaged_changelog_text().rstrip()
 
 
 __all__ = [
@@ -175,6 +227,8 @@ __all__ = [
     "new_role",
     "new_skill",
     "remove",
+    "start",
     "update_roster",
+    "changelog",
     "version",
 ]
