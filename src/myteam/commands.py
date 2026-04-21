@@ -198,7 +198,13 @@ def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False
     result = run_workflow(workflow_definition, logger=logger)
     if result.status != "completed":
         failed_step = result.failed_step_name or "<unknown>"
-        print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
+        if result.error_message:
+            print(
+                f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
         raise SystemExit(1)
 
     logger(f"Workflow '{workflow}' completed successfully.")

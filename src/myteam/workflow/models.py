@@ -73,6 +73,7 @@ class WorkflowRunResult:
     status: str
     output: WorkflowOutput | None = None
     failed_step_name: str | None = None
+    error_message: str | None = None
 
 
 @dataclass

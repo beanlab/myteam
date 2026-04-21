@@ -147,14 +147,18 @@ def test_start_reports_failed_step_from_engine(run_myteam_inprocess, initialized
     monkeypatch.setattr("myteam.commands.load_workflow", lambda path: {"step1": {"prompt": "hello", "output": {"message": "hi"}}})
     monkeypatch.setattr(
         "myteam.commands.run_workflow",
-        lambda workflow_definition, **kwargs: WorkflowRunResult(status="failed", failed_step_name="step1"),
+        lambda workflow_definition, **kwargs: WorkflowRunResult(
+            status="failed",
+            failed_step_name="step1",
+            error_message="missing completion",
+        ),
     )
 
     result = run_myteam_inprocess(initialized_project, "start", "demo")
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert "Workflow 'demo' failed at step 'step1'." in result.stderr
+    assert "Workflow 'demo' failed at step 'step1': missing completion" in result.stderr
 
 
 def test_start_verbose_logs_to_stderr(run_myteam_inprocess, initialized_project: Path, monkeypatch):

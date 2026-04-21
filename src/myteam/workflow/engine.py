@@ -48,6 +48,7 @@ def run_workflow(
                 status="failed",
                 output=completed_steps or None,
                 failed_step_name=step_name,
+                error_message=step_result.error_message,
             )
 
         completed_steps[step_name] = _build_completed_step_state(
