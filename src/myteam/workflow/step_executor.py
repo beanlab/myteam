@@ -130,7 +130,7 @@ def _build_step_prompt(
             "Objective:",
             objective_text,
             "",
-            "Output template (strict):",
+            "Output template (schema):",
             _dump_yaml_block(output_template),
             "",
             "Return only the completion JSON object when the objective is complete.",
