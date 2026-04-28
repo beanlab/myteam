@@ -31,6 +31,22 @@ def test_run_pty_session_sends_initial_input_with_enter(capfd: pytest.CaptureFix
     assert "ECHO:hello from wrapper" in captured.out
 
 
+def test_run_pty_session_waits_for_child_output_before_initial_input(capfd: pytest.CaptureFixture[str]):
+    result = run_pty_session(
+        _helper_argv("reject_early_initial"),
+        "hello from wrapper",
+        lambda _chunk: None,
+        inactivity_timeout_seconds=1,
+        graceful_shutdown_timeout_seconds=1,
+    )
+
+    capfd.readouterr()
+    assert result.exit_code == 0
+    assert "READY" in result.transcript
+    assert "EARLY_INPUT" not in result.transcript
+    assert "ECHO:hello from wrapper" in result.transcript
+
+
 def test_run_pty_session_callback_can_inject_quit_command(capfd: pytest.CaptureFixture[str]):
     def on_output(chunk: bytes) -> str | None:
         return "/quit\n" if b"dog" in chunk else None

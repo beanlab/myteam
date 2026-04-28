@@ -37,6 +37,8 @@ def run_pty_session(
     transcript_chunks: list[bytes] = []
     graceful_shutdown_started_at: float | None = None
     parent_stdin_closed = False
+    # Interactive TUIs may echo or mishandle input written before their terminal is initialized.
+    pending_initial_input = initial_input
     # Codex accepts "/quit" when the text lands in the input box and Enter arrives
     # as a later keystroke. If we send both too quickly, its paste-burst logic
     # groups them together and the command stays in the composer instead of executing.
@@ -86,9 +88,6 @@ def run_pty_session(
         previous_winch_handler = signal.getsignal(signal.SIGWINCH)
         signal.signal(signal.SIGWINCH, handle_winch)
 
-        if initial_input is not None:
-            write_injected_input(initial_input)
-
         last_output_at = time.monotonic()
         while True:
             if process.poll() is not None:
@@ -130,6 +129,9 @@ def run_pty_session(
                 last_output_at = time.monotonic()
                 os.write(sys.stdout.fileno(), chunk)
                 injected = on_output(chunk)
+                if pending_initial_input is not None:
+                    write_injected_input(pending_initial_input)
+                    pending_initial_input = None
                 if injected is not None:
                     write_injected_input(injected)
                     graceful_shutdown_started_at = time.monotonic()

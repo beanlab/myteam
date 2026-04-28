@@ -1,11 +1,25 @@
 from __future__ import annotations
 
 import signal
+import select
 import sys
 import time
 
 
 def _mode_echo_initial() -> int:
+    print("READY", flush=True)
+    line = sys.stdin.readline()
+    print(f"ECHO:{line.rstrip()}", flush=True)
+    return 0
+
+
+def _mode_reject_early_initial() -> int:
+    ready, _, _ = select.select([sys.stdin], [], [], 0.1)
+    if ready:
+        line = sys.stdin.readline()
+        print(f"EARLY_INPUT:{line.rstrip()}", flush=True)
+        return 3
+
     print("READY", flush=True)
     line = sys.stdin.readline()
     print(f"ECHO:{line.rstrip()}", flush=True)
@@ -53,6 +67,8 @@ def main(argv: list[str]) -> int:
     mode = argv[1]
     if mode == "echo_initial":
         return _mode_echo_initial()
+    if mode == "reject_early_initial":
+        return _mode_reject_early_initial()
     if mode == "wait_for_quit":
         return _mode_wait_for_quit()
     if mode == "trailing_after_quit":
