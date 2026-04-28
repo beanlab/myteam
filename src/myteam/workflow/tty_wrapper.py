@@ -39,10 +39,9 @@ def run_pty_session(
     parent_stdin_closed = False
     # Interactive TUIs may echo or mishandle input written before their terminal is initialized.
     pending_initial_input = initial_input
-    # Codex accepts "/quit" when the text lands in the input box and Enter arrives
-    # as a later keystroke. If we send both too quickly, its paste-burst logic
-    # groups them together and the command stays in the composer instead of executing.
-    injected_enter_delay_seconds = 0.02
+    # Keep injected text, cursor movement, and submit as distinct keystrokes.
+    injected_key_delay_seconds = 0.02
+    injected_right_arrow = b"\x1b[C"
 
     def write_injected_input(text: str) -> None:
         payload = text
@@ -52,9 +51,17 @@ def run_pty_session(
             payload = payload[:-1]
 
         if payload:
-            os.write(master_fd, payload.encode("utf-8"))
-            time.sleep(injected_enter_delay_seconds)
-        os.write(master_fd, b"\r")
+            write_all(payload.encode("utf-8"))
+            time.sleep(injected_key_delay_seconds)
+        write_all(injected_right_arrow)
+        time.sleep(injected_key_delay_seconds)
+        write_all(b"\r")
+
+    def write_all(data: bytes) -> None:
+        view = memoryview(data)
+        while view:
+            written = os.write(master_fd, view)
+            view = view[written:]
 
     def copy_terminal_size() -> None:
         size = shutil.get_terminal_size(fallback=(80, 24))

@@ -47,6 +47,22 @@ def test_run_pty_session_waits_for_child_output_before_initial_input(capfd: pyte
     assert "ECHO:hello from wrapper" in result.transcript
 
 
+def test_run_pty_session_sends_right_arrow_before_initial_enter(capfd: pytest.CaptureFixture[str]):
+    result = run_pty_session(
+        _helper_argv("require_submit_sequence"),
+        "hello from wrapper",
+        lambda _chunk: None,
+        inactivity_timeout_seconds=1,
+        graceful_shutdown_timeout_seconds=1,
+    )
+
+    capfd.readouterr()
+    assert result.exit_code == 0
+    assert "RAW_ECHO:hello from wrapper" in result.transcript
+    assert "RIGHT_ARROW_SUBMIT" in result.transcript
+    assert "MISSING_RIGHT_ARROW" not in result.transcript
+
+
 def test_run_pty_session_callback_can_inject_quit_command(capfd: pytest.CaptureFixture[str]):
     def on_output(chunk: bytes) -> str | None:
         return "/quit\n" if b"dog" in chunk else None
