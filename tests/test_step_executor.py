@@ -49,6 +49,23 @@ def test_completion_watcher_preserves_escaped_newlines_inside_json_strings():
     assert watcher.content == {"title": "line one\nline two", "body": "ok"}
 
 
+def test_completion_watcher_accepts_ansi_wrapped_completion_payload():
+    watcher = CompletionWatcher()
+
+    watcher.append(
+        (
+            b'\x1b[2m\xe2\x80\xa2 \x1b[22m{"status":"OBJECTIVE_COMPLETE","content":{"title":"A flooded stone shrine\r\n'
+            b'\x1b[;m\x1b[K  beneath an old mill","body":"ok"}}\x1b[m'
+        )
+    )
+
+    assert watcher.completed is True
+    assert watcher.content == {
+        "title": "A flooded stone shrine beneath an old mill",
+        "body": "ok",
+    }
+
+
 def test_completion_watcher_ignores_non_completion_json_before_final_payload():
     watcher = CompletionWatcher()
 
@@ -158,6 +175,49 @@ def test_execute_step_returns_completed_result(monkeypatch):
     assert "Write a summary." in prompt_text
     assert "Input:" not in prompt_text
     assert result.resolved_input is None
+
+
+def test_execute_step_returns_completed_result_for_ansi_wrapped_completion_output(monkeypatch):
+    def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
+        return {
+            "name": "fake-agent",
+            "argv": ["fake-agent"],
+            "exit_text": "/quit\n",
+        }
+
+    chunk = (
+        b'\x1b[2m\xe2\x80\xa2 \x1b[22m{"status":"OBJECTIVE_COMPLETE","content":{"summary":"A flooded stone shrine\r\n'
+        b'\x1b[;m\x1b[K  beneath an old mill"}}\x1b[m'
+    )
+
+    def fake_run_pty_session(
+        argv: list[str],
+        initial_input: str | None,
+        on_output,
+        *,
+        inactivity_timeout_seconds: int,
+        graceful_shutdown_timeout_seconds: int,
+    ) -> PtyRunResult:
+        injected = on_output(chunk)
+        assert injected == "/quit\n"
+        return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
+
+    monkeypatch.setattr("myteam.workflow.step_executor.get_agent_config", fake_get_agent_config)
+    monkeypatch.setattr("myteam.workflow.step_executor.run_pty_session", fake_run_pty_session)
+
+    result = execute_step(
+        "draft",
+        {
+            "prompt": "Write a summary.",
+            "output": {
+                "summary": "short summary",
+            },
+        },
+        prior_steps={},
+    )
+
+    assert result.status == "completed"
+    assert result.output == {"summary": "A flooded stone shrine beneath an old mill"}
 
 
 def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatch):
