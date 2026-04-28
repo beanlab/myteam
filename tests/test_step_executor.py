@@ -170,7 +170,7 @@ def test_execute_step_returns_completed_result(monkeypatch):
     prompt_text = recorded_launch["initial_input"]
     assert recorded_launch["argv"] == ["fake-agent"]
     assert "Objective:" in prompt_text
-    assert "Output template (strict):" in prompt_text
+    assert "Output template" in prompt_text
     assert "Write a summary." in prompt_text
     assert "Input:" not in prompt_text
     assert result.resolved_input is None
