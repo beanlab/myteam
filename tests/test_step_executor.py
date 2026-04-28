@@ -154,7 +154,7 @@ def test_execute_step_returns_completed_result(monkeypatch):
     assert recorded_launch["argv"][:-1] == ["fake-agent"]
     assert recorded_launch["initial_input"] is None
     assert "Objective:" in prompt_text
-    assert "Output template:" in prompt_text
+    assert "Output template (strict):" in prompt_text
     assert "Write a summary." in prompt_text
     assert "Input:" not in prompt_text
     assert result.resolved_input is None
@@ -508,3 +508,53 @@ def test_execute_step_returns_failed_result_when_agent_fails_after_valid_output(
     assert result.status == "failed"
     assert result.error_type == "agent_failure_after_output"
     assert "status 7" in (result.error_message or "")
+
+
+def test_execute_step_requests_agent_exit_only_once_after_completion(monkeypatch):
+    def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
+        return {
+            "name": "fake-agent",
+            "argv": ["fake-agent"],
+            "exit_text": "/quit\n",
+        }
+
+    def fake_run_pty_session(
+        argv: list[str],
+        initial_input: str | None,
+        on_output,
+        *,
+        inactivity_timeout_seconds: int,
+        graceful_shutdown_timeout_seconds: int,
+    ) -> PtyRunResult:
+        assert argv[:-1] == ["fake-agent"]
+        assert initial_input is None
+
+        first_injected = on_output(
+            b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
+        )
+        second_injected = on_output(b"Token usage: total=123\n")
+
+        assert first_injected == "/quit\n"
+        assert second_injected is None
+        return PtyRunResult(
+            exit_code=0,
+            transcript='{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
+            "Token usage: total=123\n",
+        )
+
+    monkeypatch.setattr("myteam.workflow.step_executor.get_agent_config", fake_get_agent_config)
+    monkeypatch.setattr("myteam.workflow.step_executor.run_pty_session", fake_run_pty_session)
+
+    result = execute_step(
+        "draft",
+        {
+            "prompt": "Write a summary.",
+            "output": {
+                "summary": "short summary",
+            },
+        },
+        prior_steps={},
+    )
+
+    assert result.status == "completed"
+    assert result.output == {"summary": "done"}

@@ -177,13 +177,11 @@ def _handle_output_chunk(
     """
     Pseudocode:
     1. Append the chunk to the completion watcher.
-    2. If the watcher has accepted a completion payload, return the agent exit text.
+    2. If the watcher has accepted a completion payload, return the agent exit text once.
     3. Otherwise return None so the PTY session continues normally.
     """
     watcher.append(chunk)
-    if watcher.completed:
-        return agent_config["exit_text"]
-    return None
+    return watcher.take_exit_text(agent_config["exit_text"])
 
 
 def _extract_completed_content(watcher: "CompletionWatcher", pty_result: PtyRunResult) -> Any:
@@ -299,6 +297,7 @@ class CompletionWatcher:
 
     _transcript_parts: list[str] = field(default_factory=list)
     _accepted_payload: dict[str, Any] | None = None
+    _exit_requested: bool = False
 
     def append(self, chunk: bytes) -> None:
         text = chunk.decode("utf-8", errors="replace")
@@ -323,6 +322,13 @@ class CompletionWatcher:
         if self._accepted_payload is None:
             return None
         return self._accepted_payload["content"]
+
+    def take_exit_text(self, exit_text: str) -> str | None:
+        """Return the exit text exactly once after completion is accepted."""
+        if not self.completed or self._exit_requested:
+            return None
+        self._exit_requested = True
+        return exit_text
 
     def _try_accept_completion(self) -> None:
         """
