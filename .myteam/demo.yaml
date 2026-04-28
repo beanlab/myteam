@@ -1,0 +1,14 @@
+generate_poems:
+  prompt: Generate 3 poems on topics provided by the user.
+  output:
+    poem1: a haiku
+    poem2: a limerick
+    poem3: a couplet
+
+rank_poems:
+  input: $generate_poems.output
+  prompt: Rank the provided poems by how well each poem captures the essence of its style
+  output:
+    best_poem: the poem that was chosen as the winner
+    reasons: why that poem was chosen over the others
+

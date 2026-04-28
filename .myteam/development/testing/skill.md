@@ -15,7 +15,7 @@ description: |
 - assertions should focus on observable results such as exit status, output, and final filesystem state
 - careful consideration should be given to what other states might emit the same assertions, and pick assertions that uniquely prove correct behavior
 - private helper tests are secondary and should only be added when a behavior is hard to capture through the interface
-- new behavior should be traced back to the interface contract in `governing_docs/application_interface.md`
+- new behavior should be traced back to the interface contract in the project governing documents
 - tests should act as evidence that the documented interface works as intended
 
 ### Process

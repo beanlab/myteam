@@ -62,6 +62,7 @@ This likely requires explicit runtime concepts for:
 - child-session ownership and lifecycle
 - resume payload format
 - failure propagation when the child does not complete successfully
+- compatibility rules for resuming sessions across `codex --exec` and interactive modes
 
 The design should also define whether this capability appears as:
 
@@ -87,3 +88,5 @@ The design should also define whether this capability appears as:
 - Does the suspension/resume mechanism belong in `tty_wrapper`, `step_executor`, or a higher-level
   workflow orchestration layer?
 - How should timeouts be split between the suspended parent and the active child?
+- Can a session started with `codex --exec` be resumed in interactive mode, and can an interactive
+  session be resumed through `codex --exec`, or do we need explicit mode restrictions?
