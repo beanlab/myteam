@@ -167,9 +167,8 @@ def test_execute_step_returns_completed_result(monkeypatch):
 
     assert result.status == "completed"
     assert result.output == {"summary": "done"}
-    prompt_text = recorded_launch["argv"][-1]
-    assert recorded_launch["argv"][:-1] == ["fake-agent"]
-    assert recorded_launch["initial_input"] is None
+    prompt_text = recorded_launch["initial_input"]
+    assert recorded_launch["argv"] == ["fake-agent"]
     assert "Objective:" in prompt_text
     assert "Output template (strict):" in prompt_text
     assert "Write a summary." in prompt_text
@@ -198,6 +197,8 @@ def test_execute_step_returns_completed_result_for_ansi_wrapped_completion_outpu
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
+        assert argv == ["fake-agent"]
+        assert "Write a summary." in (initial_input or "")
         injected = on_output(chunk)
         assert injected == "/quit\n"
         return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
@@ -261,8 +262,8 @@ def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatc
 
     assert result.status == "completed"
     assert result.resolved_input is None
-    assert recorded_launch["initial_input"] is None
-    assert "Input:" not in recorded_launch["argv"][-1]
+    assert recorded_launch["argv"] == ["fake-agent"]
+    assert "Input:" not in (recorded_launch["initial_input"] or "")
 
 
 def test_execute_step_returns_failed_result_for_reference_resolution_errors(monkeypatch):
@@ -377,9 +378,8 @@ def test_execute_step_returns_failed_result_when_completion_is_missing(monkeypat
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
-        assert argv[:-1] == ["fake-agent"]
-        assert "Write a summary." in argv[-1]
-        assert initial_input is None
+        assert argv == ["fake-agent"]
+        assert "Write a summary." in (initial_input or "")
         on_output(b"still thinking\n")
         return PtyRunResult(exit_code=0, transcript="still thinking\n")
 
@@ -586,8 +586,8 @@ def test_execute_step_requests_agent_exit_only_once_after_completion(monkeypatch
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
-        assert argv[:-1] == ["fake-agent"]
-        assert initial_input is None
+        assert argv == ["fake-agent"]
+        assert "Write a summary." in (initial_input or "")
 
         first_injected = on_output(
             b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
