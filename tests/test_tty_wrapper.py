@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.tty_wrapper import _InitialInputGate, run_pty_session
+from myteam.workflow.tty_wrapper import run_pty_session
 
 
 HELPER = Path(__file__).resolve().parent / "helpers" / "tty_child.py"
@@ -51,27 +51,6 @@ def test_run_pty_session_waits_for_ready_frame_before_sending_initial_input(
     assert "EARLY_INPUT:" not in result.transcript
     assert "LATE_INPUT:hello from wrapper" in result.transcript
     assert "LATE_INPUT:hello from wrapper" in captured.out
-
-
-def test_initial_input_gate_waits_for_settled_output_before_pressing_enter():
-    gate = _InitialInputGate(
-        markers=[],
-        quiet_period_seconds=0.06,
-        pending_text="hello from wrapper",
-    )
-
-    assert gate.next_action(0.0) == "send_payload"
-    assert gate.consume_payload() == "hello from wrapper"
-    assert gate.next_action(0.01) is None
-
-    gate.observe(b"composer redraw", observed_at=1.0)
-    assert gate.next_action(1.04) is None
-    assert gate.next_action(1.06) == "send_enter"
-
-    gate.consume_enter()
-    assert gate.next_action(1.07) is None
-
-
 def test_run_pty_session_callback_can_inject_quit_command(capfd: pytest.CaptureFixture[str]):
     def on_output(chunk: bytes) -> str | None:
         return "/quit\n" if b"dog" in chunk else None

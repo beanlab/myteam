@@ -11,6 +11,9 @@ from .models import AgentConfig, PtyRunResult, StepDefinition, StepResult, Workf
 from .reference_resolver import resolve_references
 from .tty_wrapper import run_pty_session
 
+_CODEX_INITIAL_INPUT_READINESS_MARKERS = [b"\x1b[?25h", b"\x1b[?2026l"]
+_CODEX_INITIAL_INPUT_QUIET_PERIOD_SECONDS = 0.15
+
 
 def execute_step(
     step_name: str,
@@ -155,12 +158,15 @@ def _run_step_session(
     4. Translate timeout and launch failures into executor-specific errors.
     """
     try:
+        initial_input_readiness_markers, initial_input_quiet_period_seconds = _initial_input_policy_for_agent(
+            agent_config["name"]
+        )
         return run_pty_session(
             agent_config["argv"],
             prompt_text,
             lambda chunk: _handle_output_chunk(chunk, watcher, agent_config),
-            initial_input_readiness_markers=agent_config["initial_input_readiness_markers"],
-            initial_input_quiet_period_seconds=agent_config["initial_input_quiet_period_seconds"],
+            initial_input_readiness_markers=initial_input_readiness_markers,
+            initial_input_quiet_period_seconds=initial_input_quiet_period_seconds,
             inactivity_timeout_seconds=inactivity_timeout_seconds,
             graceful_shutdown_timeout_seconds=graceful_shutdown_timeout_seconds,
         )
@@ -185,6 +191,12 @@ def _handle_output_chunk(
     if watcher.completed:
         return agent_config["exit_text"]
     return None
+
+
+def _initial_input_policy_for_agent(agent_name: str) -> tuple[list[bytes], float]:
+    if agent_name == DEFAULT_AGENT:
+        return _CODEX_INITIAL_INPUT_READINESS_MARKERS, _CODEX_INITIAL_INPUT_QUIET_PERIOD_SECONDS
+    return [], 0.0
 
 
 def _extract_completed_content(watcher: "CompletionWatcher", pty_result: PtyRunResult) -> Any:

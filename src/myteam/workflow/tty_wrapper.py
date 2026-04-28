@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
 import os
 import pty
 import select
@@ -40,11 +39,12 @@ def run_pty_session(
     transcript_chunks: list[bytes] = []
     graceful_shutdown_started_at: float | None = None
     parent_stdin_closed = False
-    initial_input_gate = _InitialInputGate(
-        markers=initial_input_readiness_markers or [],
-        quiet_period_seconds=initial_input_quiet_period_seconds,
-        pending_text=initial_input,
-    )
+    initial_input_markers = initial_input_readiness_markers or []
+    initial_input_pending = initial_input
+    initial_input_output = bytearray()
+    ready_quiet_since: float | None = None
+    enter_pending = False
+    enter_quiet_since: float | None = None
     # Codex accepts "/quit" when the text lands in the input box and Enter arrives
     # as a later keystroke. If we send both too quickly, its paste-burst logic
     # groups them together and the command stays in the composer instead of executing.
@@ -67,6 +67,46 @@ def run_pty_session(
         write_injected_payload(text)
         time.sleep(injected_enter_delay_seconds)
         write_injected_enter()
+
+    def initial_input_markers_seen() -> bool:
+        output = bytes(initial_input_output)
+        return all(marker in output for marker in initial_input_markers)
+
+    def initial_input_timeout(now: float) -> float:
+        if initial_input_pending is None and not enter_pending:
+            return float("inf")
+        if initial_input_pending is not None:
+            if not initial_input_markers:
+                return 0.0
+            if ready_quiet_since is None:
+                return float("inf")
+            return max(0.0, initial_input_quiet_period_seconds - (now - ready_quiet_since))
+        if enter_quiet_since is None:
+            return float("inf")
+        return max(0.0, initial_input_quiet_period_seconds - (now - enter_quiet_since))
+
+    def maybe_send_initial_input(now: float) -> bool:
+        nonlocal initial_input_pending, enter_pending, enter_quiet_since
+
+        if initial_input_pending is not None:
+            if initial_input_markers and ready_quiet_since is None:
+                return False
+            if ready_quiet_since is not None and now - ready_quiet_since < initial_input_quiet_period_seconds:
+                return False
+            write_injected_payload(initial_input_pending)
+            initial_input_pending = None
+            enter_pending = True
+            enter_quiet_since = time.monotonic()
+            return True
+
+        if not enter_pending or enter_quiet_since is None:
+            return False
+        if now - enter_quiet_since < initial_input_quiet_period_seconds:
+            return False
+        write_injected_enter()
+        enter_pending = False
+        enter_quiet_since = None
+        return True
 
     def copy_terminal_size() -> None:
         size = shutil.get_terminal_size(fallback=(80, 24))
@@ -103,12 +143,7 @@ def run_pty_session(
         last_output_at = time.monotonic()
         while True:
             now = time.monotonic()
-            initial_input_action = initial_input_gate.next_action(now)
-            if initial_input_action == "send_payload":
-                write_injected_payload(initial_input_gate.consume_payload())
-            elif initial_input_action == "send_enter":
-                write_injected_enter()
-                initial_input_gate.consume_enter()
+            maybe_send_initial_input(now)
 
             if process.poll() is not None:
                 break
@@ -117,7 +152,7 @@ def run_pty_session(
                 timeout = max(0.0, graceful_shutdown_timeout_seconds - (now - graceful_shutdown_started_at))
             else:
                 timeout = max(0.0, inactivity_timeout_seconds - (now - last_output_at))
-                timeout = min(timeout, initial_input_gate.select_timeout(now))
+                timeout = min(timeout, initial_input_timeout(now))
 
             read_fds = [master_fd]
             if stdin_fd is not None and not parent_stdin_closed:
@@ -126,13 +161,7 @@ def run_pty_session(
             ready, _, _ = select.select(read_fds, [], [], timeout)
             if not ready:
                 now = time.monotonic()
-                initial_input_action = initial_input_gate.next_action(now)
-                if initial_input_action == "send_payload":
-                    write_injected_payload(initial_input_gate.consume_payload())
-                    continue
-                if initial_input_action == "send_enter":
-                    write_injected_enter()
-                    initial_input_gate.consume_enter()
+                if maybe_send_initial_input(now):
                     continue
                 if graceful_shutdown_started_at is not None:
                     process.terminate()
@@ -157,7 +186,12 @@ def run_pty_session(
                 transcript_chunks.append(chunk)
                 last_output_at = time.monotonic()
                 os.write(sys.stdout.fileno(), chunk)
-                initial_input_gate.observe(chunk, last_output_at)
+                if initial_input_pending is not None and initial_input_markers:
+                    initial_input_output.extend(chunk)
+                    if initial_input_markers_seen():
+                        ready_quiet_since = last_output_at
+                if enter_pending:
+                    enter_quiet_since = last_output_at
                 injected = on_output(chunk)
                 if injected is not None:
                     write_injected_input(injected)
@@ -194,88 +228,6 @@ def run_pty_session(
 
 def _noop_output(_chunk: bytes) -> str | None:
     return None
-
-
-@dataclass
-class _InitialInputGate:
-    markers: list[bytes]
-    quiet_period_seconds: float
-    pending_text: str | None
-    _seen_output: bytearray = field(init=False, repr=False)
-    _markers_satisfied_at: float | None = None
-    _payload_sent_at: float | None = None
-    _last_post_payload_output_at: float | None = None
-    _enter_pending: bool = False
-
-    def __post_init__(self) -> None:
-        self._seen_output = bytearray()
-
-    def observe(self, chunk: bytes, observed_at: float) -> None:
-        if self.pending_text is not None and self.markers:
-            self._seen_output.extend(chunk)
-            if self._markers_satisfied_at is None and self._all_markers_seen():
-                self._markers_satisfied_at = observed_at
-            elif self._markers_satisfied_at is not None:
-                self._markers_satisfied_at = observed_at
-
-        if self._enter_pending:
-            self._last_post_payload_output_at = observed_at
-
-    def select_timeout(self, now: float) -> float:
-        if self.next_action(now) is not None:
-            return 0.0
-        if self.pending_text is None and not self._enter_pending:
-            return float("inf")
-        if self.pending_text is not None:
-            if not self.markers:
-                return 0.0
-            if self._markers_satisfied_at is None:
-                return float("inf")
-            return max(0.0, self.quiet_period_seconds - (now - self._markers_satisfied_at))
-
-        if self._payload_sent_at is None:
-            return float("inf")
-        reference_time = self._last_post_payload_output_at or self._payload_sent_at
-        return max(0.0, self.quiet_period_seconds - (now - reference_time))
-
-    def next_action(self, now: float) -> str | None:
-        if self.pending_text is not None:
-            if not self.markers:
-                return "send_payload"
-            if self._markers_satisfied_at is None:
-                return None
-            if now - self._markers_satisfied_at >= self.quiet_period_seconds:
-                return "send_payload"
-            return None
-
-        if not self._enter_pending:
-            return None
-
-        reference_time = self._last_post_payload_output_at or self._payload_sent_at
-        if reference_time is None:
-            return None
-        if now - reference_time >= self.quiet_period_seconds:
-            return "send_enter"
-        return None
-
-    def consume_payload(self) -> str:
-        if self.pending_text is None:
-            raise RuntimeError("Initial input payload has already been sent.")
-        text = self.pending_text
-        self.pending_text = None
-        self._payload_sent_at = time.monotonic()
-        self._last_post_payload_output_at = None
-        self._enter_pending = True
-        return text
-
-    def consume_enter(self) -> None:
-        if not self._enter_pending:
-            raise RuntimeError("Initial input enter has already been sent.")
-        self._enter_pending = False
-
-    def _all_markers_seen(self) -> bool:
-        output = bytes(self._seen_output)
-        return all(marker in output for marker in self.markers)
 
 
 if __name__ == "__main__":
