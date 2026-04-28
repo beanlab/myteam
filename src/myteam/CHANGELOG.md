@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.2.12
+
+- Improved experimental workflow execution so each step prompt is injected only after the agent
+  session is ready to receive input.
+- Improved completion detection for terminal-wrapped JSON output and ensured workflow agents are
+  asked to exit only once after a valid completion payload is accepted.
+
 ## 0.2.11
 
 - *Note: the workflows feature is experimental and may change in the future*
