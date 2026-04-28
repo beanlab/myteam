@@ -216,6 +216,7 @@ Expected outcome on success:
 - Resolves the workflow file from the selected local tree using the requested workflow path.
 - Loads and validates the authored workflow definition.
 - Executes the workflow's steps in order.
+- Launches each configured workflow agent with the authored step prompt supplied at process start.
 - Allows later steps to reference completed state from earlier steps.
 - Returns success only after all workflow steps complete in order.
 

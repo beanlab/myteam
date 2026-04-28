@@ -134,6 +134,7 @@ def _build_step_prompt(
             _dump_yaml_block(output_template),
             "",
             "Return only the completion JSON object when the objective is complete.",
+            "You may return plain text only if following objective instructions, like asking questions to the user",
         ]
     )
     return "\n".join(sections)
@@ -149,15 +150,15 @@ def _run_step_session(
 ) -> PtyRunResult:
     """
     Pseudocode:
-    1. Start the configured PTY-backed agent session.
-    2. Send the canonical step prompt as the initial input.
+    1. Start the configured PTY-backed agent session with the step prompt in argv.
+    2. Do not inject an initial PTY input after launch.
     3. Feed streamed output chunks into the completion watcher.
     4. Translate timeout and launch failures into executor-specific errors.
     """
     try:
         return run_pty_session(
-            agent_config["argv"],
-            prompt_text,
+            [*agent_config["argv"], prompt_text],
+            None,
             lambda chunk: _handle_output_chunk(chunk, watcher, agent_config),
             inactivity_timeout_seconds=inactivity_timeout_seconds,
             graceful_shutdown_timeout_seconds=graceful_shutdown_timeout_seconds,

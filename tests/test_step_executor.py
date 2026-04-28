@@ -107,7 +107,7 @@ def test_completion_watcher_prefers_most_recent_completion_attempt():
 
 
 def test_execute_step_returns_completed_result(monkeypatch):
-    recorded_initial_input: dict[str, str] = {}
+    recorded_launch: dict[str, Any] = {}
 
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
         return {
@@ -124,10 +124,10 @@ def test_execute_step_returns_completed_result(monkeypatch):
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
-        assert argv == ["fake-agent"]
+        recorded_launch["argv"] = argv
+        recorded_launch["initial_input"] = initial_input
         assert inactivity_timeout_seconds == 300
         assert graceful_shutdown_timeout_seconds == 30
-        recorded_initial_input["value"] = initial_input or ""
 
         chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
         injected = on_output(chunk)
@@ -150,15 +150,18 @@ def test_execute_step_returns_completed_result(monkeypatch):
 
     assert result.status == "completed"
     assert result.output == {"summary": "done"}
-    assert "Objective:" in recorded_initial_input["value"]
-    assert "Output template:" in recorded_initial_input["value"]
-    assert "Write a summary." in recorded_initial_input["value"]
-    assert "Input:" not in recorded_initial_input["value"]
+    prompt_text = recorded_launch["argv"][-1]
+    assert recorded_launch["argv"][:-1] == ["fake-agent"]
+    assert recorded_launch["initial_input"] is None
+    assert "Objective:" in prompt_text
+    assert "Output template:" in prompt_text
+    assert "Write a summary." in prompt_text
+    assert "Input:" not in prompt_text
     assert result.resolved_input is None
 
 
 def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatch):
-    recorded_initial_input: dict[str, str] = {}
+    recorded_launch: dict[str, Any] = {}
 
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
         return {
@@ -175,7 +178,8 @@ def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatc
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
-        recorded_initial_input["value"] = initial_input or ""
+        recorded_launch["argv"] = argv
+        recorded_launch["initial_input"] = initial_input
         chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
         on_output(chunk)
         return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
@@ -197,7 +201,8 @@ def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatc
 
     assert result.status == "completed"
     assert result.resolved_input is None
-    assert "Input:" not in recorded_initial_input["value"]
+    assert recorded_launch["initial_input"] is None
+    assert "Input:" not in recorded_launch["argv"][-1]
 
 
 def test_execute_step_returns_failed_result_for_reference_resolution_errors(monkeypatch):
@@ -312,7 +317,9 @@ def test_execute_step_returns_failed_result_when_completion_is_missing(monkeypat
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
-        assert argv == ["fake-agent"]
+        assert argv[:-1] == ["fake-agent"]
+        assert "Write a summary." in argv[-1]
+        assert initial_input is None
         on_output(b"still thinking\n")
         return PtyRunResult(exit_code=0, transcript="still thinking\n")
 
