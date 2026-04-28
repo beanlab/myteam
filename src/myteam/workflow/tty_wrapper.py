@@ -235,9 +235,7 @@ class _InitialInputGate:
 
         if self._payload_sent_at is None:
             return float("inf")
-        reference_time = self._payload_settled_reference()
-        if reference_time is None:
-            return float("inf")
+        reference_time = self._last_post_payload_output_at or self._payload_sent_at
         return max(0.0, self.quiet_period_seconds - (now - reference_time))
 
     def next_action(self, now: float) -> str | None:
@@ -253,7 +251,7 @@ class _InitialInputGate:
         if not self._enter_pending:
             return None
 
-        reference_time = self._payload_settled_reference()
+        reference_time = self._last_post_payload_output_at or self._payload_sent_at
         if reference_time is None:
             return None
         if now - reference_time >= self.quiet_period_seconds:
@@ -278,11 +276,6 @@ class _InitialInputGate:
     def _all_markers_seen(self) -> bool:
         output = bytes(self._seen_output)
         return all(marker in output for marker in self.markers)
-
-    def _payload_settled_reference(self) -> float | None:
-        if self._last_post_payload_output_at is not None:
-            return self._last_post_payload_output_at
-        return self._payload_sent_at
 
 
 if __name__ == "__main__":
