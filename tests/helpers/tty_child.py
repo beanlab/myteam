@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import select
 import signal
 import sys
 import time
@@ -45,6 +47,28 @@ def _mode_silent() -> int:
     return 0
 
 
+def _mode_gated_initial() -> int:
+    sys.stdout.write("\x1b[?2004h")
+    sys.stdout.write("OpenAI Codex\r\n")
+    sys.stdout.flush()
+    time.sleep(0.05)
+
+    early_ready, _, _ = select.select([sys.stdin], [], [], 0)
+    if early_ready:
+        early_input = os.read(sys.stdin.fileno(), 4096).decode("utf-8", errors="replace")
+        print(f"EARLY_INPUT:{early_input.rstrip()}", flush=True)
+    else:
+        print("NO_EARLY_INPUT", flush=True)
+
+    sys.stdout.write("\x1b[?25h\x1b[?2026l")
+    sys.stdout.flush()
+    time.sleep(0.2)
+
+    line = sys.stdin.readline()
+    print(f"LATE_INPUT:{line.rstrip()}", flush=True)
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print("usage: tty_child.py <mode> [args...]", file=sys.stderr)
@@ -61,6 +85,8 @@ def main(argv: list[str]) -> int:
         return _mode_exit_code(argv[2])
     if mode == "silent":
         return _mode_silent()
+    if mode == "gated_initial":
+        return _mode_gated_initial()
 
     print(f"unknown mode: {mode}", file=sys.stderr)
     return 2

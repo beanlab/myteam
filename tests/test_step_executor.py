@@ -6,6 +6,16 @@ from myteam.workflow.models import PtyRunResult
 from myteam.workflow.step_executor import CompletionWatcher, execute_step
 
 
+def _fake_agent_config() -> dict[str, Any]:
+    return {
+        "name": "fake-agent",
+        "argv": ["fake-agent"],
+        "exit_text": "/quit\n",
+        "initial_input_readiness_markers": [b"\x1b[?25h", b"\x1b[?2026l"],
+        "initial_input_quiet_period_seconds": 0.15,
+    }
+
+
 def test_completion_watcher_accepts_first_objective_complete_payload():
     watcher = CompletionWatcher()
 
@@ -108,23 +118,24 @@ def test_completion_watcher_prefers_most_recent_completion_attempt():
 
 def test_execute_step_returns_completed_result(monkeypatch):
     recorded_initial_input: dict[str, str] = {}
+    recorded_readiness: dict[str, object] = {}
 
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     def fake_run_pty_session(
         argv: list[str],
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
         assert argv == ["fake-agent"]
+        recorded_readiness["markers"] = initial_input_readiness_markers
+        recorded_readiness["quiet_period_seconds"] = initial_input_quiet_period_seconds
         assert inactivity_timeout_seconds == 300
         assert graceful_shutdown_timeout_seconds == 30
         recorded_initial_input["value"] = initial_input or ""
@@ -154,6 +165,10 @@ def test_execute_step_returns_completed_result(monkeypatch):
     assert "Output template:" in recorded_initial_input["value"]
     assert "Write a summary." in recorded_initial_input["value"]
     assert "Input:" not in recorded_initial_input["value"]
+    assert recorded_readiness == {
+        "markers": [b"\x1b[?25h", b"\x1b[?2026l"],
+        "quiet_period_seconds": 0.15,
+    }
     assert result.resolved_input is None
 
 
@@ -161,20 +176,20 @@ def test_execute_step_omits_input_section_when_authored_input_is_null(monkeypatc
     recorded_initial_input: dict[str, str] = {}
 
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     def fake_run_pty_session(
         argv: list[str],
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
+        assert initial_input_readiness_markers == [b"\x1b[?25h", b"\x1b[?2026l"]
+        assert initial_input_quiet_period_seconds == 0.15
         recorded_initial_input["value"] = initial_input or ""
         chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
         on_output(chunk)
@@ -238,11 +253,7 @@ def test_execute_step_returns_failed_result_for_invalid_runtime_default_agent():
 
 def test_execute_step_returns_failed_result_when_agent_launch_fails(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     def fake_run_pty_session(*args, **kwargs):
         raise OSError("no such file or directory")
@@ -268,11 +279,7 @@ def test_execute_step_returns_failed_result_when_agent_launch_fails(monkeypatch)
 
 def test_execute_step_returns_failed_result_on_timeout(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     def fake_run_pty_session(*args, **kwargs):
         raise TimeoutError("became inactive for 5 seconds")
@@ -298,21 +305,21 @@ def test_execute_step_returns_failed_result_on_timeout(monkeypatch):
 
 def test_execute_step_returns_failed_result_when_completion_is_missing(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     def fake_run_pty_session(
         argv: list[str],
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
         assert argv == ["fake-agent"]
+        assert initial_input_readiness_markers == [b"\x1b[?25h", b"\x1b[?2026l"]
+        assert initial_input_quiet_period_seconds == 0.15
         on_output(b"still thinking\n")
         return PtyRunResult(exit_code=0, transcript="still thinking\n")
 
@@ -337,11 +344,7 @@ def test_execute_step_returns_failed_result_when_completion_is_missing(monkeypat
 
 def test_execute_step_returns_failed_result_when_completion_json_is_invalid(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     transcript = '{"status":"OBJECTIVE_COMPLETE","content":\n'
 
@@ -350,9 +353,13 @@ def test_execute_step_returns_failed_result_when_completion_json_is_invalid(monk
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
+        assert initial_input_readiness_markers == [b"\x1b[?25h", b"\x1b[?2026l"]
+        assert initial_input_quiet_period_seconds == 0.15
         on_output(transcript.encode("utf-8"))
         return PtyRunResult(exit_code=0, transcript=transcript)
 
@@ -377,11 +384,7 @@ def test_execute_step_returns_failed_result_when_completion_json_is_invalid(monk
 
 def test_execute_step_returns_failed_result_when_nested_output_key_is_missing(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     chunk = (
         b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":{"title":"done"}}}\n'
@@ -392,9 +395,13 @@ def test_execute_step_returns_failed_result_when_nested_output_key_is_missing(mo
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
+        assert initial_input_readiness_markers == [b"\x1b[?25h", b"\x1b[?2026l"]
+        assert initial_input_quiet_period_seconds == 0.15
         on_output(chunk)
         return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
 
@@ -422,11 +429,7 @@ def test_execute_step_returns_failed_result_when_nested_output_key_is_missing(mo
 
 def test_execute_step_returns_failed_result_when_mapping_output_is_not_mapping(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
 
@@ -435,9 +438,13 @@ def test_execute_step_returns_failed_result_when_mapping_output_is_not_mapping(m
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
+        assert initial_input_readiness_markers == [b"\x1b[?25h", b"\x1b[?2026l"]
+        assert initial_input_quiet_period_seconds == 0.15
         on_output(chunk)
         return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
 
@@ -464,11 +471,7 @@ def test_execute_step_returns_failed_result_when_mapping_output_is_not_mapping(m
 
 def test_execute_step_returns_failed_result_when_agent_fails_after_valid_output(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
-        return {
-            "name": "fake-agent",
-            "argv": ["fake-agent"],
-            "exit_text": "/quit\n",
-        }
+        return _fake_agent_config()
 
     chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"summary":"done"}}\n'
 
@@ -477,9 +480,13 @@ def test_execute_step_returns_failed_result_when_agent_fails_after_valid_output(
         initial_input: str | None,
         on_output,
         *,
+        initial_input_readiness_markers: list[bytes] | None,
+        initial_input_quiet_period_seconds: float,
         inactivity_timeout_seconds: int,
         graceful_shutdown_timeout_seconds: int,
     ) -> PtyRunResult:
+        assert initial_input_readiness_markers == [b"\x1b[?25h", b"\x1b[?2026l"]
+        assert initial_input_quiet_period_seconds == 0.15
         injected = on_output(chunk)
         assert injected == "/quit\n"
         return PtyRunResult(exit_code=7, transcript=chunk.decode("utf-8"))

@@ -159,6 +159,8 @@ def _run_step_session(
             agent_config["argv"],
             prompt_text,
             lambda chunk: _handle_output_chunk(chunk, watcher, agent_config),
+            initial_input_readiness_markers=agent_config["initial_input_readiness_markers"],
+            initial_input_quiet_period_seconds=agent_config["initial_input_quiet_period_seconds"],
             inactivity_timeout_seconds=inactivity_timeout_seconds,
             graceful_shutdown_timeout_seconds=graceful_shutdown_timeout_seconds,
         )

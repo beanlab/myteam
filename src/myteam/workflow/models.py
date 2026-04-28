@@ -8,6 +8,8 @@ class AgentConfig(TypedDict):
     name: str
     argv: list[str]
     exit_text: str
+    initial_input_readiness_markers: list[bytes]
+    initial_input_quiet_period_seconds: float
 
 
 class StepDefinition(TypedDict, total=False):

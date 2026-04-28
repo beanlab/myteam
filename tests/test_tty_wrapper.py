@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.tty_wrapper import run_pty_session
+from myteam.workflow.tty_wrapper import _InitialInputGate, run_pty_session
 
 
 HELPER = Path(__file__).resolve().parent / "helpers" / "tty_child.py"
@@ -29,6 +29,47 @@ def test_run_pty_session_sends_initial_input_with_enter(capfd: pytest.CaptureFix
     assert "READY" in result.transcript
     assert "ECHO:hello from wrapper" in result.transcript
     assert "ECHO:hello from wrapper" in captured.out
+
+
+def test_run_pty_session_waits_for_ready_frame_before_sending_initial_input(
+    capfd: pytest.CaptureFixture[str],
+):
+    result = run_pty_session(
+        _helper_argv("gated_initial"),
+        "hello from wrapper",
+        lambda _chunk: None,
+        initial_input_readiness_markers=[b"\x1b[?25h", b"\x1b[?2026l"],
+        initial_input_quiet_period_seconds=0.05,
+        inactivity_timeout_seconds=1,
+        graceful_shutdown_timeout_seconds=1,
+    )
+
+    captured = capfd.readouterr()
+    assert result.exit_code == 0
+    assert "OpenAI Codex" in result.transcript
+    assert "NO_EARLY_INPUT" in result.transcript
+    assert "EARLY_INPUT:" not in result.transcript
+    assert "LATE_INPUT:hello from wrapper" in result.transcript
+    assert "LATE_INPUT:hello from wrapper" in captured.out
+
+
+def test_initial_input_gate_waits_for_settled_output_before_pressing_enter():
+    gate = _InitialInputGate(
+        markers=[],
+        quiet_period_seconds=0.06,
+        pending_text="hello from wrapper",
+    )
+
+    assert gate.next_action(0.0) == "send_payload"
+    assert gate.consume_payload() == "hello from wrapper"
+    assert gate.next_action(0.01) is None
+
+    gate.observe(b"composer redraw", observed_at=1.0)
+    assert gate.next_action(1.04) is None
+    assert gate.next_action(1.06) == "send_enter"
+
+    gate.consume_enter()
+    assert gate.next_action(1.07) is None
 
 
 def test_run_pty_session_callback_can_inject_quit_command(capfd: pytest.CaptureFixture[str]):
