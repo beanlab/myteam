@@ -130,10 +130,11 @@ def _build_step_prompt(
             "Objective:",
             objective_text,
             "",
-            "Output template:",
+            "Output template (schema):",
             _dump_yaml_block(output_template),
             "",
             "Return only the completion JSON object when the objective is complete.",
+            "You may return plain text only if following objective instructions, like asking questions to the user",
         ]
     )
     return "\n".join(sections)
@@ -150,7 +151,7 @@ def _run_step_session(
     """
     Pseudocode:
     1. Start the configured PTY-backed agent session.
-    2. Send the canonical step prompt as the initial input.
+    2. Send the canonical step prompt as the initial PTY input.
     3. Feed streamed output chunks into the completion watcher.
     4. Translate timeout and launch failures into executor-specific errors.
     """
@@ -176,13 +177,11 @@ def _handle_output_chunk(
     """
     Pseudocode:
     1. Append the chunk to the completion watcher.
-    2. If the watcher has accepted a completion payload, return the agent exit text.
+    2. If the watcher has accepted a completion payload, return the agent exit text once.
     3. Otherwise return None so the PTY session continues normally.
     """
     watcher.append(chunk)
-    if watcher.completed:
-        return agent_config["exit_text"]
-    return None
+    return watcher.take_exit_text(agent_config["exit_text"])
 
 
 def _extract_completed_content(watcher: "CompletionWatcher", pty_result: PtyRunResult) -> Any:
@@ -298,6 +297,7 @@ class CompletionWatcher:
 
     _transcript_parts: list[str] = field(default_factory=list)
     _accepted_payload: dict[str, Any] | None = None
+    _exit_requested: bool = False
 
     def append(self, chunk: bytes) -> None:
         text = chunk.decode("utf-8", errors="replace")
@@ -322,6 +322,13 @@ class CompletionWatcher:
         if self._accepted_payload is None:
             return None
         return self._accepted_payload["content"]
+
+    def take_exit_text(self, exit_text: str) -> str | None:
+        """Return the exit text exactly once after completion is accepted."""
+        if not self.completed or self._exit_requested:
+            return None
+        self._exit_requested = True
+        return exit_text
 
     def _try_accept_completion(self) -> None:
         """
@@ -397,7 +404,8 @@ class CompletionWatcher:
         return None
 
     def _parse_candidate_payload(self, candidate_text: str) -> dict[str, Any] | None:
-        for text in (candidate_text, self._normalize_wrapped_json(candidate_text)):
+        sanitized_text = self._strip_terminal_control(candidate_text)
+        for text in (sanitized_text, self._normalize_wrapped_json(sanitized_text)):
             try:
                 payload = json.loads(text)
             except json.JSONDecodeError:
@@ -405,6 +413,52 @@ class CompletionWatcher:
             if isinstance(payload, dict):
                 return payload
         return None
+
+    def _strip_terminal_control(self, candidate_text: str) -> str:
+        output_chars: list[str] = []
+        index = 0
+
+        while index < len(candidate_text):
+            char = candidate_text[index]
+
+            if char == "\x1b":
+                index = self._skip_terminal_escape(candidate_text, index)
+                continue
+
+            if ord(char) < 0x20 and char not in {"\n", "\r", "\t"}:
+                index += 1
+                continue
+
+            output_chars.append(char)
+            index += 1
+
+        return "".join(output_chars)
+
+    def _skip_terminal_escape(self, candidate_text: str, start_index: int) -> int:
+        if start_index + 1 >= len(candidate_text):
+            return start_index + 1
+
+        next_char = candidate_text[start_index + 1]
+        index = start_index + 2
+
+        if next_char == "[":
+            while index < len(candidate_text):
+                if 0x40 <= ord(candidate_text[index]) <= 0x7E:
+                    return index + 1
+                index += 1
+            return index
+
+        if next_char == "]":
+            while index < len(candidate_text):
+                char = candidate_text[index]
+                if char == "\x07":
+                    return index + 1
+                if char == "\x1b" and index + 1 < len(candidate_text) and candidate_text[index + 1] == "\\":
+                    return index + 2
+                index += 1
+            return index
+
+        return index
 
     def _normalize_wrapped_json(self, candidate_text: str) -> str:
         """
@@ -423,6 +477,8 @@ class CompletionWatcher:
         output_chars: list[str] = []
         in_string = False
         escaping = False
+        dropping_wrapped_indent = False
+        saw_wrapped_indent = False
 
         for char in candidate_text:
             if escaping:
@@ -436,16 +492,32 @@ class CompletionWatcher:
             if char == "\\" and in_string:
                 output_chars.append(char)
                 escaping = True
+                dropping_wrapped_indent = False
+                saw_wrapped_indent = False
                 continue
 
             if char == '"':
                 output_chars.append(char)
                 in_string = not in_string
+                dropping_wrapped_indent = False
+                saw_wrapped_indent = False
                 continue
 
             if char == "\n" and in_string:
+                dropping_wrapped_indent = True
+                saw_wrapped_indent = False
                 continue
 
+            if dropping_wrapped_indent and in_string and char in {" ", "\t"}:
+                saw_wrapped_indent = True
+                continue
+
+            if dropping_wrapped_indent and saw_wrapped_indent:
+                if output_chars and output_chars[-1] not in {" ", "\t", '"'}:
+                    output_chars.append(" ")
+
+            dropping_wrapped_indent = False
+            saw_wrapped_indent = False
             output_chars.append(char)
 
         return "".join(output_chars)

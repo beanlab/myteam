@@ -37,10 +37,11 @@ def run_pty_session(
     transcript_chunks: list[bytes] = []
     graceful_shutdown_started_at: float | None = None
     parent_stdin_closed = False
-    # Codex accepts "/quit" when the text lands in the input box and Enter arrives
-    # as a later keystroke. If we send both too quickly, its paste-burst logic
-    # groups them together and the command stays in the composer instead of executing.
-    injected_enter_delay_seconds = 0.02
+    # Interactive TUIs may mishandle input written before their terminal is ready.
+    pending_initial_input = initial_input
+    # Keep injected text, cursor movement, and submit as separate keystrokes.
+    injected_key_delay_seconds = 0.02
+    injected_right_arrow = b"\x1b[C"
 
     def write_injected_input(text: str) -> None:
         payload = text
@@ -50,9 +51,17 @@ def run_pty_session(
             payload = payload[:-1]
 
         if payload:
-            os.write(master_fd, payload.encode("utf-8"))
-            time.sleep(injected_enter_delay_seconds)
-        os.write(master_fd, b"\r")
+            write_all(payload.encode("utf-8"))
+            time.sleep(injected_key_delay_seconds)
+        write_all(injected_right_arrow)
+        time.sleep(injected_key_delay_seconds)
+        write_all(b"\r")
+
+    def write_all(data: bytes) -> None:
+        view = memoryview(data)
+        while view:
+            written = os.write(master_fd, view)
+            view = view[written:]
 
     def copy_terminal_size() -> None:
         size = shutil.get_terminal_size(fallback=(80, 24))
@@ -85,9 +94,6 @@ def run_pty_session(
 
         previous_winch_handler = signal.getsignal(signal.SIGWINCH)
         signal.signal(signal.SIGWINCH, handle_winch)
-
-        if initial_input is not None:
-            write_injected_input(initial_input)
 
         last_output_at = time.monotonic()
         while True:
@@ -130,6 +136,9 @@ def run_pty_session(
                 last_output_at = time.monotonic()
                 os.write(sys.stdout.fileno(), chunk)
                 injected = on_output(chunk)
+                if pending_initial_input is not None:
+                    write_injected_input(pending_initial_input)
+                    pending_initial_input = None
                 if injected is not None:
                     write_injected_input(injected)
                     graceful_shutdown_started_at = time.monotonic()
