@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import asdict
+
+import yaml
 
 from .agents import DEFAULT_AGENT
 from .models import CompletedStepState, StepDefinition, StepResult, WorkflowDefinition, WorkflowOutput, WorkflowRunResult
@@ -57,6 +60,7 @@ def run_workflow(
         )
         if logger is not None:
             logger(f"Completed step '{step_name}'")
+            logger(yaml.safe_dump(asdict(step_result), sort_keys=True).rstrip())
 
     return WorkflowRunResult(status="completed", output=completed_steps)
 
