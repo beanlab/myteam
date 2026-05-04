@@ -9,14 +9,7 @@ from .terminal.result_channel import submit_result_payload
 
 
 def workflow_result(json: str | None = None, text: str | None = None) -> None:
-    try:
-        payload = _read_payload(json_text=json, text=text)
-        submit_result_payload(payload)
-    except (OSError, ValueError) as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(1)
-
-    print("Workflow result accepted.")
+    raise SystemExit(_run_submission(json_text=json, text=text))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,9 +17,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json")
     parser.add_argument("--text")
     args = parser.parse_args(argv)
+    return _run_submission(json_text=args.json, text=args.text)
 
+
+def _run_submission(*, json_text: str | None, text: str | None) -> int:
     try:
-        payload = _read_payload(json_text=args.json, text=args.text)
+        payload = _read_payload(json_text=json_text, text=text)
         submit_result_payload(payload)
     except (OSError, ValueError) as exc:
         print(str(exc), file=sys.stderr)

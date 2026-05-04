@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.2.13
+
+- Reworked experimental workflow completion so step agents now report structured results with
+  `myteam workflow-result` over a private result channel instead of terminal marker scraping.
+- Split the workflow runtime into focused workflow, agent-backend, and terminal transport modules.
+- Added workflow package documentation and migration guidance for customized workflow wrappers that
+  still expect terminal `OBJECTIVE_COMPLETE` output.
+
 ## 0.2.12
 
 - Improved experimental workflow execution so each step prompt is injected only after the agent
