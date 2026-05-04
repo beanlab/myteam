@@ -225,8 +225,10 @@ User-visible result:
 - The caller can invoke a workflow stored at `.myteam/dev/frontend.yaml` with `myteam start dev/frontend`.
 - `--prefix` changes which local root is searched for workflows in the same way it does for other
   project-local tree commands.
-- Workflow execution emits the workflow's runtime output to standard output and reports failures on
-  standard error.
+- Workflow execution mirrors the child session's terminal output to standard output as the workflow
+  runs and reports command failures on standard error.
+- Successful completion does not currently emit an additional final workflow-result payload on
+  standard output.
 
 Failure conditions that matter at the interface:
 
@@ -235,6 +237,38 @@ Failure conditions that matter at the interface:
 - If the workflow definition is malformed or references an unknown agent, the command exits with an error.
 - If any workflow step fails, the command stops at that first failing step, does not execute later
   steps, and exits with an error.
+
+### `myteam workflow-result [--json <json> | --text <text>]`
+
+Submits the final structured result for the current workflow step.
+
+Inputs:
+
+- `--json <json>` passes the payload directly as JSON text.
+- `--text <text>` wraps plain text as `{"text": <text>}`.
+- If neither flag is provided, the command reads JSON from standard input.
+
+Expected outcome on success:
+
+- Reads the workflow result socket path and token from the current process environment.
+- Validates the provided payload input.
+- Sends the payload once to the parent workflow runner for the active step.
+- Prints a short confirmation message.
+
+User-visible result:
+
+- This command is primarily intended for workflow agents, not direct human operation.
+- Workflow prompts can instruct the agent to call `myteam workflow-result` exactly once when the
+  step is complete.
+
+Failure conditions that matter at the interface:
+
+- If both `--json` and `--text` are provided, the command exits with an error.
+- If no payload is provided and standard input is empty, the command exits with an error.
+- If the environment does not contain the workflow result socket metadata, the command exits with an
+  error.
+- If the parent runner rejects the payload or acknowledgement is invalid, the command exits with an
+  error.
 
 ### Workflow File Format
 
@@ -283,6 +317,8 @@ Authoring rules that matter at the interface:
 - Nested objects in `output` require the same nested keys to appear in the final result.
 - Output-template leaf values are descriptive placeholders and do not constrain the final JSON value type.
 - Workflow files are validated before execution begins.
+- The step agent must report the final structured result through `myteam workflow-result` rather
+  than terminal markers or free-form prose.
 
 Reference semantics:
 

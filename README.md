@@ -293,6 +293,21 @@ myteam start release/checklist --prefix .agents
 myteam start dev/frontend --verbose
 ```
 
+### `myteam workflow-result [--json <json> | --text <text>]`
+
+Submits the structured result for the current workflow step.
+
+This command is primarily agent-facing. Workflow prompts use it to report a final payload back to
+the parent workflow runner over the private result channel for that step.
+
+Examples:
+
+```bash
+myteam workflow-result --json '{"summary":"done"}'
+myteam workflow-result --text "done"
+printf '{"summary":"done"}\n' | myteam workflow-result
+```
+
 ### `myteam changelog`
 
 Prints the packaged `myteam` changelog from the installed release.
@@ -403,8 +418,11 @@ Notes:
 
 - step names should use identifier-style names such as `gather_context`
 - `$step_name.output...` references pull data from earlier completed steps
+- the step agent reports its final structured result by calling `myteam workflow-result`
 - `myteam start` stops at the first failing step and does not continue to later steps
 - `--verbose` writes workflow lifecycle logs to standard error
+- successful `myteam start` runs currently mirror workflow session terminal output; they do not yet
+  print a separate final structured payload on stdout
 
 ## Why Use Myteam
 

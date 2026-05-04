@@ -46,53 +46,53 @@ The terminal contract is:
 
 ### Package Root
 
-- [__init__.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/__init__.py)
+- [__init__.py](__init__.py)
   Exposes the main public workflow entrypoints: `load_workflow` and `run_workflow`.
 
-- [parser.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/parser.py)
+- [parser.py](parser.py)
   Owns workflow-file loading and validation of the authored YAML structure.
 
-- [models.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/models.py)
+- [models.py](models.py)
   Owns shared workflow types: authored step definitions, completed-step state, and run results.
 
-- [reference_resolver.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/reference_resolver.py)
+- [reference_resolver.py](reference_resolver.py)
   Owns `$step.path` reference resolution against prior completed steps.
 
-- [engine.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/engine.py)
+- [engine.py](engine.py)
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
-- [steps.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/steps.py)
+- [steps.py](steps.py)
   Owns single-step execution: resolve input, select agent/backend, build prompt, run session, validate result, and return `StepResult`.
 
-- [result_tool.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/result_tool.py)
+- [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.
 
 ### Agents
 
-- [agents/__init__.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/agents/__init__.py)
+- [agents/__init__.py](agents/__init__.py)
   Re-exports the agent lookup and backend helpers.
 
-- [agents/registry.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/agents/registry.py)
+- [agents/registry.py](agents/registry.py)
   Owns named workflow agent definitions and default agent lookup.
 
-- [agents/backends.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/agents/backends.py)
+- [agents/backends.py](agents/backends.py)
   Owns backend-specific terminal input encoding, including submit and exit byte sequences.
 
 ### Terminal
 
-- [terminal/__init__.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/terminal/__init__.py)
+- [terminal/__init__.py](terminal/__init__.py)
   Re-exports the terminal-layer building blocks.
 
-- [terminal/pty_session.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/terminal/pty_session.py)
+- [terminal/pty_session.py](terminal/pty_session.py)
   Owns the low-level PTY transport. It launches the child, yields raw output bytes through the `events()` generator, mirrors terminal IO, and accepts injected input through `enqueue_input(...)`.
 
-- [terminal/recording.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/terminal/recording.py)
+- [terminal/recording.py](terminal/recording.py)
   Owns transcript recording from raw PTY byte chunks.
 
-- [terminal/result_channel.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/terminal/result_channel.py)
+- [terminal/result_channel.py](terminal/result_channel.py)
   Owns the out-of-band result socket, token validation, acknowledgement handling, and payload submission helper.
 
-- [terminal/session.py](/Users/tylerreese/Desktop/Work/myteam/src/myteam/workflow/terminal/session.py)
+- [terminal/session.py](terminal/session.py)
   Owns orchestration of `PtySession`, `TerminalRecording`, and `ResultChannel` into one terminal session result for a workflow step.
 
 ## Design Constraints

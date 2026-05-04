@@ -8,21 +8,6 @@ from .models import AgentConfig, StepDefinition, StepResult, WorkflowOutput
 from .reference_resolver import resolve_references
 from .terminal.session import run_terminal_session
 
-# here's the input
-# here's the output schema
-# here's the agent that should do the job
-
-# this should create the prompt that harnesses the agent
-# - you are part of this workflow, this is your specific task:
-# - the prompt could just be contained in the role?
-# - or just give it directly to the role, but then we're at odds with AGENTS.md
-#     - "if you're running in a workflow, don't call `get role`"
-# - "your role is workflow"
-# or given as a parameter?
-# if no agents.md file, is there a way to auto-load the role
-
-# figure out which is best ^^
-
 def execute_step(
     step_name: str,
     step_definition: StepDefinition,
@@ -118,6 +103,7 @@ def _build_step_prompt(
         "Complete the objective below.",
         "",
         "Return the final workflow result by calling this command exactly once:",
+        "Replace the placeholder values below with the real final result content.",
         "",
         "myteam workflow-result <<'JSON'",
         json.dumps(output_template, indent=2),
