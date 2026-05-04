@@ -323,3 +323,4 @@ def test_run_workflow_stores_null_input_for_completed_steps(monkeypatch):
             "output": {"reviewed_title": "Reviewed Draft Title"},
         },
     }
+

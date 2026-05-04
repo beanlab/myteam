@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from .agent_registry import get_agent_config
+from .agents import get_agent_config
 from .models import StepDefinition, WorkflowDefinition
 
 _REQUIRED_STEP_KEYS = {"prompt", "output"}
