@@ -27,6 +27,7 @@ def _encode_codex_input(text: str) -> bytes:
 
 _BACKENDS = {
     "codex": BackendAdapter(name="codex", submit_text=_encode_codex_input),
+    "pi": BackendAdapter(name="pi", submit_text=_encode_codex_input),
 }
 
 
