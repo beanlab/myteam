@@ -16,7 +16,6 @@ from .commands import (
     start,
     update_roster,
     version,
-    workflow_result,
 )
 
 
@@ -36,7 +35,6 @@ def main(argv: list[str] | None = None):
         "update": update_roster,
         "list": list_available_rosters,
         "start": start,
-        "workflow-result": workflow_result,
         "changelog": changelog,
         "--version": version,
     }

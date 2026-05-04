@@ -24,7 +24,6 @@ from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
 from .workflow.engine import run_workflow
 from .workflow.parser import load_workflow
-from .workflow.result_tool import workflow_result as submit_workflow_result
 
 
 def ensure_dir(path: Path) -> None:
@@ -211,10 +210,6 @@ def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False
     logger(f"Workflow '{workflow}' completed successfully.")
 
 
-def workflow_result(json: str | None = None, text: str | None = None) -> None:
-    submit_workflow_result(json=json, text=text)
-
-
 def version() -> str:
     return f"{APP_NAME} {__version__}"
 
@@ -233,7 +228,6 @@ __all__ = [
     "new_skill",
     "remove",
     "start",
-    "workflow_result",
     "update_roster",
     "changelog",
     "version",

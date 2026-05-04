@@ -1,23 +1,19 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import asdict
 
-import yaml
-
-from .agents import DEFAULT_AGENT
-from .models import CompletedStepState, StepDefinition, StepResult, WorkflowDefinition, WorkflowOutput, \
-    WorkflowRunResult
-from .steps import execute_step
+from .agent_registry import DEFAULT_AGENT
+from .models import CompletedStepState, StepDefinition, StepResult, WorkflowDefinition, WorkflowOutput, WorkflowRunResult
+from .step_executor import execute_step
 
 
 def run_workflow(
-        workflow: WorkflowDefinition,
-        *,
-        default_agent: str = DEFAULT_AGENT,
-        inactivity_timeout_seconds: int = 300,
-        graceful_shutdown_timeout_seconds: int = 30,
-        logger: Callable[[str], None] | None = None,
+    workflow: WorkflowDefinition,
+    *,
+    default_agent: str = DEFAULT_AGENT,
+    inactivity_timeout_seconds: int = 300,
+    graceful_shutdown_timeout_seconds: int = 30,
+    logger: Callable[[str], None] | None = None,
 ) -> WorkflowRunResult:
     """
     Execute a workflow in authored order and stop at the first failing step.
@@ -61,15 +57,14 @@ def run_workflow(
         )
         if logger is not None:
             logger(f"Completed step '{step_name}'")
-            logger(yaml.safe_dump({"step_name": step_name, "output": step_result.output}, sort_keys=False).rstrip())
 
     return WorkflowRunResult(status="completed", output=completed_steps)
 
 
 def _build_completed_step_state(
-        *,
-        step_definition: StepDefinition,
-        step_result: StepResult,
+    *,
+    step_definition: StepDefinition,
+    step_result: StepResult,
 ) -> CompletedStepState:
     """
     Build the stored step state exposed to later workflow references.
