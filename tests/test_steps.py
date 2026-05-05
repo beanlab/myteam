@@ -29,11 +29,9 @@ def test_execute_step_returns_completed_result(monkeypatch):
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
 
     result = execute_step(
-        {
-            "agent": "codex",
-            "prompt": "Write a summary.",
-            "output": {"summary": "short summary"},
-        }
+        agent="codex",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
     )
 
     assert result.status == "completed"
@@ -50,11 +48,9 @@ def test_execute_step_reports_missing_result(monkeypatch):
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
 
     result = execute_step(
-        {
-            "agent": "codex",
-            "prompt": "Write a summary.",
-            "output": {"summary": "short summary"},
-        }
+        agent="codex",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
     )
 
     assert result.status == "failed"
@@ -63,10 +59,8 @@ def test_execute_step_reports_missing_result(monkeypatch):
 
 def test_execute_step_requires_explicit_agent():
     result = execute_step(
-        {
-            "prompt": "Write a summary.",
-            "output": {"summary": "short summary"},
-        }
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
     )
 
     assert result.status == "failed"
@@ -94,12 +88,10 @@ def test_execute_step_preserves_literal_input(monkeypatch):
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
 
     result = execute_step(
-        {
-            "agent": "codex",
-            "input": {"topic": "release notes"},
-            "prompt": "Write a summary.",
-            "output": {"summary": "short summary"},
-        }
+        agent="codex",
+        input={"topic": "release notes"},
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
     )
 
     assert result.status == "completed"

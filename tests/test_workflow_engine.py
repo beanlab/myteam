@@ -11,12 +11,18 @@ from myteam.workflow.models import StepResult
 def test_run_workflow_executes_steps_in_authored_order(monkeypatch):
     calls: list[str] = []
 
-    def fake_execute_step(step_definition: dict[str, Any]) -> StepResult:
-        calls.append(step_definition["prompt"])
+    def fake_execute_step(
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
+    ) -> StepResult:
+        calls.append(prompt)
         return StepResult(
             status="completed",
-            output={"value": step_definition["output"]["value"]},
-            agent_name=step_definition["agent"],
+            output={"value": output["value"]},
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -43,9 +49,15 @@ def test_run_workflow_executes_steps_in_authored_order(monkeypatch):
 def test_run_workflow_stops_at_first_failed_step(monkeypatch):
     calls: list[str] = []
 
-    def fake_execute_step(step_definition: dict[str, Any]) -> StepResult:
-        calls.append(step_definition["prompt"])
-        if step_definition["prompt"] == "two":
+    def fake_execute_step(
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
+    ) -> StepResult:
+        calls.append(prompt)
+        if prompt == "two":
             return StepResult(
                 status="failed",
                 error_type="completion_missing",
@@ -53,8 +65,8 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
             )
         return StepResult(
             status="completed",
-            output={"value": step_definition["output"]["value"]},
-            agent_name=step_definition["agent"],
+            output={"value": output["value"]},
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -93,19 +105,32 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
 def test_run_workflow_stores_completed_step_state_for_later_references(monkeypatch):
     seen_step_definitions: list[dict[str, Any]] = []
 
-    def fake_execute_step(step_definition: dict[str, Any]) -> StepResult:
-        seen_step_definitions.append(step_definition)
-        if step_definition["prompt"] == "Write a draft.":
+    def fake_execute_step(
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
+    ) -> StepResult:
+        seen_step_definitions.append(
+            {
+                "agent": agent,
+                "input": input,
+                "output": output,
+                "prompt": prompt,
+            }
+        )
+        if prompt == "Write a draft.":
             return StepResult(
                 status="completed",
                 output={"title": "Draft Title"},
-                agent_name=step_definition["agent"],
+                agent_name=agent,
             )
         return StepResult(
             status="completed",
             output={"reviewed_title": "Reviewed Draft Title"},
             resolved_input={"title": "Draft Title"},
-            agent_name=step_definition["agent"],
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -163,12 +188,25 @@ def test_run_workflow_stores_completed_step_state_for_later_references(monkeypat
 def test_run_workflow_injects_default_agent_before_execution(monkeypatch):
     seen_step_definition: dict[str, Any] = {}
 
-    def fake_execute_step(step_definition: dict[str, Any]) -> StepResult:
-        seen_step_definition.update(step_definition)
+    def fake_execute_step(
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
+    ) -> StepResult:
+        seen_step_definition.update(
+            {
+                "agent": agent,
+                "input": input,
+                "output": output,
+                "prompt": prompt,
+            }
+        )
         return StepResult(
             status="completed",
             output={"value": "draft"},
-            agent_name=step_definition["agent"],
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -187,10 +225,16 @@ def test_run_workflow_injects_default_agent_before_execution(monkeypatch):
 
 
 def test_run_workflow_rejects_completed_step_without_agent_name(monkeypatch):
-    def fake_execute_step(step_definition: dict[str, Any]) -> StepResult:
+    def fake_execute_step(
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
+    ) -> StepResult:
         return StepResult(
             status="completed",
-            output={"value": step_definition["prompt"]},
+            output={"value": prompt},
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -208,19 +252,25 @@ def test_run_workflow_rejects_completed_step_without_agent_name(monkeypatch):
 
 
 def test_run_workflow_stores_null_input_for_completed_steps(monkeypatch):
-    def fake_execute_step(step_definition: dict[str, Any]) -> StepResult:
-        if step_definition["prompt"] == "Write a draft.":
+    def fake_execute_step(
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
+    ) -> StepResult:
+        if prompt == "Write a draft.":
             return StepResult(
                 status="completed",
                 output={"title": "Draft Title"},
                 resolved_input=None,
-                agent_name=step_definition["agent"],
+                agent_name=agent,
             )
         return StepResult(
             status="completed",
             output={"reviewed_title": "Reviewed Draft Title"},
             resolved_input=None,
-            agent_name=step_definition["agent"],
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)

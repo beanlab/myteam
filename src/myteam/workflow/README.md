@@ -25,7 +25,7 @@ From outside the package, the flow is:
 2. `workflow.parser.load_workflow(...)` loads and validates the authored YAML.
 3. `workflow.engine.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.steps.execute_step(...)`:
-   - receives a resolved step definition from the engine
+   - receives the resolved step values from the engine
    - chooses the configured agent and backend
    - builds the prompt
    - runs an interactive terminal session
@@ -62,7 +62,7 @@ The terminal contract is:
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
 - [steps.py](steps.py)
-  Owns single-step execution: accept a fully resolved step definition, select agent/backend, build prompt, run session, validate result, and return `StepResult`.
+  Owns single-step execution: accept resolved step values, select agent/backend, build prompt, run session, validate result, and return `StepResult`.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.

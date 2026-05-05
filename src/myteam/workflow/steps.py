@@ -4,23 +4,27 @@ import json
 from typing import Any
 
 from .agents import get_agent_config, get_backend
-from .models import AgentConfig, StepDefinition, StepResult
+from .models import AgentConfig, StepResult
 from .terminal.session import run_terminal_session
 
 
 def execute_step(
-    step_definition: StepDefinition,
+    *,
+    prompt: str,
+    output: dict[str, Any],
+    input: Any = None,
+    agent: str | None = None,
 ) -> StepResult:
     transcript = ""
     try:
-        resolved_input = step_definition.get("input")
-        agent_name = _require_agent_name(step_definition)
+        resolved_input = input
+        agent_name = _require_agent_name(agent)
         agent_config = _resolve_agent_config(agent_name)
         backend = get_backend(agent_config["backend"])
         prompt_text = _build_step_prompt(
             resolved_input=resolved_input,
-            objective_text=step_definition["prompt"],
-            output_template=step_definition["output"],
+            objective_text=prompt,
+            output_template=output,
         )
         session_result = run_terminal_session(
             agent_config["argv"],
@@ -34,7 +38,7 @@ def execute_step(
                 "completion_missing",
                 "Workflow agent exited before reporting a structured result.",
             )
-        _validate_step_output(step_definition["output"], session_result.payload)
+        _validate_step_output(output, session_result.payload)
         return StepResult(
             status="completed",
             output=session_result.payload,
@@ -66,8 +70,7 @@ def execute_step(
         )
 
 
-def _require_agent_name(step_definition: StepDefinition) -> str:
-    agent_name = step_definition.get("agent")
+def _require_agent_name(agent_name: str | None) -> str:
     if not agent_name:
         raise StepExecutionError(
             "agent_resolution",

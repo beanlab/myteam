@@ -15,7 +15,12 @@ WORKFLOW_AGENT = "codex"
 
 
 def _execute_required_step(step_definition: dict) -> StepResult:
-    result = execute_step(step_definition)
+    result = execute_step(
+        agent=step_definition.get("agent"),
+        input=step_definition.get("input"),
+        output=step_definition["output"],
+        prompt=step_definition["prompt"],
+    )
     if result.status != "completed":
         raise RuntimeError(
             f"Workflow step failed with {result.error_type}: {result.error_message}"

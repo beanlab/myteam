@@ -53,7 +53,12 @@ def run_workflow(
                 error_message=str(exc),
             )
 
-        step_result = execute_step(resolved_step_definition)
+        step_result = execute_step(
+            agent=resolved_step_definition["agent"],
+            input=resolved_step_definition["input"],
+            output=resolved_step_definition["output"],
+            prompt=resolved_step_definition["prompt"],
+        )
         if step_result.status != "completed":
             if logger is not None:
                 if step_result.error_message:
