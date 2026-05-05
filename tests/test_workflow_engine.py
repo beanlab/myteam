@@ -12,20 +12,17 @@ def test_run_workflow_executes_steps_in_authored_order(monkeypatch):
     calls: list[str] = []
 
     def fake_execute_step(
-        step_name: str,
-        step_definition: dict[str, Any],
         *,
-        prior_steps,
-        default_agent: str,
-        inactivity_timeout_seconds: int,
-        graceful_shutdown_timeout_seconds: int,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
     ) -> StepResult:
-        calls.append(step_name)
+        calls.append(prompt)
         return StepResult(
-            step_name=step_name,
             status="completed",
-            output={"value": step_name},
-            agent_name=default_agent,
+            output={"value": output["value"]},
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -43,7 +40,7 @@ def test_run_workflow_executes_steps_in_authored_order(monkeypatch):
         }
     )
 
-    assert calls == ["first", "second"]
+    assert calls == ["one", "two"]
     assert result.status == "completed"
     assert result.output is not None
     assert list(result.output) == ["first", "second"]
@@ -53,27 +50,23 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
     calls: list[str] = []
 
     def fake_execute_step(
-        step_name: str,
-        step_definition: dict[str, Any],
         *,
-        prior_steps,
-        default_agent: str,
-        inactivity_timeout_seconds: int,
-        graceful_shutdown_timeout_seconds: int,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
     ) -> StepResult:
-        calls.append(step_name)
-        if step_name == "second":
+        calls.append(prompt)
+        if prompt == "two":
             return StepResult(
-                step_name=step_name,
                 status="failed",
                 error_type="completion_missing",
                 error_message="missing completion",
             )
         return StepResult(
-            step_name=step_name,
             status="completed",
-            output={"value": step_name},
-            agent_name=default_agent,
+            output={"value": output["value"]},
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -95,7 +88,7 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
         }
     )
 
-    assert calls == ["first", "second"]
+    assert calls == ["one", "two"]
     assert result.status == "failed"
     assert result.failed_step_name == "second"
     assert result.error_message == "missing completion"
@@ -110,31 +103,34 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
 
 
 def test_run_workflow_stores_completed_step_state_for_later_references(monkeypatch):
-    seen_prior_steps: list[dict[str, Any]] = []
+    seen_step_definitions: list[dict[str, Any]] = []
 
     def fake_execute_step(
-        step_name: str,
-        step_definition: dict[str, Any],
         *,
-        prior_steps,
-        default_agent: str,
-        inactivity_timeout_seconds: int,
-        graceful_shutdown_timeout_seconds: int,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
     ) -> StepResult:
-        seen_prior_steps.append(dict(prior_steps))
-        if step_name == "draft":
+        seen_step_definitions.append(
+            {
+                "agent": agent,
+                "input": input,
+                "output": output,
+                "prompt": prompt,
+            }
+        )
+        if prompt == "Write a draft.":
             return StepResult(
-                step_name=step_name,
                 status="completed",
                 output={"title": "Draft Title"},
-                agent_name=default_agent,
+                agent_name=agent,
             )
         return StepResult(
-            step_name=step_name,
             status="completed",
             output={"reviewed_title": "Reviewed Draft Title"},
             resolved_input={"title": "Draft Title"},
-            agent_name=default_agent,
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -159,17 +155,19 @@ def test_run_workflow_stores_completed_step_state_for_later_references(monkeypat
         }
     )
 
-    assert seen_prior_steps == [
-        {},
-        {
-            "draft": {
-                "prompt": "Write a draft.",
-                "input": None,
-                "agent": "codex",
-                "output": {"title": "Draft Title"},
-            }
-        },
-    ]
+    assert len(seen_step_definitions) == 2
+    assert seen_step_definitions[0] == {
+        "prompt": "Write a draft.",
+        "output": {"title": "draft title"},
+        "input": None,
+        "agent": "codex",
+    }
+    assert seen_step_definitions[1] == {
+        "input": {"title": "Draft Title"},
+        "prompt": "Review the draft.",
+        "output": {"reviewed_title": "reviewed title"},
+        "agent": "codex",
+    }
     assert result.status == "completed"
     assert result.output == {
         "draft": {
@@ -187,26 +185,28 @@ def test_run_workflow_stores_completed_step_state_for_later_references(monkeypat
     }
 
 
-def test_run_workflow_passes_runtime_settings_through_to_executor(monkeypatch):
-    seen: dict[str, Any] = {}
+def test_run_workflow_injects_default_agent_before_execution(monkeypatch):
+    seen_step_definition: dict[str, Any] = {}
 
     def fake_execute_step(
-        step_name: str,
-        step_definition: dict[str, Any],
         *,
-        prior_steps,
-        default_agent: str,
-        inactivity_timeout_seconds: int,
-        graceful_shutdown_timeout_seconds: int,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
     ) -> StepResult:
-        seen["default_agent"] = default_agent
-        seen["inactivity_timeout_seconds"] = inactivity_timeout_seconds
-        seen["graceful_shutdown_timeout_seconds"] = graceful_shutdown_timeout_seconds
+        seen_step_definition.update(
+            {
+                "agent": agent,
+                "input": input,
+                "output": output,
+                "prompt": prompt,
+            }
+        )
         return StepResult(
-            step_name=step_name,
             status="completed",
-            output={"value": step_name},
-            agent_name=default_agent,
+            output={"value": "draft"},
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -217,34 +217,24 @@ def test_run_workflow_passes_runtime_settings_through_to_executor(monkeypatch):
                 "prompt": "Write a draft.",
                 "output": {"value": "draft"},
             }
-        },
-        default_agent="test-agent",
-        inactivity_timeout_seconds=12,
-        graceful_shutdown_timeout_seconds=7,
+        }
     )
 
     assert result.status == "completed"
-    assert seen == {
-        "default_agent": "test-agent",
-        "inactivity_timeout_seconds": 12,
-        "graceful_shutdown_timeout_seconds": 7,
-    }
+    assert seen_step_definition["agent"] == "codex"
 
 
 def test_run_workflow_rejects_completed_step_without_agent_name(monkeypatch):
     def fake_execute_step(
-        step_name: str,
-        step_definition: dict[str, Any],
         *,
-        prior_steps,
-        default_agent: str,
-        inactivity_timeout_seconds: int,
-        graceful_shutdown_timeout_seconds: int,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
     ) -> StepResult:
         return StepResult(
-            step_name=step_name,
             status="completed",
-            output={"value": step_name},
+            output={"value": prompt},
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -263,28 +253,24 @@ def test_run_workflow_rejects_completed_step_without_agent_name(monkeypatch):
 
 def test_run_workflow_stores_null_input_for_completed_steps(monkeypatch):
     def fake_execute_step(
-        step_name: str,
-        step_definition: dict[str, Any],
         *,
-        prior_steps,
-        default_agent: str,
-        inactivity_timeout_seconds: int,
-        graceful_shutdown_timeout_seconds: int,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any,
+        agent: str,
     ) -> StepResult:
-        if step_name == "draft":
+        if prompt == "Write a draft.":
             return StepResult(
-                step_name=step_name,
                 status="completed",
                 output={"title": "Draft Title"},
                 resolved_input=None,
-                agent_name=default_agent,
+                agent_name=agent,
             )
         return StepResult(
-            step_name=step_name,
             status="completed",
             output={"reviewed_title": "Reviewed Draft Title"},
             resolved_input=None,
-            agent_name=default_agent,
+            agent_name=agent,
         )
 
     monkeypatch.setattr("myteam.workflow.engine.execute_step", fake_execute_step)
@@ -323,4 +309,3 @@ def test_run_workflow_stores_null_input_for_completed_steps(monkeypatch):
             "output": {"reviewed_title": "Reviewed Draft Title"},
         },
     }
-

@@ -39,12 +39,12 @@ def workflow_candidates(base: Path, workflow: str, prefix: str | Path | None = N
     requested_path = root.joinpath(*workflow.split("/"))
     candidates: list[Path] = []
 
-    if requested_path.suffix in {".yaml", ".yml"}:
+    if requested_path.suffix in {".yaml", ".yml", ".py"}:
         if requested_path.exists():
             candidates.append(requested_path)
         return candidates
 
-    for suffix in (".yaml", ".yml"):
+    for suffix in (".yaml", ".yml", ".py"):
         candidate = requested_path.with_suffix(suffix)
         if candidate.exists():
             candidates.append(candidate)

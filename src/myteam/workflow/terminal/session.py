@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 import threading
-import time
 
 from .pty_session import PtySession
 from .recording import TerminalRecording
@@ -23,7 +22,6 @@ def run_terminal_session(
     initial_input: bytes,
     exit_input: bytes,
     inactivity_timeout_seconds: int = 300,
-    graceful_shutdown_timeout_seconds: int = 30,
 ) -> TerminalSessionResult:
     recording = TerminalRecording()
     with ResultChannel() as result_channel:
@@ -36,7 +34,6 @@ def run_terminal_session(
                 session,
                 result_channel,
                 exit_input=exit_input,
-                graceful_shutdown_timeout_seconds=graceful_shutdown_timeout_seconds,
             )
 
             sent_initial_input = False
@@ -66,7 +63,6 @@ def _start_result_watcher(
     result_channel: ResultChannel,
     *,
     exit_input: bytes,
-    graceful_shutdown_timeout_seconds: int,
 ) -> None:
     def watch() -> None:
         while not result_channel.closed.is_set():
@@ -74,14 +70,6 @@ def _start_result_watcher(
             if payload is None:
                 continue
             session.enqueue_input(exit_input)
-            if graceful_shutdown_timeout_seconds > 0:
-                time.sleep(graceful_shutdown_timeout_seconds)
-                process = session.process
-                if process is not None and process.poll() is None:
-                    process.terminate()
-                    time.sleep(0.2)
-                    if process.poll() is None:
-                        process.kill()
             return
 
     threading.Thread(target=watch, daemon=True).start()
