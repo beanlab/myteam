@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.2.14
+
+- Changed the experimental `execute_step(...)` API to accept resolved step values as explicit
+  keyword arguments instead of a full workflow `StepDefinition` mapping.
+- Moved workflow reference resolution and default-agent injection into the workflow engine so
+  single-step execution only handles agent selection, prompt construction, terminal execution, and
+  output validation.
+
 ## 0.2.13
 
 - Reworked experimental workflow completion so step agents now report structured results with
