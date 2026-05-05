@@ -48,7 +48,6 @@ class StepResult:
     - ``completion_missing``: the agent session ended without producing a structured result.
     - ``output_validation``: the completion payload content did not satisfy the authored output template.
     """
-    step_name: str
     status: str
     output: Any | None = None
     resolved_input: Any | None = None

@@ -3,24 +3,18 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .agents import DEFAULT_AGENT, get_agent_config, get_backend
-from .models import AgentConfig, StepDefinition, StepResult, WorkflowOutput
-from .reference_resolver import resolve_references
+from .agents import get_agent_config, get_backend
+from .models import AgentConfig, StepDefinition, StepResult
 from .terminal.session import run_terminal_session
 
+
 def execute_step(
-    step_name: str,
     step_definition: StepDefinition,
-    *,
-    prior_steps: WorkflowOutput,
-    default_agent: str = DEFAULT_AGENT,
-    inactivity_timeout_seconds: int = 300,
-    graceful_shutdown_timeout_seconds: int = 30,
 ) -> StepResult:
     transcript = ""
     try:
-        resolved_input = _resolve_step_input(step_definition, prior_steps)
-        agent_name = step_definition.get("agent", default_agent)
+        resolved_input = step_definition.get("input")
+        agent_name = _require_agent_name(step_definition)
         agent_config = _resolve_agent_config(agent_name)
         backend = get_backend(agent_config["backend"])
         prompt_text = _build_step_prompt(
@@ -32,8 +26,7 @@ def execute_step(
             agent_config["argv"],
             initial_input=backend.encode_input(prompt_text),
             exit_input=backend.encode_exit(),
-            inactivity_timeout_seconds=inactivity_timeout_seconds,
-            graceful_shutdown_timeout_seconds=graceful_shutdown_timeout_seconds,
+            inactivity_timeout_seconds=300,
         )
         transcript = session_result.transcript
         if session_result.payload is None:
@@ -43,7 +36,6 @@ def execute_step(
             )
         _validate_step_output(step_definition["output"], session_result.payload)
         return StepResult(
-            step_name=step_name,
             status="completed",
             output=session_result.payload,
             resolved_input=resolved_input,
@@ -53,7 +45,6 @@ def execute_step(
         )
     except StepExecutionError as exc:
         return StepResult(
-            step_name=step_name,
             status="failed",
             error_type=exc.error_type,
             error_message=exc.error_message,
@@ -61,7 +52,6 @@ def execute_step(
         )
     except TimeoutError as exc:
         return StepResult(
-            step_name=step_name,
             status="failed",
             error_type="timeout",
             error_message=str(exc),
@@ -69,7 +59,6 @@ def execute_step(
         )
     except OSError as exc:
         return StepResult(
-            step_name=step_name,
             status="failed",
             error_type="agent_launch",
             error_message=f"Failed to launch workflow agent: {exc}",
@@ -77,13 +66,14 @@ def execute_step(
         )
 
 
-def _resolve_step_input(step_definition: StepDefinition, prior_steps: WorkflowOutput) -> Any:
-    if "input" not in step_definition:
-        return None
-    try:
-        return resolve_references(step_definition["input"], prior_steps)
-    except ValueError as exc:
-        raise StepExecutionError("reference_resolution", str(exc)) from exc
+def _require_agent_name(step_definition: StepDefinition) -> str:
+    agent_name = step_definition.get("agent")
+    if not agent_name:
+        raise StepExecutionError(
+            "agent_resolution",
+            "Step definition is missing required field 'agent'.",
+        )
+    return agent_name
 
 
 def _resolve_agent_config(agent_name: str) -> AgentConfig:
