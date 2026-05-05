@@ -126,3 +126,6 @@ def feature_pipeline():
                 "implementation": implement_result.output,
                 "review": review_result.output
             }
+
+def main():
+    return feature_pipeline()

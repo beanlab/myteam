@@ -100,6 +100,35 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
     assert seen["path"] == workflow_file
 
 
+def test_start_runs_python_workflow_file(run_myteam_inprocess, initialized_project: Path):
+    workflow_file = initialized_project / ".myteam" / "demo.py"
+    workflow_file.write_text(
+        "from pathlib import Path\n"
+        "\n"
+        "def main():\n"
+        "    Path('workflow_ran.txt').write_text('ok', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert (initialized_project / "workflow_ran.txt").read_text(encoding="utf-8") == "ok"
+
+
+def test_start_fails_for_python_workflow_without_main(run_myteam_inprocess, initialized_project: Path):
+    workflow_file = initialized_project / ".myteam" / "demo.py"
+    workflow_file.write_text("VALUE = 1\n", encoding="utf-8")
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "must define a callable main()" in result.stderr
+
+
 def test_start_fails_when_workflow_file_is_missing(run_myteam_inprocess, initialized_project: Path):
     result = run_myteam_inprocess(initialized_project, "start", "missing")
 
