@@ -104,6 +104,38 @@ issue_url="$(gh issue create \
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
+## Priority
+
+Backlog priority is a GitHub Project field, not an issue label. When
+the user asks for a priority during issue creation, add the issue to
+the project first, then update the project item.
+
+Use these current IDs for the Bean Lab backlog project:
+
+- Project ID: `PVT_kwDOCA0Mqs4BW0Oo`
+- Priority field ID: `PVTSSF_lADOCA0Mqs4BW0OozhSFeN8`
+- `P0` option ID: `79628723`
+- `P1` option ID: `0a877460`
+- `P2` option ID: `da944a9c`
+
+Find the project item, then set the requested priority:
+
+```sh
+gh project item-list 13 \
+  --owner beanlab \
+  --format json \
+  --jq '.items[] | select(.content.number == <issue-number>)'
+
+gh project item-edit \
+  --id <project-item-id> \
+  --project-id PVT_kwDOCA0Mqs4BW0Oo \
+  --field-id PVTSSF_lADOCA0Mqs4BW0OozhSFeN8 \
+  --single-select-option-id <priority-option-id>
+```
+
+If the fixed IDs stop working, refresh them with
+`gh project field-list 13 --owner beanlab --format json --limit 100`.
+
 ## Output
 
 After successful issue creation and project insertion, output only the
