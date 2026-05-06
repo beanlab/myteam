@@ -208,21 +208,23 @@ Inputs:
 - `<path>` is a slash-delimited workflow path such as `dev/frontend`.
 - The command resolves that path relative to the selected local root.
 - The command accepts any standard YAML workflow file extension for the resolved file, including
-  `.yaml` and `.yml`.
+  `.yaml` and `.yml`, plus Python workflow files ending in `.py`.
 - `--verbose` enables workflow lifecycle logging on standard error.
 
 Expected outcome on success:
 
 - Resolves the workflow file from the selected local tree using the requested workflow path.
-- Loads and validates the authored workflow definition.
-- Executes the workflow's steps in order.
+- For YAML workflows, loads and validates the authored workflow definition and executes the
+  workflow's steps in order.
+- For Python workflows, executes the workflow file as a separate Python process.
 - Supplies each configured workflow agent with the authored step prompt when the step session starts.
 - Allows later steps to reference completed state from earlier steps.
 - Returns success only after all workflow steps complete in order.
 
 User-visible result:
 
-- The caller can invoke a workflow stored at `.myteam/dev/frontend.yaml` with `myteam start dev/frontend`.
+- The caller can invoke a workflow stored at `.myteam/dev/frontend.yaml` or
+  `.myteam/dev/frontend.py` with `myteam start dev/frontend`.
 - `--prefix` changes which local root is searched for workflows in the same way it does for other
   project-local tree commands.
 - Workflow execution mirrors the child session's terminal output to standard output as the workflow
@@ -232,11 +234,12 @@ User-visible result:
 
 Failure conditions that matter at the interface:
 
-- If the target path does not resolve to a workflow file with a supported YAML extension in the
+- If the target path does not resolve to a workflow file with a supported extension in the
   selected local tree, the command exits with an error.
 - If the workflow definition is malformed or references an unknown agent, the command exits with an error.
 - If any workflow step fails, the command stops at that first failing step, does not execute later
   steps, and exits with an error.
+- If a Python workflow exits non-zero, `myteam` exits with the same non-zero status.
 
 ### `myteam workflow-result [--json <json> | --text <text>]`
 
@@ -270,7 +273,7 @@ Failure conditions that matter at the interface:
 - If the parent runner rejects the payload or acknowledgement is invalid, the command exits with an
   error.
 
-### Workflow File Format
+### YAML Workflow File Format
 
 Workflow definitions are user-authored YAML files stored in the selected local tree.
 
@@ -319,6 +322,21 @@ Authoring rules that matter at the interface:
 - Workflow files are validated before execution begins.
 - The step agent must report the final structured result through `myteam workflow-result` rather
   than terminal markers or free-form prose.
+
+### Python Workflow Execution
+
+Python workflows are user-authored `.py` files stored in the selected local tree.
+
+Execution rules that matter at the interface:
+
+- A Python workflow file is run as a script in a separate Python process using the active Python
+  executable.
+- The child process working directory is the directory containing the workflow file.
+- The child process receives the selected project-local root through the internal
+  `MYTEAM_PROJECT_ROOT` environment variable.
+- The Python workflow is responsible for invoking its own entry point, such as with an
+  `if __name__ == "__main__":` block.
+- `myteam` propagates the Python workflow process exit status.
 
 Reference semantics:
 

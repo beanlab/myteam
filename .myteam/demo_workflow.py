@@ -135,3 +135,7 @@ def feature_pipeline():
 
 def main():
     return feature_pipeline()
+
+
+if __name__ == "__main__":
+    main()
