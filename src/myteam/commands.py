@@ -1,7 +1,6 @@
 """Command implementations for the myteam CLI."""
 from __future__ import annotations
 
-import importlib.util
 import os
 import shutil
 import subprocess
@@ -178,20 +177,11 @@ def _log(message: str) -> None:
     print(message, file=sys.stderr)
 
 
-def _run_python_workflow(path: Path) -> None:
-    module_name = f"_myteam_workflow_{path.stem}"
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    if spec is None or spec.loader is None:
-        raise ValueError(f"Could not load Python workflow module from {path}.")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    main = getattr(module, "main", None)
-    if not callable(main):
-        raise ValueError(f"Python workflow '{path.name}' must define a callable main().")
-
-    main()
+def _run_python_workflow(path: Path, *, project_root: Path) -> int:
+    env = dict(os.environ)
+    env[PROJECT_ROOT_ENV_VAR] = str(project_root)
+    result = subprocess.run([sys.executable, str(path)], cwd=path.parent, env=env, check=False)
+    return result.returncode
 
 
 def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
@@ -207,10 +197,12 @@ def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False
 
     if path.suffix == ".py":
         try:
-            _run_python_workflow(path)
-        except Exception as exc:
-            print(f"Failed to run workflow '{workflow}': {exc}", file=sys.stderr)
+            returncode = _run_python_workflow(path, project_root=agents_root(base_dir(), prefix))
+        except OSError as exc:
+            print(f"Failed to execute Python workflow '{workflow}': {exc}", file=sys.stderr)
             raise SystemExit(1)
+        if returncode != 0:
+            raise SystemExit(returncode)
         logger(f"Workflow '{workflow}' completed successfully.")
         return
 

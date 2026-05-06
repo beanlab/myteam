@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.2.15
+
+- Changed Python workflows launched by `myteam start` to run as separate Python script processes
+  instead of being imported and invoked inside the CLI process.
+- Python workflow processes now use the workflow file's containing directory as their working
+  directory, receive `MYTEAM_PROJECT_ROOT`, and propagate their exit status directly.
+
 ## 0.2.14
 
 - Changed the experimental `execute_step(...)` API to accept resolved step values as explicit
