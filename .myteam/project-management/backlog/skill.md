@@ -27,7 +27,7 @@ Bean Lab GitHub Project.
 These skills use the Bean Lab GitHub Project as the
 project-management surface:
 
-- Project URL: `https://github.com/orgs/beanlab/projects/13/views/1`
+- Project URL: `https://github.com/orgs/beanlab/projects/13`
 - Project owner: `beanlab`
 - Project number: `13`
 
