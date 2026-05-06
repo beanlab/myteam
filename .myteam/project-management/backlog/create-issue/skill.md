@@ -44,7 +44,7 @@ Use this issue body template:
 
 ```md
 Created on: <YYYY-MM-DD>
-Created by: <user or agent>
+Created by: <user>
 
 ## Details
 
@@ -89,7 +89,7 @@ project:
 issue_url="$(gh issue create \
   --title "<title>" \
   --body-file <body-file>)"
-# Set the GitHub issue type to bug, feature, task, or refactor.
+# Set the GitHub issue type to Bug, Feature, or Task.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
@@ -100,7 +100,7 @@ issue_url="$(gh issue create \
   --title "<title>" \
   --label "needs-clarification" \
   --body-file <body-file>)"
-# Set the GitHub issue type to bug, feature, task, or refactor.
+# Set the GitHub issue type to Bug, Feature, or Task.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
