@@ -25,9 +25,8 @@ The token must include the `project` scope. Check with
 
 Every issue must have a GitHub issue type:
 
-- `Bug`
-- `Feature`
-- `Task`
+- `Touch Code` - any work that involves the code
+- `Task` - something that needs doing, but doesn't involve changing code
 
 For labels, add `needs-clarification` only when the input is ambiguous or incomplete
 
@@ -89,7 +88,7 @@ project:
 issue_url="$(gh issue create \
   --title "<title>" \
   --body-file <body-file>)"
-# Set the GitHub issue type to Bug, Feature, or Task.
+# Set the GitHub issue type to `Task` or `Touch Code`.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
@@ -100,7 +99,7 @@ issue_url="$(gh issue create \
   --title "<title>" \
   --label "needs-clarification" \
   --body-file <body-file>)"
-# Set the GitHub issue type to Bug, Feature, or Task.
+# Set the GitHub issue type to `Task` or `Touch Code`.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
