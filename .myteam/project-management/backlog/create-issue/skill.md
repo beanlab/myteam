@@ -23,23 +23,13 @@ The token must include the `project` scope. Check with
 
 ## Issue Types and Labels
 
-Every issue must have exactly one GitHub issue type:
+Every issue must have a GitHub issue type:
 
-- `bug`
-- `feature`
-- `task`
-- `refactor`
+- `Bug`
+- `Feature`
+- `Task`
 
-Issue types are not labels. Do not create or apply labels named
-`bug`, `feature`, `task`, or `refactor` as a substitute for setting
-the issue type.
-
-Only one label is allowed by default:
-
-- `needs-clarification`, only when the input is ambiguous or incomplete
-
-Do not add any other labels unless the user explicitly changes this
-policy.
+For labels, add `needs-clarification` only when the input is ambiguous or incomplete
 
 ## Title Rules
 
