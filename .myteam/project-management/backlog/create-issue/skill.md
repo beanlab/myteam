@@ -23,18 +23,20 @@ The token must include the `project` scope. Check with
 
 ## Issue Types and Labels
 
-Every issue must have exactly one type label:
+Every issue must have exactly one GitHub issue type:
 
 - `bug`
 - `feature`
 - `task`
 - `refactor`
 
-Only these labels are allowed by default:
+Issue types are not labels. Do not create or apply labels named
+`bug`, `feature`, `task`, or `refactor` as a substitute for setting
+the issue type.
 
-- one issue type label: `bug`, `feature`, `task`, or `refactor`
-- `needs clarification`, only when the input is ambiguous or
-  incomplete
+Only one label is allowed by default:
+
+- `needs-clarification`, only when the input is ambiguous or incomplete
 
 Do not add any other labels unless the user explicitly changes this
 policy.
@@ -74,25 +76,30 @@ when known.>
 
 - Create issues automatically once enough input exists; do not add a
   confirmation step.
-- Assign the best-fit type label.
+- Assign the best-fit GitHub issue type.
 - Creating a backlog issue is about capturing the ideas immediately on
   hand, not fleshing out the idea or preparing for implementation.
 - Draw relevant information from the conversation when drafting the
   issue.
 - Think through what information should and should not be included.
 - If input is ambiguous but there is enough to create a placeholder,
-  create the issue, add `needs clarification`, and fill the body using
+  create the issue, add `needs-clarification`, and fill the body using
   best-effort inference.
 - Prefer `--body-file` for multi-line bodies.
 - Always add the created issue to Bean Lab project `13`.
+- If the available `gh issue create` or `gh issue edit` commands cannot
+  set the issue type directly, use the GitHub UI or an appropriate
+  GitHub API call to set the issue type. Do not consider issue creation
+  complete until the GitHub issue type is set.
 
-Create the issue, then add it to the project:
+Create the issue with the correct GitHub issue type, then add it to the
+project:
 
 ```sh
 issue_url="$(gh issue create \
   --title "<title>" \
-  --label "<type>" \
   --body-file <body-file>)"
+# Set the GitHub issue type to bug, feature, task, or refactor.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
@@ -101,9 +108,9 @@ For unclear input, add the clarification label:
 ```sh
 issue_url="$(gh issue create \
   --title "<title>" \
-  --label "<type>" \
-  --label "needs clarification" \
+  --label "needs-clarification" \
   --body-file <body-file>)"
+# Set the GitHub issue type to bug, feature, task, or refactor.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 

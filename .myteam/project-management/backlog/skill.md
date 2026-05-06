@@ -120,8 +120,10 @@ GitHub also tracks:
 
 - Number or URL: stable identifiers for referencing the issue.
 - Title: short summary of the work or problem.
+- Type: exactly one of `bug`, `feature`, `task`, or `refactor`.
 - Body: durable backlog description using the structure above.
-- Labels: typed metadata used for filtering.
+- Labels: optional metadata used for filtering. By default, only use
+  `needs-clarification` when the issue is ambiguous or incomplete.
 - State: `open` or `closed`.
 - Comments: discussion, follow-up, and implementation notes.
 
