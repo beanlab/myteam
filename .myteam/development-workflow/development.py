@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_ROOT = Path(
+    os.environ.get("MYTEAM_PROJECT_ROOT", Path(__file__).resolve().parents[1])
+).resolve()
+REPO_ROOT = LOCAL_ROOT.parent
 SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))

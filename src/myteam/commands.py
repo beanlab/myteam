@@ -36,6 +36,17 @@ def write_py_script(path: Path, contents: str) -> None:
 
 
 def _selected_root(prefix: str | None) -> Path:
+    configured_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    if configured_root:
+        configured_path = Path(configured_root)
+        if prefix in (None, DEFAULT_LOCAL_ROOT):
+            return configured_path
+        try:
+            return agents_root(configured_path.parent, prefix)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1)
+
     try:
         return agents_root(base_dir(), prefix)
     except ValueError as exc:

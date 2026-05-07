@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-DEVELOPMENT_WORKFLOW = ROOT / ".myteam" / "development.py"
+DEVELOPMENT_WORKFLOW = ROOT / ".myteam" / "development-workflow" / "development.py"
 
 
 def load_development_workflow():
