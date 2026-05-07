@@ -8,7 +8,7 @@ from .models import AgentConfig, StepResult
 from .terminal.session import run_terminal_session
 
 
-def execute_step(
+def run_agent(
     *,
     prompt: str,
     output: dict[str, Any],

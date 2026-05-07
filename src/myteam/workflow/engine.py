@@ -15,7 +15,7 @@ from .models import (
     WorkflowRunResult,
 )
 from .reference_resolver import resolve_references
-from .steps import execute_step
+from .steps import run_agent
 
 
 def run_workflow(
@@ -53,7 +53,7 @@ def run_workflow(
                 error_message=str(exc),
             )
 
-        step_result = execute_step(
+        step_result = run_agent(
             agent=resolved_step_definition["agent"],
             input=resolved_step_definition["input"],
             output=resolved_step_definition["output"],

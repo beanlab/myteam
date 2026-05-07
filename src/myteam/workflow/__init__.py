@@ -2,6 +2,6 @@
 
 from .engine import run_workflow
 from .parser import load_workflow
-from .steps import execute_step
+from .steps import run_agent
 
-__all__ = ["execute_step", "load_workflow", "run_workflow"]
+__all__ = ["run_agent", "load_workflow", "run_workflow"]
