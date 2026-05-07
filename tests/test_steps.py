@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from myteam.workflow.steps import execute_step
+from myteam.workflow.steps import run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 
 
-def test_execute_step_returns_completed_result(monkeypatch):
+def test_run_agent_returns_completed_result(monkeypatch):
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -28,7 +28,7 @@ def test_execute_step_returns_completed_result(monkeypatch):
 
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
 
-    result = execute_step(
+    result = run_agent(
         agent="codex",
         prompt="Write a summary.",
         output={"summary": "short summary"},
@@ -41,13 +41,13 @@ def test_execute_step_returns_completed_result(monkeypatch):
     assert b"/quit" in seen["exit_input"]
 
 
-def test_execute_step_reports_missing_result(monkeypatch):
+def test_run_agent_reports_missing_result(monkeypatch):
     def fake_run_terminal_session(*_args, **_kwargs) -> TerminalSessionResult:
         return TerminalSessionResult(exit_code=0, transcript="runner transcript", payload=None)
 
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
 
-    result = execute_step(
+    result = run_agent(
         agent="codex",
         prompt="Write a summary.",
         output={"summary": "short summary"},
@@ -57,8 +57,8 @@ def test_execute_step_reports_missing_result(monkeypatch):
     assert result.error_type == "completion_missing"
 
 
-def test_execute_step_requires_explicit_agent():
-    result = execute_step(
+def test_run_agent_requires_explicit_agent():
+    result = run_agent(
         prompt="Write a summary.",
         output={"summary": "short summary"},
     )
@@ -68,7 +68,7 @@ def test_execute_step_requires_explicit_agent():
     assert result.error_message == "Step definition is missing required field 'agent'."
 
 
-def test_execute_step_preserves_literal_input(monkeypatch):
+def test_run_agent_preserves_literal_input(monkeypatch):
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -87,7 +87,7 @@ def test_execute_step_preserves_literal_input(monkeypatch):
 
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
 
-    result = execute_step(
+    result = run_agent(
         agent="codex",
         input={"topic": "release notes"},
         prompt="Write a summary.",

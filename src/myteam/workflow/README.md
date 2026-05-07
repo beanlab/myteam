@@ -24,7 +24,7 @@ From outside the package, the flow is:
 1. `commands.start(...)` resolves a workflow file path.
 2. `workflow.parser.load_workflow(...)` loads and validates the authored YAML.
 3. `workflow.engine.run_workflow(...)` executes steps in authored order.
-4. For each step, `workflow.steps.execute_step(...)`:
+4. For each step, `workflow.steps.run_agent(...)`:
    - receives the resolved step values from the engine
    - chooses the configured agent and backend
    - builds the prompt
@@ -47,7 +47,7 @@ The terminal contract is:
 ### Package Root
 
 - [__init__.py](__init__.py)
-  Exposes the main public workflow entrypoints: `execute_step`, `load_workflow`, and `run_workflow`.
+  Exposes the main public workflow entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
 
 - [parser.py](parser.py)
   Owns workflow-file loading and validation of the authored YAML structure.
