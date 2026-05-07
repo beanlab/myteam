@@ -11,7 +11,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from myteam.workflow import execute_step
+from myteam.workflow import run_agent
 from myteam.workflow.models import StepResult
 
 WORKFLOW_AGENT = "codex"
@@ -39,15 +39,13 @@ def run_step(
     input: Any | None = None,
     agent: str = WORKFLOW_AGENT,
 ) -> dict[str, Any]:
-    step_definition: dict[str, Any] = {
-        "agent": agent,
-        "prompt": prompt,
-        "output": output,
-    }
-    if input is not None:
-        step_definition["input"] = input
-
-    return require_completed(execute_step(step_definition))
+    result = run_agent(
+        agent=agent,
+        input=input,
+        output=output,
+        prompt=prompt,
+    )
+    return require_completed(result)
 
 
 def require_completed(result: StepResult) -> dict[str, Any]:
