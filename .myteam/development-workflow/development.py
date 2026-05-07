@@ -138,12 +138,7 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
             "project_number": PROJECT_NUMBER,
             "required_issue_sections": list(ISSUE_SECTIONS),
         },
-        prompt=(
-            "Run `myteam get skill project-management/backlog`. Identify the GitHub issue for this "
-            "development workflow from the Bean Lab project, or create one if needed. "
-            "Edit the issue body so it contains the required workflow sections. Return "
-            "the issue identifiers and a concise backlog summary."
-        ),
+        prompt="Your role is 'development-workflow/backlog'.",
         output=issue_output(
             backlog_summary="Short summary of the selected or created backlog issue.",
         ),
@@ -153,11 +148,7 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
 def scenarios_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt=(
-            "Update the issue body's Scenarios section. Write externally visible "
-            "behavior scenarios using context, action, and outcome. Return next_step "
-            "as scenarios if more scenario work is needed, otherwise design."
-        ),
+        prompt="Your role is 'development-workflow/scenarios'.",
         output=issue_output(
             scenarios_summary="Summary of scenario decisions recorded in the issue body.",
             next_step="scenarios or design",
@@ -168,12 +159,7 @@ def scenarios_step(state: dict[str, Any]) -> dict[str, Any]:
 def design_step(state: dict[str, Any]) -> dict[str, Any]:
     result = run_step(
         input=with_issue_sections(state),
-        prompt=(
-            "Load `development/feature-pipeline/framework-oriented-design`. Plan the "
-            "feature from the issue scenarios. Edit the issue body's Design section "
-            "with the implementation plan and any framework-oriented design decisions. "
-            "Return next_step as scenarios, design, or implement."
-        ),
+        prompt="Your role is 'development-workflow/design'.",
         output=issue_output(
             design_summary="Summary of design decisions recorded in the issue body.",
             next_step="scenarios, design, or implement",
@@ -187,12 +173,7 @@ def implement_step(state: dict[str, Any]) -> dict[str, Any]:
     set_project_status(state, "In progress")
     return run_step(
         input=with_issue_sections(state),
-        prompt=(
-            "Implement the feature according to the issue body's Scenarios and Design "
-            "sections. Run relevant tests. Edit the issue body's Implementation section "
-            "with the changes and test results. Return next_step as scenarios, design, "
-            "implement, or review."
-        ),
+        prompt="Your role is 'development-workflow/implement'.",
         output=issue_output(
             implementation_summary="Summary of implementation work recorded in the issue body.",
             test_results="Relevant test command results.",
@@ -204,12 +185,7 @@ def implement_step(state: dict[str, Any]) -> dict[str, Any]:
 def review_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt=(
-            "Review the implementation against the issue body's Scenarios and Design "
-            "sections. Also apply framework-oriented design and code-linter guidance. "
-            "Edit the issue body's Review section with findings and readiness. Return "
-            "next_step as scenarios, design, implement, review, or wrap_up."
-        ),
+        prompt="Your role is 'development-workflow/review'.",
         output=issue_output(
             review_summary="Summary of review findings recorded in the issue body.",
             ready=False,
@@ -221,12 +197,7 @@ def review_step(state: dict[str, Any]) -> dict[str, Any]:
 def wrap_up_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt=(
-            "Load `development/feature-pipeline/conclusion`. Complete the MVP wrap-up: "
-            "final checks, version decision, changelog, README/docs updates, and "
-            "project-myteam-update review when relevant. Edit the issue body's Wrap Up "
-            "section with the final readiness state."
-        ),
+        prompt="Your role is 'development-workflow/wrap-up'.",
         output=issue_output(
             wrap_up_summary="Summary of final wrap-up work recorded in the issue body.",
             ready_to_complete=False,
@@ -237,10 +208,7 @@ def wrap_up_step(state: dict[str, Any]) -> dict[str, Any]:
 def complete_step(state: dict[str, Any]) -> dict[str, Any]:
     result = run_step(
         input=with_issue_sections(state),
-        prompt=(
-            "Open a pull request for the current branch. Link the issue in the PR body. "
-            "Edit the issue body's Pull Request section with the PR URL and final status."
-        ),
+        prompt="Your role is 'development-workflow/complete'.",
         output=issue_output(
             pr_url="Pull request URL.",
             completion_summary="Summary of completion state recorded in the issue body.",
