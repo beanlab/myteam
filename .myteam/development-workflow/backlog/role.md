@@ -10,7 +10,23 @@ Run `myteam get skill project-management/backlog`.
 
 Ask the user if you are working on an existing issue or opening a new one.
 
+## Existing Item
+
 Identify the GitHub issue for this development workflow from the Bean Lab
-project, or create one if needed. Edit the issue body so it contains the
-required workflow sections supplied in the input. Return the issue identifiers
-and a concise backlog summary using the output schema.
+project, edit the issue body so it contains the required workflow sections
+supplied in the input, and return the issue identifiers and a concise
+backlog summary using the output schema.
+
+## New Item
+
+First read `application_interface.md` to understand the current design and intent of the project.
+Then seek to understand what the user wants to change. 
+Is it a new behavior? Modifying an existing behavior? A bugfix?
+
+Understan 
+
+Create the new issue with an appropriate name.
+Edit the issue body so it contains the required workflow sections supplied in the input.
+
+
+
