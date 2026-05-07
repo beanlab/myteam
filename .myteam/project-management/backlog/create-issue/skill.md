@@ -20,6 +20,10 @@ Created issues must be added to the Bean Lab GitHub Project:
 
 The token must include the `project` scope. Check with
 `gh auth status`; add it with `gh auth refresh -s project` if needed.
+If `gh auth status` reports an invalid environment token, verify that
+the specific `gh` command fails before stopping. Some environments have
+an invalid `GITHUB_TOKEN` while another authenticated path still lets
+the necessary command complete.
 
 ## Issue Types and Labels
 
@@ -28,7 +32,8 @@ Every issue must have a GitHub issue type:
 - `Touch Code` - any work that involves the code
 - `Task` - something that needs doing, but doesn't involve changing code
 
-For labels, add `needs-clarification` only when the input is ambiguous or incomplete
+For labels, add `needs-clarification` only when the input is ambiguous
+or incomplete.
 
 ## Title Rules
 
@@ -66,6 +71,9 @@ when known.>
 - Create issues automatically once enough input exists; do not add a
   confirmation step.
 - Assign the best-fit GitHub issue type.
+- If the human owner is known but their GitHub username is not, record
+  the owner in the issue body and do not guess an assignee. Assign the
+  issue only when the username is known.
 - Creating a backlog issue is about capturing the ideas immediately on
   hand, not fleshing out the idea or preparing for implementation.
 - Draw relevant information from the conversation when drafting the
@@ -88,7 +96,7 @@ project:
 issue_url="$(gh issue create \
   --title "<title>" \
   --body-file <body-file>)"
-# Set the GitHub issue type to `Task` or `Touch Code`.
+# Set the GitHub issue type to `Task` or `Touch Code`, then add it.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
 
@@ -99,9 +107,48 @@ issue_url="$(gh issue create \
   --title "<title>" \
   --label "needs-clarification" \
   --body-file <body-file>)"
-# Set the GitHub issue type to `Task` or `Touch Code`.
+# Set the GitHub issue type to `Task` or `Touch Code`, then add it.
 gh project item-add 13 --owner beanlab --url "$issue_url"
 ```
+
+If `gh issue create` and `gh issue edit` cannot set the GitHub issue
+type directly, use the GraphQL API.
+
+Find the repository issue type ID:
+
+```sh
+gh api graphql \
+  -f query='query {
+    repository(owner:"beanlab", name:"myteam") {
+      issueTypes(first:20) {
+        nodes { id name }
+      }
+    }
+  }'
+```
+
+Find the issue node ID:
+
+```sh
+gh issue view <issue-number-or-url> \
+  --json id,number,url
+```
+
+Set the issue type:
+
+```sh
+gh api graphql \
+  -f query='mutation($id:ID!, $type:ID!) {
+    updateIssue(input:{id:$id, issueTypeId:$type}) {
+      issue { number issueType { name } }
+    }
+  }' \
+  -f id=<issue-node-id> \
+  -f type=<issue-type-id>
+```
+
+Use the target repository in the issue-type query when creating issues
+outside `beanlab/myteam`.
 
 ## Priority
 

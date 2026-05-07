@@ -16,10 +16,12 @@ Bean Lab GitHub Project.
 - GitHub issue work uses the `gh` CLI with the current repository
   by default.
 - Check authentication with `gh auth status` when needed.
-- The token must include the `project` scope when reading project
-  items. Add it with `gh auth refresh -s project` if needed.
-- If authentication is missing or invalid, ask the user to provide a
-  GitHub token or authenticate `gh` before proceeding.
+- If `gh auth status` reports an environment-token problem, verify
+  whether the needed `gh` commands actually fail before stopping. Some
+  environments report an invalid `GITHUB_TOKEN` while the keychain or
+  approved command path still works.
+- If the needed `gh` commands cannot authenticate, ask the user to
+  provide a GitHub token or authenticate `gh` before proceeding.
 - Use `-R OWNER/REPO` when working outside the current repository.
 
 ## Project Target
@@ -120,7 +122,7 @@ GitHub also tracks:
 
 - Number or URL: stable identifiers for referencing the issue.
 - Title: short summary of the work or problem.
-- Type: exactly one of `bug`, `feature`, `task`, or `refactor`.
+- Type: exactly one of `Touch Code` or `Task`.
 - Body: durable backlog description using the structure above.
 - Labels: optional metadata used for filtering. By default, only use
   `needs-clarification` when the issue is ambiguous or incomplete.
@@ -151,4 +153,4 @@ for missing information when needed.
 ## Creating Issues
 
 When asked to create a GitHub issue, load and follow
-`project-management/github-issues/create-issue`.
+`project-management/backlog/create-issue`.
