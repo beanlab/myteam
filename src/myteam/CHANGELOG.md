@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.2.16
+
+- Renamed the experimental workflow step runner API from `execute_step(...)` to
+  `run_agent(...)` to better describe its responsibility.
+- Updated the workflow package exports, engine wiring, tests, and package documentation to use
+  the new `run_agent(...)` name.
+
 ## 0.2.15
 
 - Changed Python workflows launched by `myteam start` to run as separate Python script processes
