@@ -12,30 +12,6 @@ import tty
 RIGHT_ARROW = "\x1b[C"
 
 
-def _read_submitted_line() -> str:
-    return sys.stdin.readline().replace(RIGHT_ARROW, "").rstrip()
-
-
-def _mode_echo_initial() -> int:
-    print("READY", flush=True)
-    line = _read_submitted_line()
-    print(f"ECHO:{line}", flush=True)
-    return 0
-
-
-def _mode_reject_early_initial() -> int:
-    ready, _, _ = select.select([sys.stdin], [], [], 0.1)
-    if ready:
-        line = sys.stdin.readline()
-        print(f"EARLY_INPUT:{line.rstrip()}", flush=True)
-        return 3
-
-    print("READY", flush=True)
-    line = _read_submitted_line()
-    print(f"ECHO:{line}", flush=True)
-    return 0
-
-
 def _mode_require_submit_sequence() -> int:
     fd = sys.stdin.fileno()
     original_attrs = termios.tcgetattr(fd)
@@ -114,10 +90,6 @@ def main(argv: list[str]) -> int:
         return 2
 
     mode = argv[1]
-    if mode == "echo_initial":
-        return _mode_echo_initial()
-    if mode == "reject_early_initial":
-        return _mode_reject_early_initial()
     if mode == "require_submit_sequence":
         return _mode_require_submit_sequence()
     if mode == "wait_for_quit":

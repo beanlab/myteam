@@ -19,7 +19,6 @@ class TerminalSessionResult:
 def run_terminal_session(
     argv: list[str],
     *,
-    initial_input: bytes,
     exit_input: bytes,
     inactivity_timeout_seconds: int = 300,
 ) -> TerminalSessionResult:
@@ -36,7 +35,6 @@ def run_terminal_session(
                 exit_input=exit_input,
             )
 
-            sent_initial_input = False
             events = session.events()
             while True:
                 try:
@@ -46,9 +44,6 @@ def run_terminal_session(
                     break
 
                 recording.feed(chunk)
-                if not sent_initial_input:
-                    session.enqueue_input(initial_input)
-                    sent_initial_input = True
 
             payload = result_channel.wait(timeout=0.1)
             return TerminalSessionResult(
