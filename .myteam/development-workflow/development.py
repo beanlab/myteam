@@ -28,6 +28,7 @@ STATUS_OPTIONS = {
     "Backlog": "f75ad846",
     "Ready": "a6761bea",
     "In progress": "47fc9ee4",
+    "Waiting for Review": "f576f05d",
     "Done": "98236657",
 }
 
@@ -226,7 +227,7 @@ def complete_step(state: dict[str, Any]) -> dict[str, Any]:
             completion_summary="Summary of completion state recorded in the issue body.",
         ),
     )
-    set_project_status(result, "Done")
+    set_project_status(result, "Waiting for Review")
     return merge_issue_state(state, result)
 
 
