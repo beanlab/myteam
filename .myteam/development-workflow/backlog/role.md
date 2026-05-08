@@ -34,6 +34,14 @@ project, edit the issue body so it contains the required workflow sections
 supplied in the input, and return the issue identifiers and a concise
 backlog summary using the output schema.
 
+Choose and return `start_step` as `scenarios`, `design`, `implement`, or
+`review`. Do not return `wrap_up` as the starting step.
+
+Choose the earliest step that still needs meaningful work, unless the user has
+explicitly asked to resume at a later allowed step. Use `review` when the issue
+already has sufficient scenarios, design, and implementation context and the
+next useful action is review.
+
 ## New Item
 
 First read `application_interface.md` to understand the current design and intent of the project.
@@ -42,5 +50,5 @@ Is it a new behavior? Modifying an existing behavior? A bugfix?
 
 Create the new issue with an appropriate name.
 Edit the issue body so it contains the required workflow sections supplied in the input.
-
+Return `start_step` as `scenarios`.
 

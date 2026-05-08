@@ -57,6 +57,8 @@ BACKWARD_LIMIT = {
     "review": ("scenarios", "design", "implement"),
 }
 
+START_STEPS = ("scenarios", "design", "implement", "review")
+
 
 def main(feature_request: str | None = None) -> dict[str, Any]:
     require_feature_branch()
@@ -71,7 +73,12 @@ def main(feature_request: str | None = None) -> dict[str, Any]:
 
 
 def run_looping_steps(state: dict[str, Any]) -> dict[str, Any]:
-    step_name = "scenarios"
+    start_step = state.get("start_step", "scenarios")
+    if not isinstance(start_step, str):
+        raise RuntimeError("Workflow state start_step must be a string.")
+    validate_start_step(start_step)
+
+    step_name = start_step
     while step_name != "wrap_up":
         if step_name == "scenarios":
             result = scenarios_step(state)
@@ -145,6 +152,7 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
         prompt="Your role is 'development-workflow/backlog'.",
         output=issue_output(
             backlog_summary="Short summary of the selected or created backlog issue.",
+            start_step="scenarios, design, implement, or review",
         ),
     )
 
@@ -252,6 +260,20 @@ def validate_next_step(current_step: str, next_step: str) -> None:
             f"Step '{current_step}' cannot choose next_step '{next_step}'. "
             f"Allowed values: {allowed_text}."
         )
+
+
+def validate_start_step(start_step: str) -> None:
+    allowed = allowed_start_steps()
+    if start_step not in allowed:
+        allowed_text = ", ".join(allowed)
+        raise RuntimeError(
+            f"Workflow cannot start at step '{start_step}'. "
+            f"Allowed values: {allowed_text}."
+        )
+
+
+def allowed_start_steps() -> tuple[str, ...]:
+    return START_STEPS
 
 
 def allowed_next_steps(current_step: str) -> tuple[str, ...]:
