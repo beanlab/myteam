@@ -27,6 +27,17 @@ Ask:
 
 Run `myteam get skill project-management/backlog`.
 
+## New Item
+
+First read `application_interface.md` to understand the current design and 
+intent of the project. Then ask the user questions to understand what they
+want to change. Is it a new behavior? Modifying an existing behavior? A bugfix?
+
+Create the new issue with an appropriate name.
+Edit the issue body so it contains the required workflow sections supplied in the input.
+
+Return `start_step` as `scenarios`.
+
 ## Existing Item
 
 Identify the GitHub issue for this development workflow from the Bean Lab
@@ -41,14 +52,3 @@ Choose the earliest step that still needs meaningful work, unless the user has
 explicitly asked to resume at a later allowed step. Use `review` when the issue
 already has sufficient scenarios, design, and implementation context and the
 next useful action is review.
-
-## New Item
-
-First read `application_interface.md` to understand the current design and intent of the project.
-Then seek to understand what the user wants to change. 
-Is it a new behavior? Modifying an existing behavior? A bugfix?
-
-Create the new issue with an appropriate name.
-Edit the issue body so it contains the required workflow sections supplied in the input.
-Return `start_step` as `scenarios`.
-
