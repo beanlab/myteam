@@ -25,8 +25,6 @@ Ask:
 > provide the issue number or title. If new, describe the feature/request to
 > capture.
 
-Run `myteam get skill project-management/backlog`.
-
 ## New Item
 
 First read `application_interface.md` to understand the current design and 
