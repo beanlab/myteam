@@ -27,8 +27,7 @@ def run_agent(
             output_template=output,
         )
         session_result = run_terminal_session(
-            agent_config["argv"],
-            initial_input=backend.encode_input(prompt_text),
+            [*agent_config["argv"], prompt_text],
             exit_input=backend.encode_exit(),
             inactivity_timeout_seconds=300,
         )

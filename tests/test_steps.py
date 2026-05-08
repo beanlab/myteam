@@ -12,12 +12,10 @@ def test_run_agent_returns_completed_result(monkeypatch):
     def fake_run_terminal_session(
         argv: list[str],
         *,
-        initial_input: bytes,
         exit_input: bytes,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
         seen["argv"] = argv
-        seen["initial_input"] = initial_input.decode("utf-8", errors="replace")
         seen["exit_input"] = exit_input
         seen["inactivity_timeout_seconds"] = inactivity_timeout_seconds
         return TerminalSessionResult(
@@ -36,8 +34,9 @@ def test_run_agent_returns_completed_result(monkeypatch):
 
     assert result.status == "completed"
     assert result.output == {"summary": "done"}
-    assert seen["argv"] == ["codex"]
-    assert "workflow-result" in seen["initial_input"]
+    assert seen["argv"][0] == "codex"
+    assert len(seen["argv"]) == 2
+    assert "workflow-result" in seen["argv"][1]
     assert b"/quit" in seen["exit_input"]
 
 
@@ -74,11 +73,10 @@ def test_run_agent_preserves_literal_input(monkeypatch):
     def fake_run_terminal_session(
         argv: list[str],
         *,
-        initial_input: bytes,
         exit_input: bytes,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
-        seen["initial_input"] = initial_input.decode("utf-8", errors="replace")
+        seen["argv"] = argv
         return TerminalSessionResult(
             exit_code=0,
             transcript="runner transcript",
@@ -96,4 +94,4 @@ def test_run_agent_preserves_literal_input(monkeypatch):
 
     assert result.status == "completed"
     assert result.resolved_input == {"topic": "release notes"}
-    assert '"topic": "release notes"' in seen["initial_input"]
+    assert '"topic": "release notes"' in seen["argv"][1]
