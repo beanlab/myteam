@@ -13,6 +13,9 @@ class BackendAdapter:
     submit_text: Callable[[str], bytes]
     exit_text: str = "/quit"
 
+    def encode_input(self, text: str) -> bytes:
+        return self.submit_text(text)
+
     def encode_exit(self) -> bytes:
         return self.submit_text(self.exit_text)
 
