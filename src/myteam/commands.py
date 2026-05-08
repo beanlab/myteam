@@ -24,6 +24,7 @@ from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
 from .workflow.engine import run_workflow
 from .workflow.parser import load_workflow
+from .workflow.result_tool import workflow_result as submit_workflow_result
 
 
 def ensure_dir(path: Path) -> None:
@@ -176,6 +177,13 @@ def _log(message: str) -> None:
     print(message, file=sys.stderr)
 
 
+def _run_python_workflow(path: Path, *, project_root: Path) -> int:
+    env = dict(os.environ)
+    env[PROJECT_ROOT_ENV_VAR] = str(project_root)
+    result = subprocess.run([sys.executable, str(path)], cwd=path.parent, env=env, check=False)
+    return result.returncode
+
+
 def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
     logger = _log if verbose else (lambda msg: None)
 
@@ -186,6 +194,17 @@ def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False
         raise SystemExit(1)
 
     logger(f"Resolved workflow '{workflow}' to {path}")
+
+    if path.suffix == ".py":
+        try:
+            returncode = _run_python_workflow(path, project_root=agents_root(base_dir(), prefix))
+        except OSError as exc:
+            print(f"Failed to execute Python workflow '{workflow}': {exc}", file=sys.stderr)
+            raise SystemExit(1)
+        if returncode != 0:
+            raise SystemExit(returncode)
+        logger(f"Workflow '{workflow}' completed successfully.")
+        return
 
     try:
         workflow_definition = load_workflow(path)
@@ -210,6 +229,10 @@ def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False
     logger(f"Workflow '{workflow}' completed successfully.")
 
 
+def workflow_result(json: str | None = None, text: str | None = None) -> None:
+    submit_workflow_result(json=json, text=text)
+
+
 def version() -> str:
     return f"{APP_NAME} {__version__}"
 
@@ -228,6 +251,7 @@ __all__ = [
     "new_skill",
     "remove",
     "start",
+    "workflow_result",
     "update_roster",
     "changelog",
     "version",

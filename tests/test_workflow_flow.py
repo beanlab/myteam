@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from myteam.workflow.models import WorkflowRunResult
@@ -98,6 +99,67 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
 
     assert result.exit_code == 0
     assert seen["path"] == workflow_file
+
+
+def test_start_runs_python_workflow_file(run_myteam, initialized_project: Path):
+    workflow_file = initialized_project / ".myteam" / "demo.py"
+    workflow_file.write_text(
+        "import os\n"
+        "from pathlib import Path\n"
+        "\n"
+        "Path('workflow_ran.txt').write_text(\n"
+        "    f\"cwd={Path.cwd()}\\nroot={os.environ.get('MYTEAM_PROJECT_ROOT')}\\n\",\n"
+        "    encoding='utf-8',\n"
+        ")\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert (initialized_project / ".myteam" / "workflow_ran.txt").read_text(encoding="utf-8") == (
+        f"cwd={initialized_project / '.myteam'}\n"
+        f"root={initialized_project / '.myteam'}\n"
+    )
+
+
+def test_start_passes_python_workflow_exit_code(run_myteam, initialized_project: Path):
+    workflow_file = initialized_project / ".myteam" / "demo.py"
+    workflow_file.write_text("raise SystemExit(7)\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "start", "demo")
+
+    assert result.exit_code == 7
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+def test_start_runs_python_workflow_like_load_py(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    workflow_file = initialized_project / ".myteam" / "demo.py"
+    workflow_file.write_text("VALUE = 1\n", encoding="utf-8")
+
+    seen: dict[str, object] = {}
+
+    def fake_run(args, **kwargs):
+        seen["args"] = args
+        seen["kwargs"] = kwargs
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr("myteam.commands.subprocess.run", fake_run)
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert seen["args"] == [sys.executable, str(workflow_file)]
+    assert seen["kwargs"]["cwd"] == workflow_file.parent
+    assert seen["kwargs"]["check"] is False
+    assert seen["kwargs"]["env"]["MYTEAM_PROJECT_ROOT"] == str(initialized_project / ".myteam")
 
 
 def test_start_fails_when_workflow_file_is_missing(run_myteam_inprocess, initialized_project: Path):

@@ -1,5 +1,35 @@
 # Change Log
 
+## 0.2.16
+
+- Renamed the experimental workflow step runner API from `execute_step(...)` to
+  `run_agent(...)` to better describe its responsibility.
+- Updated the workflow package exports, engine wiring, tests, and package documentation to use
+  the new `run_agent(...)` name.
+
+## 0.2.15
+
+- Changed Python workflows launched by `myteam start` to run as separate Python script processes
+  instead of being imported and invoked inside the CLI process.
+- Python workflow processes now use the workflow file's containing directory as their working
+  directory, receive `MYTEAM_PROJECT_ROOT`, and propagate their exit status directly.
+
+## 0.2.14
+
+- Changed the experimental `execute_step(...)` API to accept resolved step values as explicit
+  keyword arguments instead of a full workflow `StepDefinition` mapping.
+- Moved workflow reference resolution and default-agent injection into the workflow engine so
+  single-step execution only handles agent selection, prompt construction, terminal execution, and
+  output validation.
+
+## 0.2.13
+
+- Reworked experimental workflow completion so step agents now report structured results with
+  `myteam workflow-result` over a private result channel instead of terminal marker scraping.
+- Split the workflow runtime into focused workflow, agent-backend, and terminal transport modules.
+- Added workflow package documentation and migration guidance for customized workflow wrappers that
+  still expect terminal `OBJECTIVE_COMPLETE` output.
+
 ## 0.2.12
 
 - Improved experimental workflow execution so each step prompt is injected only after the agent

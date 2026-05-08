@@ -282,7 +282,7 @@ Executes a workflow definition from the selected local root.
 - use slash-delimited workflow paths such as `dev/frontend`
 - workflow paths are resolved starting from the selected local root, which acts as the reference point for lookup
 - relative segments in workflow paths are allowed
-- workflow files are resolved with standard YAML extensions
+- workflow files are resolved with standard YAML extensions or `.py`
 - later workflow steps may reference completed state from earlier steps
 
 Examples:
@@ -291,6 +291,21 @@ Examples:
 myteam start dev/frontend
 myteam start release/checklist --prefix .agents
 myteam start dev/frontend --verbose
+```
+
+### `myteam workflow-result [--json <json> | --text <text>]`
+
+Submits the structured result for the current workflow step.
+
+This command is primarily agent-facing. Workflow prompts use it to report a final payload back to
+the parent workflow runner over the private result channel for that step.
+
+Examples:
+
+```bash
+myteam workflow-result --json '{"summary":"done"}'
+myteam workflow-result --text "done"
+printf '{"summary":"done"}\n' | myteam workflow-result
 ```
 
 ### `myteam changelog`
@@ -371,7 +386,7 @@ looks for a workflow file such as:
 If you use `--prefix .agents`, the same workflow path is resolved under `.agents/` instead.
 The selected local root is the reference point for resolution, not a containment boundary.
 
-Workflow files are YAML mappings where each top-level key is a step name. Each step defines:
+YAML workflow files are mappings where each top-level key is a step name. Each step defines:
 
 - `prompt`: the objective for that step
 - `agent`: optional agent name; omit it to use the default agent
@@ -403,8 +418,16 @@ Notes:
 
 - step names should use identifier-style names such as `gather_context`
 - `$step_name.output...` references pull data from earlier completed steps
+- the step agent reports its final structured result by calling `myteam workflow-result`
 - `myteam start` stops at the first failing step and does not continue to later steps
 - `--verbose` writes workflow lifecycle logs to standard error
+- successful `myteam start` runs currently mirror workflow session terminal output; they do not yet
+  print a separate final structured payload on stdout
+
+Python workflow files ending in `.py` are run as scripts in a separate Python process. The child
+process uses the directory containing the workflow file as its current working directory, receives
+the selected local root in `MYTEAM_PROJECT_ROOT`, and returns its exit status directly through
+`myteam start`.
 
 ## Why Use Myteam
 

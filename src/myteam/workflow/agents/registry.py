@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from .models import AgentConfig
+from ..models import AgentConfig
+
 
 DEFAULT_AGENT = "codex"
-DEFAULT_AGENT_CONFIG: AgentConfig = {
-    "name": DEFAULT_AGENT,
-    "argv": ["codex"],
-    "exit_text": "/quit\n",
-}
 
 _KNOWN_AGENTS: dict[str, AgentConfig] = {
-    DEFAULT_AGENT: DEFAULT_AGENT_CONFIG,
+    DEFAULT_AGENT: {
+        "name": DEFAULT_AGENT,
+        "argv": ["codex"],
+        "backend": "codex",
+    }
 }
 
 
