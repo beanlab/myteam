@@ -347,7 +347,13 @@ def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info("Team Members", folder, base_dir, ignore, is_role_dir, lambda role_dir: _get_folder_info(role_dir, "role"))
 
 
-def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
+def list_skills(
+    folder: Path,
+    base_dir: Path,
+    ignore: list[str],
+    *,
+    include_builtins: bool = True,
+):
     effective_ignore = list(ignore)
     entries: list[tuple[str, str]] = []
     if folder == base_dir and not _is_under_builtin_root(folder):
@@ -361,7 +367,12 @@ def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
             name = skill_dir.relative_to(base_dir).as_posix()
             entries.append((name, _get_folder_info(skill_dir, "skill")))
 
-    if folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
+    if (
+        include_builtins
+        and folder == base_dir
+        and not _is_under_builtin_root(folder)
+        and has_builtin_skill(BUILTIN_ROOT_NAME)
+    ):
         entries.append((BUILTIN_ROOT_NAME, _builtin_root_info()))
 
     _print_named_info("Skills", entries)

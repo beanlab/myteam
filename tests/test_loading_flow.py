@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam import __version__
+from myteam.utils import list_skills
 
 
 def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_project: Path):
@@ -265,6 +266,61 @@ def test_root_role_lists_packaged_builtin_skill_namespace(run_myteam, initialize
     assert "*********** Skills ***********" in result.stdout
     assert "---------- builtins ----------" in result.stdout
     assert "Packaged maintenance and upgrade helpers" in result.stdout
+
+
+def test_list_skills_defaults_to_packaged_builtin_skill_namespace(capsys, initialized_project: Path):
+    myteam_root = initialized_project / ".myteam"
+
+    list_skills(myteam_root, myteam_root, [])
+
+    output = capsys.readouterr().out
+    assert "*********** Skills ***********" in output
+    assert "---------- builtins ----------" in output
+    assert "Packaged maintenance and upgrade helpers" in output
+
+
+def test_list_skills_can_explicitly_include_packaged_builtin_skill_namespace(capsys, initialized_project: Path):
+    myteam_root = initialized_project / ".myteam"
+
+    list_skills(myteam_root, myteam_root, [], include_builtins=True)
+
+    output = capsys.readouterr().out
+    assert "*********** Skills ***********" in output
+    assert "---------- builtins ----------" in output
+    assert "Packaged maintenance and upgrade helpers" in output
+
+
+def test_list_skills_can_hide_packaged_builtin_skill_namespace(capsys, initialized_project: Path):
+    myteam_root = initialized_project / ".myteam"
+    skill_dir = myteam_root / "python"
+    skill_dir.mkdir()
+    (skill_dir / "skill.md").write_text(
+        "---\nname: Python\ndescription: Project Python skill\n---\n",
+        encoding="utf-8",
+    )
+
+    list_skills(myteam_root, myteam_root, [], include_builtins=False)
+
+    output = capsys.readouterr().out
+    assert "---------- python ----------" in output
+    assert "Project Python skill" in output
+    assert "---------- builtins ----------" not in output
+    assert "Packaged maintenance and upgrade helpers" not in output
+
+
+def test_list_skills_keeps_project_builtin_namespace_reserved_when_hiding_builtins(
+    capsys, initialized_project: Path
+):
+    myteam_root = initialized_project / ".myteam"
+    builtin_dir = myteam_root / "builtins"
+    builtin_dir.mkdir()
+    (builtin_dir / "skill.md").write_text("Project builtins skill\n", encoding="utf-8")
+
+    list_skills(myteam_root, myteam_root, [], include_builtins=False)
+
+    output = capsys.readouterr().out
+    assert "Project builtins skill" not in output
+    assert "---------- builtins ----------" not in output
 
 
 def test_builtin_changelog_skill_reports_newer_release_notes(run_myteam, initialized_project: Path):
