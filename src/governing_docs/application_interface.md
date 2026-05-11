@@ -29,6 +29,9 @@ The intended workflow is:
 - A loadable skill directory contains `skill.md` or `SKILL.md` and a `load.py`.
 - Packaged built-in skills also exist under the reserved `builtins/` namespace and are loadable even
   though they do not live in the project's local tree.
+- Generated loaders include the packaged `builtins` skill namespace in root skill listings by
+  default; callers using the loader helper can set `include_builtins=False` on `list_skills(...)` to
+  hide only the packaged built-in listing.
 - Instruction files may contain YAML frontmatter. When a role or skill is loaded, the frontmatter is not shown in the printed instructions.
 
 ## Local Root Selection
@@ -510,6 +513,9 @@ The following notes describe internal implementation constraints that support th
 - Loader helpers such as `get_active_myteam_root()` and the compatibility helper
   `get_myteam_root()` consult that environment variable so generated loaders, packaged built-in
   loaders, and older project loaders can all resolve the active local root consistently.
+- The `list_skills(folder, base_dir, ignore, *, include_builtins=True)` helper preserves existing
+  behavior when the keyword option is omitted, and `include_builtins=False` suppresses only the
+  packaged built-ins appended at the selected root.
 - `MYTEAM_PROJECT_ROOT` is an internal loader-execution mechanism, not part of the user-facing CLI
   contract.
 

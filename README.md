@@ -94,6 +94,9 @@ If you want a different project-local root, pass `--prefix <path>` to the suppor
 example, `myteam init --prefix .agents` creates the root role under `.agents/`.
 
 The packaged `builtins/` skill tree is available to load, but it is not created inside `.myteam/`.
+Generated loaders include this packaged namespace in skill listings by default. Custom loaders that
+call `list_skills(...)` can pass `include_builtins=False` to hide the packaged `builtins` entry while
+still listing project-defined skills.
 
 Edit `.myteam/role.md` with the instructions that should be given to the default agent. Then that agent can load its
 instructions with:
