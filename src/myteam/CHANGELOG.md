@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.2.17
+
+- Changed experimental workflow agent launches to pass the rendered step prompt as an agent
+  command-line argument instead of injecting it into the terminal session after startup.
+- Removed the workflow terminal session's dedicated initial-input path while preserving backend
+  submit handling for workflow agent exit commands.
+
 ## 0.2.16
 
 - Renamed the experimental workflow step runner API from `execute_step(...)` to
