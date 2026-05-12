@@ -159,12 +159,12 @@ def run_looping_steps(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_step(
-    *,
-    prompt: str,
-    output: dict[str, Any],
-    input: dict[str, Any],
-    agent: str = WORKFLOW_AGENT,
-    session_id: str | None = None,
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: dict[str, Any],
+        agent: str = WORKFLOW_AGENT,
+        session_id: str | None = None,
 ) -> dict[str, Any]:
     result = run_agent(
         agent=agent,
@@ -224,7 +224,7 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
 def high_level_design_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/high-level-design-conversation'.",
+        prompt="""Your role is 'development-workflow/high-level-design-conversation'.  You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
         output=planning_conversation_output(
             next_step="high_level_design_conversation or high_level_design_artifact",
         ),
@@ -246,7 +246,7 @@ def high_level_design_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
 def scenario_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/scenario-conversation'.",
+        prompt="""Your role is 'development-workflow/scenario-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
         output=planning_conversation_output(
             next_step="scenario_conversation or scenario_artifact",
         ),
@@ -271,7 +271,7 @@ def scenario_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
 def implementation_plan_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/implementation-plan-conversation'.",
+        prompt="""Your role is 'development-workflow/implementation-plan-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
         output=planning_conversation_output(
             next_step=(
                 "implementation_plan_conversation or "
@@ -383,9 +383,9 @@ def normalize_step_name(step_name: str) -> str:
 
 
 def validate_next_step(
-    current_step: str,
-    next_step: str,
-    result: dict[str, Any],
+        current_step: str,
+        next_step: str,
+        result: dict[str, Any],
 ) -> None:
     allowed = allowed_next_steps(current_step)
     if next_step not in allowed:
