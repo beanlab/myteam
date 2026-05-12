@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.2.18
+
+- Treat Linux/WSL PTY master `EIO` reads as end-of-file so completed workflow
+  agents can exit through the normal terminal session path instead of reporting
+  a misleading launch failure.
+
 ## 0.2.17
 
 - Changed experimental workflow agent launches to pass the rendered step prompt as an agent
