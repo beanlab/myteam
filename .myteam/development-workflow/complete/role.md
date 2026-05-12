@@ -9,3 +9,9 @@ record the final completion status.
 Open a pull request for the current branch. Link the issue in the PR body. Edit
 the issue body's Pull Request section with the PR URL and final status, using
 the output schema supplied by the caller.
+
+Before editing workflow sections in the issue body, run:
+
+```sh
+myteam get skill development-workflow/shared/workflow-issue
+```

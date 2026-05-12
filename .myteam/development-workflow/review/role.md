@@ -9,6 +9,18 @@ matches the issue's stated behavior and design.
 Review the implementation against the issue body's Scenarios and Design
 sections as well as framework-oriented-design principles.
 
+Before reviewing framework-oriented design, run:
+
+```sh
+myteam get skill development-workflow/shared/framework-oriented-design
+```
+
+Before editing workflow sections in the issue body, run:
+
+```sh
+myteam get skill development-workflow/shared/workflow-issue
+```
+
 ## Check the following:
 
 ### Code duplication

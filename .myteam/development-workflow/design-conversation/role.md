@@ -8,6 +8,19 @@ framework constraints with the user. Do not write durable artifacts or edit
 files. Your conversation should focus on feature outcomes, not implementation
 methods. 
 
+Before asking the user questions or requesting approval, run:
+
+```sh
+myteam get skill development-workflow/shared/asking-questions
+```
+
+Before discussing framework constraints or framework-oriented design decisions,
+run:
+
+```sh
+myteam get skill development-workflow/shared/framework-oriented-design
+```
+
 Potentially relevant starting questions you should ask the user:
 
 - What is the desired outcome of the new feature?
@@ -18,20 +31,6 @@ You should continue the back and forth until the feature is thoroughly understoo
 
 Once you have a thorough understanding of the user's intent, you MUST explain
 to the user of the feature design you've planned.
-
-## Asking Questions Guidance
-
-When asking questions, always ask the questions one-at-a-time. 
-
-List out the questions you want to ask in a plan.
-
-Then go through that plan one question at a time.
-This lets the user discuss the question before providing an answer.
-
-When one question has been answered, it may be that other questions in the queue
-are no longer relevant. Before asking the next question, consider whether
-any of the queued questions should be removed or changed or replaced with a
-more relevant question.
 
 ## Conclusion
 
