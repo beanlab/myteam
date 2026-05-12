@@ -34,7 +34,7 @@ want to change. Is it a new behavior? Modifying an existing behavior? A bugfix?
 Create the new issue with an appropriate name.
 Edit the issue body so it contains the required workflow sections supplied in the input.
 
-Return `start_step` as `high_level_design_conversation`.
+Return `start_step` as `design-conversation`.
 
 ## Existing Item
 
@@ -43,7 +43,7 @@ project, edit the issue body so it contains the required workflow sections
 supplied in the input, and return the issue identifiers and a concise
 backlog summary using the output schema.
 
-Choose and return `start_step` as `high_level_design_conversation`,
+Choose and return `start_step` as `design-conversation`,
 `scenario_conversation`, `implement-conversation`, `implement`, or
 `review`. Do not return `wrap_up` as the starting step.
 

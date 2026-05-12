@@ -81,7 +81,7 @@ def test_artifact_step_resumes_conversation_session(monkeypatch):
 
     monkeypatch.setattr(workflow, "run_step", fake_run_step)
 
-    workflow.high_level_design_artifact_step(
+    workflow.design_artifact_step(
         {
             "issue_number": 76,
             "issue_id": "I_123",
@@ -90,7 +90,7 @@ def test_artifact_step_resumes_conversation_session(monkeypatch):
         }
     )
 
-    assert seen["prompt"] == "Your role is 'development-workflow/high-level-design-artifact'."
+    assert seen["prompt"] == "Your role is 'development-workflow/design-artifact'."
     assert seen["session_id"] == "thread-123"
 
 
@@ -106,14 +106,14 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
     }
 
     responses = {
-        "Your role is 'development-workflow/high-level-design-conversation'.  You **MUST** obtain explicit approval from the user before calling the workflow-result command.": {
+        "Your role is 'development-workflow/design-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.": {
             **base_issue,
-            "session_id": "high-level-design-session",
+            "session_id": "design-session",
             "approved": True,
             "summary": "Design approved.",
-            "next_step": "high_level_design_artifact",
+            "next_step": "design-artifact",
         },
-        "Your role is 'development-workflow/high-level-design-artifact'.": {
+        "Your role is 'development-workflow/design-artifact'.": {
             **base_issue,
             "design_summary": "Design recorded.",
             "next_step": "scenario_conversation",
@@ -169,7 +169,7 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
     result = workflow.run_looping_steps(
         {
             **base_issue,
-            "start_step": "high_level_design_conversation",
+            "start_step": "design-conversation",
         }
     )
 
@@ -179,7 +179,7 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
         for call in calls
         if call["session_id"] is not None
     ] == [
-        "high-level-design-session",
+        "design-session",
         "scenario-session",
         "implement-session",
     ]
@@ -204,7 +204,7 @@ def test_unsupported_planning_jump_is_rejected():
 
     with pytest.raises(RuntimeError, match="cannot choose next_step"):
         workflow.validate_next_step(
-            "high_level_design_artifact",
+            "design-artifact",
             "implement-conversation",
             {},
         )
@@ -216,4 +216,4 @@ def test_old_start_step_aliases_are_supported():
     workflow.validate_start_step("scenarios")
     workflow.validate_start_step("design")
     assert workflow.normalize_step_name("scenarios") == "scenario_conversation"
-    assert workflow.normalize_step_name("design") == "implement-conversation"
+    assert workflow.normalize_step_name("design") == "design-conversation"

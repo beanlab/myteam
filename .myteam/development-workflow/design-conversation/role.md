@@ -1,5 +1,5 @@
 ---
-name: Development Workflow High-Level Design Conversation
+name: Development Workflow Design Conversation
 description: Approval-gated feature direction conversation.
 ---
 
@@ -36,5 +36,5 @@ more relevant question.
 ## Conclusion
 
 Return `session_id`, `approved`, a concise `summary`, and `next_step`. Use
-`high_level_design_conversation` until the user explicitly approves, then use
-`high_level_design_artifact`.
+`design-conversation` until the user explicitly approves, then use
+`design-artifact`.

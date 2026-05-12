@@ -46,27 +46,27 @@ ISSUE_SECTIONS = (
 
 STEP_ALIASES = {
     "scenarios": "scenario_conversation",
-    "design": "implement-conversation",
+    "design": "design-conversation",
 }
 
 PAIRED_ARTIFACT_STEP = {
-    "high_level_design_conversation": "high_level_design_artifact",
+    "design-conversation": "design-artifact",
     "scenario_conversation": "scenario_artifact",
     "implement-conversation": "implement",
 }
 
 ALLOWED_NEXT_STEPS = {
-    "high_level_design_conversation": (
-        "high_level_design_conversation",
-        "high_level_design_artifact",
+    "design-conversation": (
+        "design-conversation",
+        "design-artifact",
     ),
-    "high_level_design_artifact": (
-        "high_level_design_conversation",
+    "design-artifact": (
+        "design-conversation",
         "scenario_conversation",
     ),
     "scenario_conversation": ("scenario_conversation", "scenario_artifact"),
     "scenario_artifact": (
-        "high_level_design_conversation",
+        "design-conversation",
         "scenario_conversation",
         "implement-conversation",
     ),
@@ -75,14 +75,14 @@ ALLOWED_NEXT_STEPS = {
         "implement",
     ),
     "implement": (
-        "high_level_design_conversation",
+        "design-conversation",
         "scenario_conversation",
         "implement-conversation",
         "implement",
         "review",
     ),
     "review": (
-        "high_level_design_conversation",
+        "design-conversation",
         "scenario_conversation",
         "implement-conversation",
         "implement",
@@ -92,7 +92,7 @@ ALLOWED_NEXT_STEPS = {
 }
 
 START_STEPS = (
-    "high_level_design_conversation",
+    "design-conversation",
     "scenario_conversation",
     "implement-conversation",
     "implement",
@@ -122,10 +122,10 @@ def run_looping_steps(state: dict[str, Any]) -> dict[str, Any]:
 
     step_name = normalize_step_name(start_step)
     while step_name != "wrap_up":
-        if step_name == "high_level_design_conversation":
-            result = high_level_design_conversation_step(state)
-        elif step_name == "high_level_design_artifact":
-            result = high_level_design_artifact_step(state)
+        if step_name == "design-conversation":
+            result = design_conversation_step(state)
+        elif step_name == "design-artifact":
+            result = design_artifact_step(state)
         elif step_name == "scenario_conversation":
             result = scenario_conversation_step(state)
         elif step_name == "scenario_artifact":
@@ -207,32 +207,32 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
         output=issue_output(
             backlog_summary="Short summary of the selected or created backlog issue.",
             start_step=(
-                "high_level_design_conversation, scenario_conversation, "
+                "design-conversation, scenario_conversation, "
                 "implement-conversation, implement, or review"
             ),
         ),
     )
 
 
-def high_level_design_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
+def design_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="""Your role is 'development-workflow/high-level-design-conversation'.  You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
+        prompt="""Your role is 'development-workflow/design-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
         output=planning_conversation_output(
-            next_step="high_level_design_conversation or high_level_design_artifact",
+            next_step="design-conversation or design-artifact",
         ),
     )
 
 
-def high_level_design_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
+def design_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/high-level-design-artifact'.",
+        prompt="Your role is 'development-workflow/design-artifact'.",
         output=issue_output(
             design_summary="Summary of design decisions recorded in the issue body.",
-            next_step="high_level_design_conversation or scenario_conversation",
+            next_step="design-conversation or scenario_conversation",
         ),
-        session_id=require_session_id(state, "high-level design"),
+        session_id=require_session_id(state, "design"),
     )
 
 
@@ -253,7 +253,7 @@ def scenario_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
         output=issue_output(
             scenarios_summary="Summary of scenario decisions recorded in the issue body.",
             next_step=(
-                "high_level_design_conversation, scenario_conversation, "
+                "design-conversation, scenario_conversation, "
                 "or implement-conversation"
             ),
         ),
@@ -283,7 +283,7 @@ def implement_step(state: dict[str, Any]) -> dict[str, Any]:
                 "Approved implementation plan recorded and implementation completed."
             ),
             next_step=(
-                "high_level_design_conversation, scenario_conversation, "
+                "design-conversation, scenario_conversation, "
                 "implement-conversation, implement, or review"
             ),
         ),

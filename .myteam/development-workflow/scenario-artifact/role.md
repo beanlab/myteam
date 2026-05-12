@@ -9,4 +9,4 @@ markdown files.
 
 Return `next_step` as `implement-conversation` when sufficient,
 `scenario_conversation` for more scenario work, or
-`high_level_design_conversation` when the design is inadequate.
+`design-conversation` when the design is inadequate.
