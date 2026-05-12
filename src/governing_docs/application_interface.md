@@ -74,6 +74,36 @@ Successful commands either:
 
 When a command cannot complete, it exits with an error and reports the failure on standard error.
 
+## Scenario Documentation
+
+The detailed externally observable behavior is organized as scenario-style
+documentation under [scenarios/](scenarios/). These scenarios preserve the
+current application contract while grouping related command variants into
+domain-oriented files:
+
+- [Local tree management](scenarios/local_tree/manages_local_tree.md) covers
+  initialization, role and skill scaffolding, and removal.
+- [Selected local roots](scenarios/local_tree/uses_selected_local_root.md)
+  covers `--prefix` behavior across supported commands.
+- [Instruction loading](scenarios/instruction_loading/loads_instruction_nodes.md)
+  covers role loading, skill loading, and built-in skill resolution.
+- [Upgrade guidance](scenarios/instruction_loading/surfaces_upgrade_guidance.md)
+  covers tracked-version notices and built-in maintenance skills.
+- [Workflow execution](scenarios/workflows/runs_workflows.md) covers starting
+  YAML and Python workflows.
+- [Workflow definition validation](scenarios/workflows/validates_workflow_definitions.md)
+  covers YAML shape rules and reference semantics.
+- [Workflow result submission](scenarios/workflows/submits_workflow_results.md)
+  covers the agent-facing `myteam workflow-result` contract.
+- [Roster management](scenarios/rosters/manages_rosters.md) covers listing,
+  downloading, and updating managed roster installs.
+- [CLI status reporting](scenarios/diagnostics/reports_cli_status.md) covers
+  version output and command failure reporting.
+
+The command reference below remains as the existing supported command surface.
+Scenario files are the preferred place to maintain detailed behavior, failure
+conditions, and operational contracts.
+
 ## Command Reference
 
 ### `myteam init [--prefix <path>]`
