@@ -44,21 +44,67 @@ ISSUE_SECTIONS = (
     "Pull Request",
 )
 
-FORWARD_STEP = {
-    "scenarios": "design",
-    "design": "implement",
-    "implement": "review",
-    "review": "wrap_up",
+STEP_ALIASES = {
+    "scenarios": "scenario_conversation",
+    "design": "implementation_plan_conversation",
 }
 
-BACKWARD_LIMIT = {
-    "scenarios": (),
-    "design": ("scenarios",),
-    "implement": ("scenarios", "design"),
-    "review": ("scenarios", "design", "implement"),
+PAIRED_ARTIFACT_STEP = {
+    "high_level_design_conversation": "high_level_design_artifact",
+    "scenario_conversation": "scenario_artifact",
+    "implementation_plan_conversation": "implementation_plan_artifact",
 }
 
-START_STEPS = ("scenarios", "design", "implement", "review")
+ALLOWED_NEXT_STEPS = {
+    "high_level_design_conversation": (
+        "high_level_design_conversation",
+        "high_level_design_artifact",
+    ),
+    "high_level_design_artifact": (
+        "high_level_design_conversation",
+        "scenario_conversation",
+    ),
+    "scenario_conversation": ("scenario_conversation", "scenario_artifact"),
+    "scenario_artifact": (
+        "high_level_design_conversation",
+        "scenario_conversation",
+        "implementation_plan_conversation",
+    ),
+    "implementation_plan_conversation": (
+        "implementation_plan_conversation",
+        "implementation_plan_artifact",
+    ),
+    "implementation_plan_artifact": (
+        "scenario_conversation",
+        "implementation_plan_conversation",
+        "implement",
+    ),
+    "implement": (
+        "high_level_design_conversation",
+        "scenario_conversation",
+        "implementation_plan_conversation",
+        "implement",
+        "review",
+    ),
+    "review": (
+        "high_level_design_conversation",
+        "scenario_conversation",
+        "implementation_plan_conversation",
+        "implement",
+        "review",
+        "wrap_up",
+    ),
+}
+
+START_STEPS = (
+    "high_level_design_conversation",
+    "scenario_conversation",
+    "implementation_plan_conversation",
+    "implement",
+    "review",
+    "scenarios",
+    "design",
+)
 
 
 def main(feature_request: str | None = None) -> dict[str, Any]:
@@ -79,12 +125,20 @@ def run_looping_steps(state: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("Workflow state start_step must be a string.")
     validate_start_step(start_step)
 
-    step_name = start_step
+    step_name = normalize_step_name(start_step)
     while step_name != "wrap_up":
-        if step_name == "scenarios":
-            result = scenarios_step(state)
-        elif step_name == "design":
-            result = design_step(state)
+        if step_name == "high_level_design_conversation":
+            result = high_level_design_conversation_step(state)
+        elif step_name == "high_level_design_artifact":
+            result = high_level_design_artifact_step(state)
+        elif step_name == "scenario_conversation":
+            result = scenario_conversation_step(state)
+        elif step_name == "scenario_artifact":
+            result = scenario_artifact_step(state)
+        elif step_name == "implementation_plan_conversation":
+            result = implementation_plan_conversation_step(state)
+        elif step_name == "implementation_plan_artifact":
+            result = implementation_plan_artifact_step(state)
         elif step_name == "implement":
             result = implement_step(state)
         elif step_name == "review":
@@ -96,7 +150,8 @@ def run_looping_steps(state: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(next_step, str):
             raise RuntimeError(f"Step '{step_name}' did not return next_step.")
 
-        validate_next_step(step_name, next_step)
+        next_step = normalize_step_name(next_step)
+        validate_next_step(step_name, next_step, result)
         state = merge_issue_state(state, result)
         step_name = next_step
 
@@ -109,12 +164,14 @@ def run_step(
     output: dict[str, Any],
     input: dict[str, Any],
     agent: str = WORKFLOW_AGENT,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     result = run_agent(
         agent=agent,
         input=input,
         output=output,
         prompt=prompt,
+        session_id=session_id,
     )
     return require_completed(result)
 
@@ -124,7 +181,10 @@ def require_completed(result: StepResult) -> dict[str, Any]:
         raise RuntimeError(f"{result.error_type}: {result.error_message}")
     if not isinstance(result.output, dict):
         raise RuntimeError("Workflow step completed without a mapping output.")
-    return result.output
+    output = dict(result.output)
+    if result.session_id and "session_id" not in output:
+        output["session_id"] = result.session_id
+    return output
 
 
 def require_feature_branch() -> str:
@@ -153,30 +213,86 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
         prompt="Your role is 'development-workflow/backlog'.",
         output=issue_output(
             backlog_summary="Short summary of the selected or created backlog issue.",
-            start_step="scenarios, design, implement, or review",
+            start_step=(
+                "high_level_design_conversation, scenario_conversation, "
+                "implementation_plan_conversation, implement, or review"
+            ),
         ),
     )
 
 
-def scenarios_step(state: dict[str, Any]) -> dict[str, Any]:
+def high_level_design_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/scenarios'.",
-        output=issue_output(
-            scenarios_summary="Summary of scenario decisions recorded in the issue body.",
-            next_step="scenarios or design",
+        prompt="Your role is 'development-workflow/high-level-design-conversation'.",
+        output=planning_conversation_output(
+            next_step="high_level_design_conversation or high_level_design_artifact",
         ),
     )
 
 
-def design_step(state: dict[str, Any]) -> dict[str, Any]:
-    result = run_step(
+def high_level_design_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
+    return run_step(
         input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/design'.",
+        prompt="Your role is 'development-workflow/high-level-design-artifact'.",
         output=issue_output(
             design_summary="Summary of design decisions recorded in the issue body.",
-            next_step="scenarios, design, or implement",
+            next_step="high_level_design_conversation or scenario_conversation",
         ),
+        session_id=require_session_id(state, "high-level design"),
+    )
+
+
+def scenario_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
+    return run_step(
+        input=with_issue_sections(state),
+        prompt="Your role is 'development-workflow/scenario-conversation'.",
+        output=planning_conversation_output(
+            next_step="scenario_conversation or scenario_artifact",
+        ),
+    )
+
+
+def scenario_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
+    return run_step(
+        input=with_issue_sections(state),
+        prompt="Your role is 'development-workflow/scenario-artifact'.",
+        output=issue_output(
+            scenarios_summary="Summary of scenario decisions recorded in the issue body.",
+            next_step=(
+                "high_level_design_conversation, scenario_conversation, "
+                "or implementation_plan_conversation"
+            ),
+        ),
+        session_id=require_session_id(state, "scenario"),
+    )
+
+
+def implementation_plan_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
+    return run_step(
+        input=with_issue_sections(state),
+        prompt="Your role is 'development-workflow/implementation-plan-conversation'.",
+        output=planning_conversation_output(
+            next_step=(
+                "implementation_plan_conversation or "
+                "implementation_plan_artifact"
+            ),
+        ),
+    )
+
+
+def implementation_plan_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
+    result = run_step(
+        input=with_issue_sections(state),
+        prompt="Your role is 'development-workflow/implementation-plan-artifact'.",
+        output=issue_output(
+            implementation_summary="Approved implementation plan recorded in the issue body.",
+            next_step=(
+                "scenario_conversation, implementation_plan_conversation, "
+                "or implement"
+            ),
+        ),
+        session_id=require_session_id(state, "implementation planning"),
     )
     set_project_status(result, "Ready")
     return result
@@ -241,6 +357,15 @@ def issue_output(**extra: Any) -> dict[str, Any]:
     return output
 
 
+def planning_conversation_output(*, next_step: str) -> dict[str, Any]:
+    return issue_output(
+        session_id="Agent session ID for the approved planning conversation.",
+        approved=False,
+        summary="Concise summary of the current planning conversation.",
+        next_step=next_step,
+    )
+
+
 def with_issue_sections(state: dict[str, Any]) -> dict[str, Any]:
     merged = dict(state)
     merged["required_issue_sections"] = list(ISSUE_SECTIONS)
@@ -253,7 +378,15 @@ def merge_issue_state(state: dict[str, Any], result: dict[str, Any]) -> dict[str
     return merged
 
 
-def validate_next_step(current_step: str, next_step: str) -> None:
+def normalize_step_name(step_name: str) -> str:
+    return STEP_ALIASES.get(step_name, step_name)
+
+
+def validate_next_step(
+    current_step: str,
+    next_step: str,
+    result: dict[str, Any],
+) -> None:
     allowed = allowed_next_steps(current_step)
     if next_step not in allowed:
         allowed_text = ", ".join(allowed)
@@ -261,11 +394,25 @@ def validate_next_step(current_step: str, next_step: str) -> None:
             f"Step '{current_step}' cannot choose next_step '{next_step}'. "
             f"Allowed values: {allowed_text}."
         )
+    paired_artifact = PAIRED_ARTIFACT_STEP.get(current_step)
+    if paired_artifact is None:
+        return
+    approved = result.get("approved") is True
+    if next_step == paired_artifact and not approved:
+        raise RuntimeError(
+            f"Step '{current_step}' cannot advance to '{next_step}' without approval."
+        )
+    if approved and next_step != paired_artifact:
+        raise RuntimeError(
+            f"Step '{current_step}' recorded approval but did not advance to "
+            f"'{paired_artifact}'."
+        )
 
 
 def validate_start_step(start_step: str) -> None:
     allowed = allowed_start_steps()
-    if start_step not in allowed:
+    normalized_allowed = tuple(normalize_step_name(step) for step in allowed)
+    if normalize_step_name(start_step) not in normalized_allowed:
         allowed_text = ", ".join(allowed)
         raise RuntimeError(
             f"Workflow cannot start at step '{start_step}'. "
@@ -278,9 +425,16 @@ def allowed_start_steps() -> tuple[str, ...]:
 
 
 def allowed_next_steps(current_step: str) -> tuple[str, ...]:
-    if current_step not in FORWARD_STEP:
+    if current_step not in ALLOWED_NEXT_STEPS:
         raise RuntimeError(f"Step '{current_step}' does not support next_step.")
-    return (*BACKWARD_LIMIT[current_step], current_step, FORWARD_STEP[current_step])
+    return ALLOWED_NEXT_STEPS[current_step]
+
+
+def require_session_id(state: dict[str, Any], phase: str) -> str:
+    session_id = state.get("session_id")
+    if not isinstance(session_id, str) or not session_id:
+        raise RuntimeError(f"Cannot write {phase} artifact without session_id.")
+    return session_id
 
 
 def ensure_issue_sections(body: str) -> str:

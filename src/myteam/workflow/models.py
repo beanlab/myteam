@@ -56,6 +56,7 @@ class StepResult:
     error_message: str | None = None
     transcript: str = ""
     exit_code: int | None = None
+    session_id: str | None = None
 
 
 @dataclass
