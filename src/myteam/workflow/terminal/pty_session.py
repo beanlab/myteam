@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator, Mapping
 from queue import Empty, Queue
+import errno
 import os
 import pty
 import select
@@ -97,10 +98,7 @@ class PtySession:
         last_output_at = time.monotonic()
         while True:
             if self.process.poll() is not None:
-                try:
-                    chunk = os.read(self._master_fd, 4096)
-                except OSError:
-                    chunk = b""
+                chunk = self._read_master()
                 if chunk:
                     if self.mirror_stdout:
                         os.write(sys.stdout.fileno(), chunk)
@@ -125,7 +123,7 @@ class PtySession:
                 self._flush_enqueued_input()
 
             if self._master_fd in ready:
-                chunk = os.read(self._master_fd, 4096)
+                chunk = self._read_master()
                 if not chunk:
                     return self.process.wait()
                 if self.mirror_stdout:
@@ -139,6 +137,14 @@ class PtySession:
                     self._stdin_closed = True
                 else:
                     self._write_all(parent_input)
+
+    def _read_master(self) -> bytes:
+        try:
+            return os.read(self._master_fd, 4096)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                return b""
+            raise
 
     def _flush_enqueued_input(self) -> None:
         while True:
