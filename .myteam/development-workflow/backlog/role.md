@@ -6,6 +6,8 @@ description: Select or create the backlog issue for the development workflow.
 As the development workflow backlog step, you establish the GitHub issue that
 will carry the rest of the workflow state.
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before reading, selecting, creating, or editing GitHub issues, run:
 
 ```sh

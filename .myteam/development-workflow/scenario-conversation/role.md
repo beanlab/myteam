@@ -3,6 +3,8 @@ name: Development Workflow Scenario Conversation
 description: Approval-gated scenario planning conversation.
 ---
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 1. Review the feature design in the issue body. 
 2. Run `myteam get skill development-workflow/shared/scenario-documentation`
 to load local instructions for authoring scenarios.

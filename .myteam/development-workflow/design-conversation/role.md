@@ -8,6 +8,8 @@ framework constraints with the user. Do not write durable artifacts or edit
 files. Your conversation should focus on feature outcomes, not implementation
 methods. 
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before asking the user questions or requesting approval, run:
 
 ```sh

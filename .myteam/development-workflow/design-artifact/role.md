@@ -6,6 +6,8 @@ description: Persist approved design decisions.
 Update the issue body's `Design` section with the accepted feature direction 
 and framework-oriented decisions. Do not implement code.
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before recording framework-oriented decisions, run:
 
 ```sh

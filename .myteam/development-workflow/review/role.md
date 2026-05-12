@@ -9,6 +9,8 @@ matches the issue's stated behavior and design.
 Review the implementation against the issue body's Scenarios and Design
 sections as well as framework-oriented-design principles.
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before reviewing framework-oriented design, run:
 
 ```sh

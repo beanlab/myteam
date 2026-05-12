@@ -11,6 +11,8 @@ updates, and project-myteam-update review when relevant. Do not run tests. Edit
 the issue body's Wrap Up section with the final readiness state, using the 
 output schema supplied by the caller.
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before editing workflow sections in the issue body, run:
 
 ```sh

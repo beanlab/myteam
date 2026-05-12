@@ -9,6 +9,8 @@ description: Approval-gated implementation conversation.
 `workflow-result` command.
 4. Make changes as needed, and again wait for explicit approval.
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before asking the user questions or requesting approval, run:
 
 ```sh

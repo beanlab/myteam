@@ -7,6 +7,8 @@ Write or update scenario documentation and summarize or link it in the
 issue body's `Scenarios` section. Do not implement code, only scenario 
 markdown files.
 
+Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.
+
 Before writing or editing scenario documentation, run:
 
 ```sh
