@@ -284,6 +284,8 @@ Executes a workflow definition from the selected local root.
 - relative segments in workflow paths are allowed
 - workflow files are resolved with standard YAML extensions or `.py`
 - later workflow steps may reference completed state from earlier steps
+- Python workflow files may resume related agent sessions by passing a prior `StepResult.session_id`
+  into `run_agent(...)`
 
 Examples:
 

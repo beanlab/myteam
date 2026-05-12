@@ -14,6 +14,7 @@ def run_agent(
     output: dict[str, Any],
     input: Any = None,
     agent: str | None = None,
+    session_id: str | None = None,
 ) -> StepResult:
     transcript = ""
     try:
@@ -25,9 +26,10 @@ def run_agent(
             resolved_input=resolved_input,
             objective_text=prompt,
             output_template=output,
+            session_discovery_prompt=backend.session_discovery_prompt,
         )
         session_result = run_terminal_session(
-            [*agent_config["argv"], prompt_text],
+            backend.build_argv(agent_config["argv"], prompt_text, session_id=session_id),
             exit_input=backend.encode_exit(),
             inactivity_timeout_seconds=300,
         )
@@ -45,6 +47,7 @@ def run_agent(
             agent_name=agent_name,
             transcript=transcript,
             exit_code=session_result.exit_code,
+            session_id=_extract_session_id(session_result.payload),
         )
     except StepExecutionError as exc:
         return StepResult(
@@ -90,11 +93,12 @@ def _build_step_prompt(
     resolved_input: Any,
     objective_text: str,
     output_template: dict[str, Any],
+    session_discovery_prompt: str,
 ) -> str:
     sections = [
         "Complete the objective below.",
         "",
-        "Return the final workflow result by calling this command exactly once:",
+        "Return the final workflow result by calling this command:",
         "Replace the placeholder values below with the real final result content.",
         "",
         "myteam workflow-result <<'JSON'",
@@ -102,6 +106,9 @@ def _build_step_prompt(
         "JSON",
         "",
         "Do not print result markers in the terminal.",
+        "",
+        "Session:",
+        session_discovery_prompt,
     ]
     if resolved_input is not None:
         sections.extend(
@@ -119,6 +126,15 @@ def _build_step_prompt(
         ]
     )
     return "\n".join(sections)
+
+
+def _extract_session_id(output_value: Any) -> str | None:
+    if not isinstance(output_value, dict):
+        return None
+    value = output_value.get("session_id")
+    if isinstance(value, str) and value:
+        return value
+    return None
 
 
 def _validate_step_output(output_template: dict[str, Any], output_value: Any) -> None:
