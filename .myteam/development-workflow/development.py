@@ -46,13 +46,13 @@ ISSUE_SECTIONS = (
 
 STEP_ALIASES = {
     "scenarios": "scenario_conversation",
-    "design": "implementation_plan_conversation",
+    "design": "implement-conversation",
 }
 
 PAIRED_ARTIFACT_STEP = {
     "high_level_design_conversation": "high_level_design_artifact",
     "scenario_conversation": "scenario_artifact",
-    "implementation_plan_conversation": "implementation_plan_artifact",
+    "implement-conversation": "implement",
 }
 
 ALLOWED_NEXT_STEPS = {
@@ -68,28 +68,23 @@ ALLOWED_NEXT_STEPS = {
     "scenario_artifact": (
         "high_level_design_conversation",
         "scenario_conversation",
-        "implementation_plan_conversation",
+        "implement-conversation",
     ),
-    "implementation_plan_conversation": (
-        "implementation_plan_conversation",
-        "implementation_plan_artifact",
-    ),
-    "implementation_plan_artifact": (
-        "scenario_conversation",
-        "implementation_plan_conversation",
+    "implement-conversation": (
+        "implement-conversation",
         "implement",
     ),
     "implement": (
         "high_level_design_conversation",
         "scenario_conversation",
-        "implementation_plan_conversation",
+        "implement-conversation",
         "implement",
         "review",
     ),
     "review": (
         "high_level_design_conversation",
         "scenario_conversation",
-        "implementation_plan_conversation",
+        "implement-conversation",
         "implement",
         "review",
         "wrap_up",
@@ -99,7 +94,7 @@ ALLOWED_NEXT_STEPS = {
 START_STEPS = (
     "high_level_design_conversation",
     "scenario_conversation",
-    "implementation_plan_conversation",
+    "implement-conversation",
     "implement",
     "review",
     "scenarios",
@@ -135,10 +130,8 @@ def run_looping_steps(state: dict[str, Any]) -> dict[str, Any]:
             result = scenario_conversation_step(state)
         elif step_name == "scenario_artifact":
             result = scenario_artifact_step(state)
-        elif step_name == "implementation_plan_conversation":
-            result = implementation_plan_conversation_step(state)
-        elif step_name == "implementation_plan_artifact":
-            result = implementation_plan_artifact_step(state)
+        elif step_name == "implement-conversation":
+            result = implement_conversation_step(state)
         elif step_name == "implement":
             result = implement_step(state)
         elif step_name == "review":
@@ -215,7 +208,7 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
             backlog_summary="Short summary of the selected or created backlog issue.",
             start_step=(
                 "high_level_design_conversation, scenario_conversation, "
-                "implementation_plan_conversation, implement, or review"
+                "implement-conversation, implement, or review"
             ),
         ),
     )
@@ -254,61 +247,49 @@ def scenario_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def scenario_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
-    return run_step(
+    result = run_step(
         input=with_issue_sections(state),
         prompt="Your role is 'development-workflow/scenario-artifact'.",
         output=issue_output(
             scenarios_summary="Summary of scenario decisions recorded in the issue body.",
             next_step=(
                 "high_level_design_conversation, scenario_conversation, "
-                "or implementation_plan_conversation"
+                "or implement-conversation"
             ),
         ),
         session_id=require_session_id(state, "scenario"),
-    )
-
-
-def implementation_plan_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
-    return run_step(
-        input=with_issue_sections(state),
-        prompt="""Your role is 'development-workflow/implementation-plan-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
-        output=planning_conversation_output(
-            next_step=(
-                "implementation_plan_conversation or "
-                "implementation_plan_artifact"
-            ),
-        ),
-    )
-
-
-def implementation_plan_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
-    result = run_step(
-        input=with_issue_sections(state),
-        prompt="Your role is 'development-workflow/implementation-plan-artifact'.",
-        output=issue_output(
-            implementation_summary="Approved implementation plan recorded in the issue body.",
-            next_step=(
-                "scenario_conversation, implementation_plan_conversation, "
-                "or implement"
-            ),
-        ),
-        session_id=require_session_id(state, "implementation planning"),
     )
     set_project_status(result, "Ready")
     return result
 
 
+def implement_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
+    return run_step(
+        input=with_issue_sections(state),
+        prompt="""Your role is 'development-workflow/implement-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
+        output=planning_conversation_output(
+            next_step="implement-conversation or implement",
+        ),
+    )
+
+
 def implement_step(state: dict[str, Any]) -> dict[str, Any]:
     set_project_status(state, "In progress")
-    return run_step(
+    result = run_step(
         input=with_issue_sections(state),
         prompt="Your role is 'development-workflow/implement'.",
         output=issue_output(
-            implementation_summary="Summary of implementation work recorded in the issue body.",
-            test_results="Relevant test command results.",
-            next_step="scenarios, design, implement, or review",
+            implementation_summary=(
+                "Approved implementation plan recorded and implementation completed."
+            ),
+            next_step=(
+                "high_level_design_conversation, scenario_conversation, "
+                "implement-conversation, implement, or review"
+            ),
         ),
+        session_id=require_session_id(state, "implement"),
     )
+    return result
 
 
 def review_step(state: dict[str, Any]) -> dict[str, Any]:

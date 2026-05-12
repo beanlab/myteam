@@ -1,12 +1,12 @@
 ---
 name: Development Workflow Implement
-description: Implement a designed workflow issue and record test results.
+description: Persist the approved implementation plan and implement it.
 ---
 
-As the development workflow implementation step, you make the code changes for
-the feature described by the issue.
+Update the issue body's `Implementation` section with the approved
+implementation plan and implement it.
 
-Implement the feature according to the issue body's Scenarios and Design
-sections. Run relevant tests. Edit the issue body's Implementation section with
-the changes and test results. Return `next_step` as `scenarios`, `design`,
-`implement`, or `review`, using the output schema supplied by the caller.
+Return `next_step` as `review` when sufficient,
+`implement-conversation` for more implementation approval, `implement` when
+more implementation work remains, or
+`scenario_conversation` when scenarios are inadequate.

@@ -44,7 +44,7 @@ supplied in the input, and return the issue identifiers and a concise
 backlog summary using the output schema.
 
 Choose and return `start_step` as `high_level_design_conversation`,
-`scenario_conversation`, `implementation_plan_conversation`, `implement`, or
+`scenario_conversation`, `implement-conversation`, `implement`, or
 `review`. Do not return `wrap_up` as the starting step.
 
 Choose the earliest step that still needs meaningful work, unless the user has

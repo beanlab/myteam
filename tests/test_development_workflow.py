@@ -106,7 +106,7 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
     }
 
     responses = {
-        "Your role is 'development-workflow/high-level-design-conversation'.": {
+        "Your role is 'development-workflow/high-level-design-conversation'.  You **MUST** obtain explicit approval from the user before calling the workflow-result command.": {
             **base_issue,
             "session_id": "high-level-design-session",
             "approved": True,
@@ -118,7 +118,7 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
             "design_summary": "Design recorded.",
             "next_step": "scenario_conversation",
         },
-        "Your role is 'development-workflow/scenario-conversation'.": {
+        "Your role is 'development-workflow/scenario-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.": {
             **base_issue,
             "session_id": "scenario-session",
             "approved": True,
@@ -128,18 +128,13 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
         "Your role is 'development-workflow/scenario-artifact'.": {
             **base_issue,
             "scenarios_summary": "Scenarios recorded.",
-            "next_step": "implementation_plan_conversation",
+            "next_step": "implement-conversation",
         },
-        "Your role is 'development-workflow/implementation-plan-conversation'.": {
+        "Your role is 'development-workflow/implement-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.": {
             **base_issue,
-            "session_id": "implementation-plan-session",
+            "session_id": "implement-session",
             "approved": True,
             "summary": "Implementation plan approved.",
-            "next_step": "implementation_plan_artifact",
-        },
-        "Your role is 'development-workflow/implementation-plan-artifact'.": {
-            **base_issue,
-            "implementation_summary": "Implementation plan recorded.",
             "next_step": "implement",
         },
         "Your role is 'development-workflow/implement'.": {
@@ -182,11 +177,11 @@ def test_planning_happy_path_reaches_implementation_with_session_handoff(monkeyp
     assert [
         call["session_id"]
         for call in calls
-        if str(call["prompt"]).endswith("-artifact'.")
+        if call["session_id"] is not None
     ] == [
         "high-level-design-session",
         "scenario-session",
-        "implementation-plan-session",
+        "implement-session",
     ]
     assert statuses == ["Ready", "In progress"]
     assert result["implementation_summary"] == "Implemented."
@@ -210,7 +205,7 @@ def test_unsupported_planning_jump_is_rejected():
     with pytest.raises(RuntimeError, match="cannot choose next_step"):
         workflow.validate_next_step(
             "high_level_design_artifact",
-            "implementation_plan_conversation",
+            "implement-conversation",
             {},
         )
 
@@ -221,4 +216,4 @@ def test_old_start_step_aliases_are_supported():
     workflow.validate_start_step("scenarios")
     workflow.validate_start_step("design")
     assert workflow.normalize_step_name("scenarios") == "scenario_conversation"
-    assert workflow.normalize_step_name("design") == "implementation_plan_conversation"
+    assert workflow.normalize_step_name("design") == "implement-conversation"

@@ -1,6 +1,6 @@
 ---
-name: Development Workflow Implementation Plan Conversation
-description: Approval-gated implementation planning conversation.
+name: Development Workflow Implement Conversation
+description: Approval-gated implementation conversation.
 ---
 
 1. Read the design and scenarios outlined in the issue body to understand the feature.
@@ -43,5 +43,5 @@ Guidance:
 ## Conclusion
 
 Return `session_id`, `approved`, a concise `summary`, and `next_step`. Use
-`implementation_plan_conversation` until the user explicitly approves, then use
-`implementation_plan_artifact`.
+`implement-conversation` until the user explicitly approves, then use
+`implement`.
