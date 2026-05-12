@@ -1,12 +1,18 @@
 # Change Log
 
-## 0.2.18
+## 0.2.19
 
 - Added session-aware workflow agent execution so `run_agent(...)` can resume a prior agent session
   when given `session_id`.
 - Added backend-owned session resume behavior and session ID discovery guidance for workflow agents.
 - Added `StepResult.session_id` so Python workflows can carry agent session state across related
   steps.
+
+## 0.2.18
+
+- Treat Linux/WSL PTY master `EIO` reads as end-of-file so completed workflow
+  agents can exit through the normal terminal session path instead of reporting
+  a misleading launch failure.
 
 ## 0.2.17
 
