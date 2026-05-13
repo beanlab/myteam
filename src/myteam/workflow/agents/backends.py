@@ -71,7 +71,7 @@ class PiBackendAdapter(BackendAdapter):
     ) -> list[str]:
         if session_id is None:
             return [*agent_argv, prompt_text]
-        return [*agent_argv, "resume", session_id, prompt_text]
+        return [*agent_argv, "--session", session_id, prompt_text]
 
 
 _BACKENDS: dict[str, BackendAdapter] = {
