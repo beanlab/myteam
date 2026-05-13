@@ -68,7 +68,7 @@ Use these commands to inspect the issue tracker:
   `gh issue view <number-or-url> --comments`
 - View structured issue data:
   ```sh
-  gh issue view <number-or-url> \
+  gh issue view <number-or-url> --comments \
     --json number,title,body,labels,state,url,comments
   ```
 - List repository labels:
