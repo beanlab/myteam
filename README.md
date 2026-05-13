@@ -284,6 +284,8 @@ Executes a workflow definition from the selected local root.
 - relative segments in workflow paths are allowed
 - workflow files are resolved with standard YAML extensions or `.py`
 - later workflow steps may reference completed state from earlier steps
+- Python workflow files may resume related agent sessions by passing a prior `StepResult.session_id`
+  into `run_agent(...)`
 
 Examples:
 
@@ -427,7 +429,8 @@ Notes:
 Python workflow files ending in `.py` are run as scripts in a separate Python process. The child
 process uses the directory containing the workflow file as its current working directory, receives
 the selected local root in `MYTEAM_PROJECT_ROOT`, and returns its exit status directly through
-`myteam start`.
+`myteam start`. Commands run by that child process, such as `myteam get role`, inherit that selected
+local root so nested workflow files behave as if those commands were run from the project root.
 
 ## Why Use Myteam
 

@@ -28,7 +28,7 @@ From outside the package, the flow is:
    - receives the resolved step values from the engine
    - chooses the configured agent and backend
    - builds the prompt
-   - runs an interactive terminal session
+   - runs or resumes an interactive terminal session
    - waits for the agent to call `myteam workflow-result`
    - validates the returned payload against the authored output shape
 5. The engine stores completed step state for later `$step.path` references.
@@ -41,6 +41,8 @@ The terminal contract is:
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
 - the child reports its final result over a private Unix socket
+- Python workflow authors can pass `session_id` to `run_agent(...)` to resume a prior agent session,
+  and can read `StepResult.session_id` from completed steps that return one
 
 ## File-Level Ownership
 
@@ -62,7 +64,7 @@ The terminal contract is:
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
 - [steps.py](steps.py)
-  Owns single-step execution: accept resolved step values, select agent/backend, build prompt, run session, validate result, and return `StepResult`.
+  Owns single-step execution: accept resolved step values, select agent/backend, build prompt, run or resume a session, validate result, and return `StepResult`.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.
@@ -76,7 +78,8 @@ The terminal contract is:
   Owns named workflow agent definitions and default agent lookup.
 
 - [agents/backends.py](agents/backends.py)
-  Owns backend-specific terminal input encoding, including submit and exit byte sequences.
+  Owns backend-specific terminal input encoding, resume argv construction, session discovery guidance,
+  and submit/exit byte sequences.
 
 ### Terminal
 

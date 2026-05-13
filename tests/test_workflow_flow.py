@@ -162,6 +162,37 @@ def test_start_runs_python_workflow_like_load_py(run_myteam_inprocess, initializ
     assert seen["kwargs"]["env"]["MYTEAM_PROJECT_ROOT"] == str(initialized_project / ".myteam")
 
 
+def test_nested_python_workflow_get_role_uses_selected_project_root(run_myteam, initialized_project: Path):
+    workflow_dir = initialized_project / ".myteam" / "nested"
+    workflow_dir.mkdir()
+    workflow_file = workflow_dir / "demo.py"
+    workflow_file.write_text(
+        "import subprocess\n"
+        "import sys\n"
+        "from pathlib import Path\n"
+        "\n"
+        "result = subprocess.run(\n"
+        "    [sys.executable, '-m', 'myteam', 'get', 'role'],\n"
+        "    text=True,\n"
+        "    capture_output=True,\n"
+        "    check=False,\n"
+        ")\n"
+        "Path('get_role_result.txt').write_text(\n"
+        "    f'exit={result.returncode}\\n{result.stdout}{result.stderr}',\n"
+        "    encoding='utf-8',\n"
+        ")\n"
+        "raise SystemExit(result.returncode)\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(initialized_project, "start", "nested/demo")
+
+    output = (workflow_dir / "get_role_result.txt").read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "exit=0" in output
+    assert "# Skills" in output
+
+
 def test_start_fails_when_workflow_file_is_missing(run_myteam_inprocess, initialized_project: Path):
     result = run_myteam_inprocess(initialized_project, "start", "missing")
 

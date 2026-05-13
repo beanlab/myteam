@@ -217,6 +217,9 @@ Expected outcome on success:
 - For YAML workflows, loads and validates the authored workflow definition and executes the
   workflow's steps in order.
 - For Python workflows, executes the workflow file as a separate Python process.
+- Python workflow child processes inherit the selected local root so nested workflow files can run
+  commands such as `myteam get role` and `myteam get skill` with the same root selection they would
+  have had from the project root.
 - Supplies each configured workflow agent with the authored step prompt when the step session starts.
 - Allows later steps to reference completed state from earlier steps.
 - Returns success only after all workflow steps complete in order.
