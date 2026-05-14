@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 import uuid
 from typing import Any
+
+from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig
@@ -22,7 +26,8 @@ def run_agent(
     try:
         resolved_input = input
         agent_name = _require_agent_name(agent)
-        agent_config = _resolve_agent_config(agent_name)
+        project_root = _resolve_project_root()
+        agent_config = _resolve_agent_config(agent_name, project_root=project_root)
         nonce = str(uuid.uuid4()) if session_id is None else None
         prompt_text = _build_step_prompt(
             resolved_input=resolved_input,
@@ -33,6 +38,7 @@ def run_agent(
         session_result = run_terminal_session(
             agent_config.build_argv(prompt_text, session_id),
             exit_input=agent_config.exit_sequence,
+            cwd=project_root,
             inactivity_timeout_seconds=300,
         )
         transcript = session_result.transcript
@@ -89,9 +95,21 @@ def _require_agent_name(agent_name: str | None) -> str:
     return agent_name
 
 
-def _resolve_agent_config(agent_name: str) -> AgentRuntimeConfig:
+def _resolve_project_root() -> Path:
+    configured_agent_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    if configured_agent_root:
+        return Path(configured_agent_root).resolve().parent
+
+    cwd = Path.cwd().resolve()
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / ".myteam").is_dir():
+            return candidate
+    return cwd
+
+
+def _resolve_agent_config(agent_name: str, *, project_root: Path) -> AgentRuntimeConfig:
     try:
-        return resolve_agent_runtime_config(agent_name)
+        return resolve_agent_runtime_config(agent_name, project_root=project_root)
     except KeyError as exc:
         raise StepExecutionError("agent_resolution", str(exc)) from exc
 
