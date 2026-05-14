@@ -1,10 +1,9 @@
-from .backends import BackendAdapter, PTY_RIGHT_ARROW, get_backend
 from .registry import DEFAULT_AGENT, get_agent_config
+from .runtime import AgentRuntimeConfig, resolve_agent_runtime_config
 
 __all__ = [
-    "BackendAdapter",
+    "AgentRuntimeConfig",
     "DEFAULT_AGENT",
-    "PTY_RIGHT_ARROW",
     "get_agent_config",
-    "get_backend",
+    "resolve_agent_runtime_config",
 ]

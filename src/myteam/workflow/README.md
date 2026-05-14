@@ -26,9 +26,9 @@ From outside the package, the flow is:
 3. `workflow.engine.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.steps.run_agent(...)`:
    - receives the resolved step values from the engine
-   - chooses the configured agent and backend
+   - resolves the configured agent runtime config
    - builds the prompt
-   - runs an interactive terminal session
+   - runs or resumes an interactive terminal session
    - waits for the agent to call `myteam workflow-result`
    - validates the returned payload against the authored output shape
 5. The engine stores completed step state for later `$step.path` references.
@@ -41,6 +41,10 @@ The terminal contract is:
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
 - the child reports its final result over a private Unix socket
+- Python workflow authors can pass `session_id` to `run_agent(...)` to resume a prior agent session,
+  and can read `StepResult.session_id` from completed steps that return one
+- `run_agent(...)` launches agents from the detected project root by default; Python workflow
+  authors can pass `cwd` to override the launch directory for a specific agent run
 
 ## File-Level Ownership
 
@@ -62,7 +66,7 @@ The terminal contract is:
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
 - [steps.py](steps.py)
-  Owns single-step execution: accept resolved step values, select agent/backend, build prompt, run session, validate result, and return `StepResult`.
+  Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run or resume a session, validate result, discover session id, and return `StepResult`.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.
@@ -70,13 +74,16 @@ The terminal contract is:
 ### Agents
 
 - [agents/__init__.py](agents/__init__.py)
-  Re-exports the agent lookup and backend helpers.
+  Re-exports the agent lookup and runtime config helpers.
 
 - [agents/registry.py](agents/registry.py)
-  Owns named workflow agent definitions and default agent lookup.
+  Owns the default agent name and compatibility lookup.
 
-- [agents/backends.py](agents/backends.py)
-  Owns backend-specific terminal input encoding, including submit and exit byte sequences.
+- [agents/runtime.py](agents/runtime.py)
+  Owns resolution of optional project-local runtime config modules with fallback to packaged defaults.
+
+- [agents/codex.py](agents/codex.py) and [agents/pi.py](agents/pi.py)
+  Own packaged default runtime config modules for supported agents, including each agent's terminal input encoding, launch arguments, exit sequence, and session discovery.
 
 ### Terminal
 

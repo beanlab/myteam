@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.2.19
+
+- Added session-aware workflow agent execution so `run_agent(...)` can resume a prior agent session
+  when given `session_id`.
+- Changed `run_agent(...)` to launch agents from the detected project root by default, with an
+  optional `cwd` override for Python workflow authors.
+- Workflow agents are configured in `workflow/agents/<agent>.py`, but allow for local overrides
+  in `.myteam`
+- Added nonce-based session ID discovery from `/sessions` folders for pi and codex.
+- Added `StepResult.session_id` so Python workflows can carry agent session state across related
+  steps.
+
 ## 0.2.18
 
 - Treat Linux/WSL PTY master `EIO` reads as end-of-file so completed workflow

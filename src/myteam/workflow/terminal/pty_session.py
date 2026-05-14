@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Mapping
+from pathlib import Path
 from queue import Empty, Queue
 import errno
 import os
@@ -21,12 +22,14 @@ class PtySession:
         argv: list[str],
         *,
         env: Mapping[str, str] | None = None,
-        inactivity_timeout_seconds: int = 300,
+        cwd: Path | str | None = None,
+        inactivity_timeout_seconds: int = 600,
         mirror_stdout: bool = True,
         forward_stdin: bool = True,
     ) -> None:
         self.argv = argv
         self.env = None if env is None else dict(env)
+        self.cwd = None if cwd is None else Path(cwd)
         self.inactivity_timeout_seconds = inactivity_timeout_seconds
         self.mirror_stdout = mirror_stdout
         self.forward_stdin = forward_stdin
@@ -52,6 +55,7 @@ class PtySession:
             stdout=self._slave_fd,
             stderr=self._slave_fd,
             env=None if self.env is None else {**os.environ, **self.env},
+            cwd=self.cwd,
             start_new_session=True,
             close_fds=True,
         )
