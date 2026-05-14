@@ -117,9 +117,9 @@ def test_pi_get_session_id_finds_newest_matching_session(tmp_path: Path, monkeyp
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     sessions_dir = tmp_path / ".pi" / "agent" / "sessions" / "--Users--tyler--project--"
     sessions_dir.mkdir(parents=True)
-    older_match = sessions_dir / "20260514T100000_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
-    newest_nonmatch = sessions_dir / "20260514T100100_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl"
-    newest_match = sessions_dir / "20260514T100200_cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    older_match = sessions_dir / "2026-05-14T10-00-00-000Z_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+    newest_nonmatch = sessions_dir / "2026-05-14T10-01-00-000Z_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl"
+    newest_match = sessions_dir / "2026-05-14T10-02-00-000Z_cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
     older_match.write_text("nonce-123", encoding="utf-8")
     newest_nonmatch.write_text("other", encoding="utf-8")
     newest_match.write_text("nonce-123", encoding="utf-8")
@@ -128,3 +128,26 @@ def test_pi_get_session_id_finds_newest_matching_session(tmp_path: Path, monkeyp
     os.utime(newest_match, (3, 3))
 
     assert get_pi_session_id("nonce-123") == "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+
+def test_pi_get_session_id_prefers_current_project_session_dir(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    project_dir = tmp_path / "workspace" / "project"
+    project_dir.mkdir(parents=True)
+    monkeypatch.chdir(project_dir)
+
+    sessions_root = tmp_path / ".pi" / "agent" / "sessions"
+    project_slug = project_dir.resolve().as_posix().strip("/").replace("/", "-")
+    project_sessions_dir = sessions_root / f"--{project_slug}--"
+    unrelated_sessions_dir = sessions_root / "--tmp-other-project--"
+    project_sessions_dir.mkdir(parents=True)
+    unrelated_sessions_dir.mkdir(parents=True)
+
+    project_match = project_sessions_dir / "2026-05-14T19-22-36-232Z_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+    newer_unrelated_match = unrelated_sessions_dir / "2026-05-14T19-23-36-232Z_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl"
+    project_match.write_text("nonce-123", encoding="utf-8")
+    newer_unrelated_match.write_text("nonce-123", encoding="utf-8")
+    os.utime(project_match, (1, 1))
+    os.utime(newer_unrelated_match, (2, 2))
+
+    assert get_pi_session_id("nonce-123") == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
