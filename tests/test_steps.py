@@ -19,7 +19,6 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
             if current_session_id is not None
             else ["codex", prompt_text]
         ),
-        session_discovery_prompt="Nonce-based session discovery is enabled.",
         source="test",
     )
 
@@ -56,7 +55,6 @@ def test_run_agent_returns_completed_result(monkeypatch):
     assert seen["argv"][0] == "codex"
     assert len(seen["argv"]) == 2
     assert "workflow-result" in seen["argv"][1]
-    assert "Nonce-based session discovery is enabled." in seen["argv"][1]
     assert "Session nonce:" in seen["argv"][1]
     assert b"/quit" in seen["exit_input"]
     assert result.session_id == "discovered-session"
@@ -172,7 +170,6 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
         encode_input=config.encode_input,
         get_session_id=missing_session_id,
         build_argv=config.build_argv,
-        session_discovery_prompt=config.session_discovery_prompt,
         source=config.source,
     )
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)

@@ -28,7 +28,6 @@ def run_agent(
             resolved_input=resolved_input,
             objective_text=prompt,
             output_template=output,
-            session_discovery_prompt=agent_config.session_discovery_prompt,
             session_nonce=nonce,
         )
         session_result = run_terminal_session(
@@ -102,7 +101,6 @@ def _build_step_prompt(
     resolved_input: Any,
     objective_text: str,
     output_template: dict[str, Any],
-    session_discovery_prompt: str,
     session_nonce: str | None,
 ) -> str:
     sections = [
@@ -116,9 +114,6 @@ def _build_step_prompt(
         "JSON",
         "",
         "Do not print result markers in the terminal.",
-        "",
-        "Session:",
-        session_discovery_prompt,
     ]
     if session_nonce is not None:
         sections.append(f"Session nonce: {session_nonce}")

@@ -18,7 +18,6 @@ class AgentRuntimeConfig:
     encode_input: Callable[[str], bytes]
     get_session_id: Callable[[str], str]
     build_argv: Callable[[str, str | None], list[str]]
-    session_discovery_prompt: str
     source: Path | str
 
 
@@ -93,14 +92,6 @@ def _config_from_module(agent_name: str, module: ModuleType, *, source: Path | s
     encode_input = _required_callable(module, "encode_input")
     get_session_id = _required_callable(module, "get_session_id")
     build_argv = _build_argv_callable(module, exec_name)
-    session_discovery_prompt = getattr(
-        module,
-        "SESSION_DISCOVERY_PROMPT",
-        "The workflow runtime embedded a session nonce in this prompt.",
-    )
-    if not isinstance(session_discovery_prompt, str):
-        raise AgentConfigError("SESSION_DISCOVERY_PROMPT must be a string")
-
     return AgentRuntimeConfig(
         name=agent_name,
         exec=exec_name,
@@ -108,7 +99,6 @@ def _config_from_module(agent_name: str, module: ModuleType, *, source: Path | s
         encode_input=encode_input,
         get_session_id=get_session_id,
         build_argv=build_argv,
-        session_discovery_prompt=session_discovery_prompt,
         source=source,
     )
 

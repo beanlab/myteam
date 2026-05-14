@@ -4,10 +4,6 @@ import re
 from pathlib import Path
 
 EXEC = "codex"
-SESSION_DISCOVERY_PROMPT = (
-    "The workflow runtime embedded a unique session nonce in this prompt. "
-    "You do not need to report the session ID manually."
-)
 
 PTY_RIGHT_ARROW = b"\x1b[C"
 SESSION_ID_RE = re.compile(

@@ -8,11 +8,6 @@ EXEC = "pi"
 PTY_RIGHT_ARROW = b"\x1b[C"
 SESSION_ID_RE = re.compile(r".+_([0-9a-f-]{36})\.jsonl$")
 
-SESSION_DISCOVERY_PROMPT = (
-    "The workflow runtime embedded a unique session nonce in this prompt. "
-    "You do not need to report the session ID manually."
-)
-
 
 def encode_input(text: str) -> bytes:
     payload = text.rstrip("\r\n")
