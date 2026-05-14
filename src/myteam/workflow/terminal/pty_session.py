@@ -21,7 +21,7 @@ class PtySession:
         argv: list[str],
         *,
         env: Mapping[str, str] | None = None,
-        inactivity_timeout_seconds: int = 300,
+        inactivity_timeout_seconds: int = 600,
         mirror_stdout: bool = True,
         forward_stdin: bool = True,
     ) -> None:
