@@ -21,12 +21,14 @@ def run_agent(
     input: Any = None,
     agent: str | None = None,
     session_id: str | None = None,
+    cwd: Path | str | None = None,
 ) -> StepResult:
     transcript = ""
     try:
         resolved_input = input
         agent_name = _require_agent_name(agent)
         project_root = _resolve_project_root()
+        launch_cwd = project_root if cwd is None else Path(cwd).resolve()
         agent_config = _resolve_agent_config(agent_name, project_root=project_root)
         nonce = str(uuid.uuid4()) if session_id is None else None
         prompt_text = _build_step_prompt(
@@ -38,7 +40,7 @@ def run_agent(
         session_result = run_terminal_session(
             agent_config.build_argv(prompt_text, session_id),
             exit_input=agent_config.exit_sequence,
-            cwd=project_root,
+            cwd=launch_cwd,
             inactivity_timeout_seconds=300,
         )
         transcript = session_result.transcript

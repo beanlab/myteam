@@ -43,6 +43,8 @@ The terminal contract is:
 - the child reports its final result over a private Unix socket
 - Python workflow authors can pass `session_id` to `run_agent(...)` to resume a prior agent session,
   and can read `StepResult.session_id` from completed steps that return one
+- `run_agent(...)` launches agents from the detected project root by default; Python workflow
+  authors can pass `cwd` to override the launch directory for a specific agent run
 
 ## File-Level Ownership
 

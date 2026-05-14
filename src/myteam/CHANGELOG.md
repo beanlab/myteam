@@ -4,6 +4,8 @@
 
 - Added session-aware workflow agent execution so `run_agent(...)` can resume a prior agent session
   when given `session_id`.
+- Changed `run_agent(...)` to launch agents from the detected project root by default, with an
+  optional `cwd` override for Python workflow authors.
 - Added packaged workflow agent runtime configs with optional project-local overrides
 - Added nonce-based session ID discovery from rollout files for new workflow agent sessions.
 - Added `StepResult.session_id` so Python workflows can carry agent session state across related

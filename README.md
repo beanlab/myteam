@@ -286,6 +286,8 @@ Executes a workflow definition from the selected local root.
 - later workflow steps may reference completed state from earlier steps
 - Python workflow files may resume related agent sessions by passing a prior `StepResult.session_id`
   into `run_agent(...)`
+- Python workflow files may pass `cwd` to `run_agent(...)` to override the default agent launch
+  directory
 
 Examples:
 
