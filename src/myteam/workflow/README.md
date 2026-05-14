@@ -81,10 +81,7 @@ The terminal contract is:
   Owns resolution of optional project-local runtime config modules with fallback to packaged defaults.
 
 - [agents/codex.py](agents/codex.py) and [agents/pi.py](agents/pi.py)
-  Own packaged default runtime config modules for supported agents.
-
-- [agents/input.py](agents/input.py)
-  Owns shared terminal input encoding helpers for packaged runtime configs.
+  Own packaged default runtime config modules for supported agents, including each agent's terminal input encoding, launch arguments, exit sequence, and session discovery.
 
 ### Terminal
 

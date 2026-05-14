@@ -3,8 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .input import encode_command
-
 EXEC = "codex"
 SESSION_DISCOVERY_PROMPT = (
     "The workflow runtime embedded a unique session nonce in this prompt. "
