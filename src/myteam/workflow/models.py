@@ -7,7 +7,6 @@ from typing import Any, TypedDict
 class AgentConfig(TypedDict):
     name: str
     argv: list[str]
-    backend: str
 
 
 class StepDefinition(TypedDict, total=False):
@@ -47,6 +46,7 @@ class StepResult:
     - ``timeout``: the PTY session became inactive before the step completed.
     - ``completion_missing``: the agent session ended without producing a structured result.
     - ``output_validation``: the completion payload content did not satisfy the authored output template.
+    - ``session_discovery``: the step completed but the runtime could not discover the new agent session id.
     """
     status: str
     output: Any | None = None

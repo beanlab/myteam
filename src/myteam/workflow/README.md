@@ -26,7 +26,7 @@ From outside the package, the flow is:
 3. `workflow.engine.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.steps.run_agent(...)`:
    - receives the resolved step values from the engine
-   - chooses the configured agent and backend
+   - resolves the configured agent runtime config
    - builds the prompt
    - runs or resumes an interactive terminal session
    - waits for the agent to call `myteam workflow-result`
@@ -64,7 +64,7 @@ The terminal contract is:
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
 - [steps.py](steps.py)
-  Owns single-step execution: accept resolved step values, select agent/backend, build prompt, run or resume a session, validate result, and return `StepResult`.
+  Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run or resume a session, validate result, discover session id, and return `StepResult`.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.
@@ -72,14 +72,19 @@ The terminal contract is:
 ### Agents
 
 - [agents/__init__.py](agents/__init__.py)
-  Re-exports the agent lookup and backend helpers.
+  Re-exports the agent lookup and runtime config helpers.
 
 - [agents/registry.py](agents/registry.py)
-  Owns named workflow agent definitions and default agent lookup.
+  Owns the default agent name and compatibility lookup.
 
-- [agents/backends.py](agents/backends.py)
-  Owns backend-specific terminal input encoding, resume argv construction, session discovery guidance,
-  and submit/exit byte sequences.
+- [agents/runtime.py](agents/runtime.py)
+  Owns resolution of optional project-local runtime config modules with fallback to packaged defaults.
+
+- [agents/codex.py](agents/codex.py) and [agents/pi.py](agents/pi.py)
+  Own packaged default runtime config modules for supported agents.
+
+- [agents/input.py](agents/input.py)
+  Owns shared terminal input encoding helpers for packaged runtime configs.
 
 ### Terminal
 
