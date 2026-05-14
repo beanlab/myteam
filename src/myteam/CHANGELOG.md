@@ -4,7 +4,8 @@
 
 - Added session-aware workflow agent execution so `run_agent(...)` can resume a prior agent session
   when given `session_id`.
-- Added backend-owned session resume behavior and session ID discovery guidance for workflow agents.
+- Added packaged workflow agent runtime configs with optional project-local overrides
+- Added nonce-based session ID discovery from rollout files for new workflow agent sessions.
 - Added `StepResult.session_id` so Python workflows can carry agent session state across related
   steps.
 
