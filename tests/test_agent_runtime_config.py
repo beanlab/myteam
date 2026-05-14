@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.agents.codex import get_session_id
+from myteam.workflow.agents.codex import get_session_id as get_codex_session_id
+from myteam.workflow.agents.pi import get_session_id as get_pi_session_id
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
 from myteam.workflow.parser import load_workflow
 
@@ -109,4 +110,21 @@ def test_codex_get_session_id_finds_newest_matching_rollout(tmp_path: Path, monk
     os.utime(newest_nonmatch, (2, 2))
     os.utime(newest_match, (3, 3))
 
-    assert get_session_id("nonce-123") == "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    assert get_codex_session_id("nonce-123") == "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+
+def test_pi_get_session_id_finds_newest_matching_session(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    sessions_dir = tmp_path / ".pi" / "agent" / "sessions" / "--Users--tyler--project--"
+    sessions_dir.mkdir(parents=True)
+    older_match = sessions_dir / "20260514T100000_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+    newest_nonmatch = sessions_dir / "20260514T100100_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl"
+    newest_match = sessions_dir / "20260514T100200_cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    older_match.write_text("nonce-123", encoding="utf-8")
+    newest_nonmatch.write_text("other", encoding="utf-8")
+    newest_match.write_text("nonce-123", encoding="utf-8")
+    os.utime(older_match, (1, 1))
+    os.utime(newest_nonmatch, (2, 2))
+    os.utime(newest_match, (3, 3))
+
+    assert get_pi_session_id("nonce-123") == "cccccccc-cccc-cccc-cccc-cccccccccccc"
