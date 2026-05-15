@@ -30,7 +30,7 @@ Every `<agent>.py` module must define:
 EXEC = "agent-executable"
 EXIT_COMMAND = "/quit"
 
-def get_session_id(nonce: str) -> str:
+def get_session_id(nonce: str, context: AgentSessionContext) -> str:
     ...
 ```
 
@@ -94,11 +94,18 @@ Existing local configs can still provide already-encoded bytes:
 EXIT_SEQUENCE = b"exit\r"
 ```
 
-### `get_session_id(nonce)`
+### `get_session_id(nonce, context)`
 
 `get_session_id` returns the session id for a completed step. `myteam` embeds
 a nonce in the prompt, then calls this function after completion so Python
 workflows can resume or fork previous sessions.
+
+The `context` argument is an `AgentSessionContext` with explicit dependencies
+for session lookup:
+
+- `context.home`: resolved home directory for the parent process
+- `context.project_root`: resolved myteam project root
+- `context.launch_cwd`: resolved working directory used to launch the agent
 
 A typical implementation searches the agent CLI's session files newest-first,
 looks for the nonce, extracts the session id from the matching filename, and
@@ -120,6 +127,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
+from myteam.workflow.agents import AgentSessionContext
 
 EXEC = "example-agent"
 SESSION_ID_RE = re.compile(r"session-([0-9a-f-]{36})\.jsonl$")
@@ -143,8 +152,8 @@ def build_argv(
     return argv
 
 
-def get_session_id(nonce: str) -> str:
-    sessions_dir = Path.home() / ".example-agent" / "sessions"
+def get_session_id(nonce: str, context: AgentSessionContext) -> str:
+    sessions_dir = context.home / ".example-agent" / "sessions"
     for path in sorted(sessions_dir.rglob("*.jsonl"), key=_mtime, reverse=True):
         try:
             if nonce not in path.read_text(encoding="utf-8", errors="ignore"):
@@ -164,4 +173,67 @@ def _mtime(path: Path) -> float:
         return path.stat().st_mtime
     except OSError:
         return 0.0
+```
+
+## Example Alias for Codex Mini
+
+Create a project-local config at `.myteam/.config/codex_mini.py` when you want
+an adapter that behaves exactly like the built-in Codex adapter but launches
+with a different argv:
+
+```python
+from __future__ import annotations
+
+from myteam.workflow.agents.codex import EXIT_COMMAND
+from myteam.workflow.agents.codex import build_argv as build_codex_argv
+from myteam.workflow.agents.codex import get_session_id
+
+EXEC = "codex"
+
+
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    resume_session_id: str | None = None,
+    fork_session_id: str | None = None,
+) -> list[str]:
+    argv = build_codex_argv(
+        prompt_text,
+        interactive,
+        resume_session_id,
+        fork_session_id,
+    )
+    argv[1:1] = ["--model", "gpt-5.4-mini"]
+    return argv
+```
+
+A custom Python workflow can then select the alias by passing the local config
+name as the `agent` value:
+
+```python
+from myteam.workflow.steps import run_agent
+
+
+result = run_agent(
+    agent="codex_mini",
+    prompt="Summarize the release notes in three bullets.",
+    output={"summary": ["bullet text"]},
+)
+
+if result.status != "completed":
+    raise RuntimeError(result.error_message)
+
+print(result.output["summary"])
+```
+
+For session-aware workflows, use `result.session_id` exactly as you would with
+the built-in `codex` adapter:
+
+```python
+follow_up = run_agent(
+    agent="codex_mini",
+    resume_session_id=result.session_id,
+    prompt="Turn the summary into a changelog entry.",
+    output={"changelog": "entry text"},
+)
 ```

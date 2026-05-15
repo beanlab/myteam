@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .runtime import AgentSessionContext
+
 EXEC = "pi"
 SESSION_ID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")
 EXIT_COMMAND = "/quit"
@@ -25,9 +27,9 @@ def build_argv(
     return argv
 
 
-def get_session_id(nonce: str) -> str:
-    sessions_dir = Path.home() / ".pi" / "agent" / "sessions"
-    project_sessions_dir = sessions_dir / _project_session_dir_name(Path.cwd())
+def get_session_id(nonce: str, context: AgentSessionContext) -> str:
+    sessions_dir = context.home / ".pi" / "agent" / "sessions"
+    project_sessions_dir = sessions_dir / _project_session_dir_name(context.launch_cwd)
     candidates = _session_candidates(project_sessions_dir)
     if project_sessions_dir != sessions_dir:
         candidates.extend(path for path in _session_candidates(sessions_dir) if path not in candidates)

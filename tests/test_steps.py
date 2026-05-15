@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
-from myteam.workflow.agents.runtime import AgentRuntimeConfig
+from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from myteam.workflow.steps import run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 
@@ -407,6 +408,7 @@ def test_run_agent_launches_from_project_root_when_called_under_active_root(tmp_
 
     def fake_resolve_agent_runtime_config(_agent, **kwargs):
         seen["project_root"] = kwargs["project_root"]
+        seen["session_context"] = kwargs["session_context"]
         return fake_agent_config()
 
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
@@ -421,6 +423,11 @@ def test_run_agent_launches_from_project_root_when_called_under_active_root(tmp_
     assert result.status == "completed"
     assert seen["cwd"] == tmp_path.resolve()
     assert seen["project_root"] == tmp_path.resolve()
+    assert seen["session_context"] == AgentSessionContext(
+        home=Path.home().resolve(),
+        project_root=tmp_path.resolve(),
+        launch_cwd=tmp_path.resolve(),
+    )
 
 
 def test_run_agent_allows_launch_cwd_override(tmp_path, monkeypatch):
@@ -448,6 +455,7 @@ def test_run_agent_allows_launch_cwd_override(tmp_path, monkeypatch):
 
     def fake_resolve_agent_runtime_config(_agent, **kwargs):
         seen["project_root"] = kwargs["project_root"]
+        seen["session_context"] = kwargs["session_context"]
         return fake_agent_config()
 
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
@@ -463,3 +471,8 @@ def test_run_agent_allows_launch_cwd_override(tmp_path, monkeypatch):
     assert result.status == "completed"
     assert seen["cwd"] == requested_cwd.resolve()
     assert seen["project_root"] == tmp_path.resolve()
+    assert seen["session_context"] == AgentSessionContext(
+        home=Path.home().resolve(),
+        project_root=tmp_path.resolve(),
+        launch_cwd=requested_cwd.resolve(),
+    )

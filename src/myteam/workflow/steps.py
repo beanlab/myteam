@@ -9,7 +9,7 @@ from typing import Any
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 
 from .agents import resolve_agent_runtime_config
-from .agents.runtime import AgentRuntimeConfig
+from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult
 from .terminal.session import run_terminal_session
 
@@ -53,7 +53,12 @@ def run_agent(
         agent_name = _require_agent_name(agent)
         project_root = _resolve_project_root()
         launch_cwd = project_root if cwd is None else Path(cwd).resolve()
-        agent_config = _resolve_agent_config(agent_name, project_root=project_root)
+        session_context = AgentSessionContext(
+            home=Path.home().resolve(),
+            project_root=project_root,
+            launch_cwd=launch_cwd,
+        )
+        agent_config = _resolve_agent_config(agent_name, session_context=session_context)
         nonce = str(uuid.uuid4())
         prompt_text = _build_step_prompt(
             resolved_input=resolved_input,
@@ -142,9 +147,13 @@ def _resolve_project_root() -> Path:
     return cwd
 
 
-def _resolve_agent_config(agent_name: str, *, project_root: Path) -> AgentRuntimeConfig:
+def _resolve_agent_config(agent_name: str, *, session_context: AgentSessionContext) -> AgentRuntimeConfig:
     try:
-        return resolve_agent_runtime_config(agent_name, project_root=project_root)
+        return resolve_agent_runtime_config(
+            agent_name,
+            project_root=session_context.project_root,
+            session_context=session_context,
+        )
     except KeyError as exc:
         raise StepExecutionError("agent_resolution", str(exc)) from exc
 
