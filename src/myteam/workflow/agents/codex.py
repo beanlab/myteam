@@ -3,30 +3,36 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .runtime import AgentSessionContext
+
 EXEC = "codex"
-
-PTY_RIGHT_ARROW = b"\x1b[C"
-SESSION_ID_RE = re.compile(
-    r"rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-([0-9a-f-]{36})\.jsonl$"
-)
+SESSION_ID_RE = re.compile(r"rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-([0-9a-f-]{36})\.jsonl$")
+EXIT_COMMAND = "/quit"
 
 
-def encode_input(text: str) -> bytes:
-    payload = text.rstrip("\r\n")
-    return payload.encode("utf-8") + PTY_RIGHT_ARROW + b"\r"
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    session_id: str | None = None,
+    fork: bool = False,
+    extra_args: list[str] | None = None,
+) -> list[str]:
+    extras = extra_args or []
+    if not interactive and fork:
+        raise ValueError("Codex non-interactive workflow steps do not support fork.")
+    if not interactive and session_id is not None:
+        return [EXEC, "exec", "resume", session_id, *extras, prompt_text]
+    if session_id is not None and fork:
+        return [EXEC, "fork", session_id, *extras, prompt_text]
+    if session_id is not None:
+        return [EXEC, "resume", session_id, *extras, prompt_text]
+    if not interactive:
+        return [EXEC, "exec", *extras, prompt_text]
+    return [EXEC, *extras, prompt_text]
 
 
-EXIT_SEQUENCE = encode_input("/quit")
-
-
-def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-    if session_id is None:
-        return [EXEC, prompt_text]
-    return [EXEC, "resume", session_id, prompt_text]
-
-
-def get_session_id(nonce: str) -> str:
-    sessions_dir = Path.home() / ".codex" / "sessions"
+def get_session_id(nonce: str, context: AgentSessionContext) -> str:
+    sessions_dir = context.home / ".codex" / "sessions"
     candidates = sorted(
         sessions_dir.rglob("rollout-*.jsonl"),
         key=_mtime,

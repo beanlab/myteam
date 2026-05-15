@@ -41,8 +41,8 @@ The terminal contract is:
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
 - the child reports its final result over a private Unix socket
-- Python workflow authors can pass `session_id` to `run_agent(...)` to resume a prior agent session,
-  and can read `StepResult.session_id` from completed steps that return one
+- Python workflow authors can pass `session_id` to `run_agent(...)` to resume, set `fork=True`
+  to fork that session, and read `StepResult.session_id` from completed steps that return one
 - `run_agent(...)` launches agents from the detected project root by default; Python workflow
   authors can pass `cwd` to override the launch directory for a specific agent run
 
@@ -66,7 +66,7 @@ The terminal contract is:
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
 - [steps.py](steps.py)
-  Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run or resume a session, validate result, discover session id, and return `StepResult`.
+  Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run, resume, or fork a session, validate result, discover session id, and return `StepResult`.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.

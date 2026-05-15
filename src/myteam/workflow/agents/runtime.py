@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -9,15 +10,23 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from .agent_utils import encode_input
+
+
+@dataclass(frozen=True)
+class AgentSessionContext:
+    home: Path
+    project_root: Path
+    launch_cwd: Path
+
 
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
     name: str
     exec: str
     exit_sequence: bytes
-    encode_input: Callable[[str], bytes]
     get_session_id: Callable[[str], str]
-    build_argv: Callable[[str, str | None], list[str]]
+    build_argv: Callable[[str, bool, str | None, bool, list[str] | None], list[str]]
     source: Path | str
 
 
@@ -28,18 +37,25 @@ class AgentConfigError(Exception):
 def resolve_agent_runtime_config(
     name: str | None,
     *,
-    project_root: Path | None = None,
+    project_root: Path,
+    session_context: AgentSessionContext,
     logger: Callable[[str], None] | None = None,
 ) -> AgentRuntimeConfig:
     agent_name = _require_agent_name(name)
-    root = Path.cwd() if project_root is None else project_root
-    local_path = root / ".myteam" / ".config" / f"{agent_name}.py"
+    local_path = project_root / ".myteam" / ".config" / f"{agent_name}.py"
+    local_error: Exception | None = None
 
     if local_path.exists():
         try:
             module = _load_module_from_path(agent_name, local_path)
-            config = _config_from_module(agent_name, module, source=local_path)
+            config = _config_from_module(
+                agent_name,
+                module,
+                source=local_path,
+                session_context=session_context,
+            )
         except Exception as exc:
+            local_error = exc
             _log(
                 logger,
                 f"Local workflow agent config '{local_path}' is unusable: {exc}. "
@@ -57,9 +73,14 @@ def resolve_agent_runtime_config(
             agent_name,
             module,
             source=f"myteam.workflow.agents.{agent_name}",
+            session_context=session_context,
         )
     except ModuleNotFoundError as exc:
         if exc.name == f"myteam.workflow.agents.{agent_name}":
+            if local_error is not None:
+                raise KeyError(
+                    f"Invalid local workflow agent config for {agent_name}: {local_error}"
+                ) from local_error
             raise KeyError(f"Unknown workflow agent: {agent_name}") from exc
         raise
     except AgentConfigError as exc:
@@ -86,21 +107,32 @@ def _load_module_from_path(agent_name: str, path: Path) -> ModuleType:
     return module
 
 
-def _config_from_module(agent_name: str, module: ModuleType, *, source: Path | str) -> AgentRuntimeConfig:
+def _config_from_module(
+    agent_name: str,
+    module: ModuleType,
+    *,
+    source: Path | str,
+    session_context: AgentSessionContext,
+) -> AgentRuntimeConfig:
     exec_name = _required_attr(module, "EXEC", str)
-    exit_sequence = _required_attr(module, "EXIT_SEQUENCE", bytes)
-    encode_input = _required_callable(module, "encode_input")
-    get_session_id = _required_callable(module, "get_session_id")
-    build_argv = _build_argv_callable(module, exec_name)
+    exit_sequence = _exit_sequence_from_module(module)
+    get_session_id = _get_session_id_callable(module, session_context)
+    build_argv = _build_argv_callable(module)
     return AgentRuntimeConfig(
         name=agent_name,
         exec=exec_name,
         exit_sequence=exit_sequence,
-        encode_input=encode_input,
         get_session_id=get_session_id,
         build_argv=build_argv,
         source=source,
     )
+
+
+def _exit_sequence_from_module(module: ModuleType) -> bytes:
+    if hasattr(module, "EXIT_SEQUENCE"):
+        return _required_attr(module, "EXIT_SEQUENCE", bytes)
+    exit_command = _required_attr(module, "EXIT_COMMAND", str)
+    return encode_input(exit_command)
 
 
 def _required_attr(module: ModuleType, name: str, expected_type: type) -> Any:
@@ -121,19 +153,54 @@ def _required_callable(module: ModuleType, name: str) -> Callable[..., Any]:
     return value
 
 
-def _build_argv_callable(module: ModuleType, exec_name: str) -> Callable[[str, str | None], list[str]]:
+def _get_session_id_callable(
+    module: ModuleType,
+    session_context: AgentSessionContext,
+) -> Callable[[str], str]:
+    module_get_session_id = _required_callable(module, "get_session_id")
+    _require_positional_parameter_count(module_get_session_id, "get_session_id", 2)
+
+    def get_session_id(nonce: str) -> str:
+        return module_get_session_id(nonce, session_context)
+
+    return get_session_id
+
+
+def _require_positional_parameter_count(callable_value: Callable[..., Any], name: str, count: int) -> None:
+    try:
+        signature = inspect.signature(callable_value)
+    except (TypeError, ValueError) as exc:
+        raise AgentConfigError(f"{name} signature could not be inspected") from exc
+
+    positional_parameters = [
+        parameter
+        for parameter in signature.parameters.values()
+        if parameter.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+    has_varargs = any(
+        parameter.kind is inspect.Parameter.VAR_POSITIONAL
+        for parameter in signature.parameters.values()
+    )
+    if not has_varargs and len(positional_parameters) != count:
+        raise AgentConfigError(f"{name} must accept nonce and context")
+
+
+def _build_argv_callable(module: ModuleType) -> Callable[[str, bool, str | None, bool, list[str] | None], list[str]]:
     if hasattr(module, "build_argv"):
         build_argv = getattr(module, "build_argv")
         if not callable(build_argv):
             raise AgentConfigError("build_argv must be callable")
         return build_argv
 
-    def default_build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-        if session_id is None:
-            return [exec_name, prompt_text]
-        return [exec_name, "resume", session_id, prompt_text]
-
-    return default_build_argv
+    raise AgentConfigError(
+        "missing build_argv; workflow agent configs must implement "
+        "build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None) "
+        "and return a list of argv strings."
+    )
 
 
 def _log(logger: Callable[[str], None] | None, message: str) -> None:
