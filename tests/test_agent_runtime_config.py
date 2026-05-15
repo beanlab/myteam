@@ -55,7 +55,9 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce, context):\n"
-        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n",
+        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
 
@@ -72,6 +74,26 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     assert config.get_session_id("nonce") == f"nonce:{tmp_path.name}:{tmp_path.name}"
 
 
+def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_dir = tmp_path / ".myteam" / ".config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "custom.py").write_text(
+        "EXEC = 'custom-agent'\n"
+        "EXIT_COMMAND = 'exit'\n"
+        "def get_session_id(nonce, context):\n"
+        "    return 'local-session'\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KeyError, match="missing build_argv"):
+        resolve_agent_runtime_config(
+            "custom",
+            project_root=tmp_path,
+            session_context=agent_session_context(tmp_path),
+        )
+
+
 def test_resolve_rejects_local_get_session_id_without_context(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_dir = tmp_path / ".myteam" / ".config"
@@ -80,11 +102,13 @@ def test_resolve_rejects_local_get_session_id_without_context(tmp_path: Path, mo
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce):\n"
-        "    return 'local-session'\n",
+        "    return 'local-session'\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
 
-    with pytest.raises(KeyError, match="Unknown workflow agent: custom"):
+    with pytest.raises(KeyError, match="get_session_id must accept nonce and context"):
         resolve_agent_runtime_config(
             "custom",
             project_root=tmp_path,
@@ -100,7 +124,9 @@ def test_resolve_accepts_legacy_local_exit_sequence(tmp_path: Path, monkeypatch)
         "EXEC = 'custom-agent'\n"
         "EXIT_SEQUENCE = b'exit\\n'\n"
         "def get_session_id(nonce, context):\n"
-        "    return 'local-session'\n",
+        "    return 'local-session'\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
 
@@ -122,7 +148,9 @@ def test_resolve_prefers_legacy_exit_sequence_over_exit_command(tmp_path: Path, 
         "EXIT_COMMAND = 'exit-command'\n"
         "EXIT_SEQUENCE = b'exit-sequence\\n'\n"
         "def get_session_id(nonce, context):\n"
-        "    return 'local-session'\n",
+        "    return 'local-session'\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
 
@@ -174,7 +202,9 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce, context):\n"
-        "    return 'local-session'\n",
+        "    return 'local-session'\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
     workflow_file = tmp_path / "workflow.yaml"

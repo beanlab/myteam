@@ -43,6 +43,7 @@ def resolve_agent_runtime_config(
 ) -> AgentRuntimeConfig:
     agent_name = _require_agent_name(name)
     local_path = project_root / ".myteam" / ".config" / f"{agent_name}.py"
+    local_error: Exception | None = None
 
     if local_path.exists():
         try:
@@ -54,6 +55,7 @@ def resolve_agent_runtime_config(
                 session_context=session_context,
             )
         except Exception as exc:
+            local_error = exc
             _log(
                 logger,
                 f"Local workflow agent config '{local_path}' is unusable: {exc}. "
@@ -75,6 +77,10 @@ def resolve_agent_runtime_config(
         )
     except ModuleNotFoundError as exc:
         if exc.name == f"myteam.workflow.agents.{agent_name}":
+            if local_error is not None:
+                raise KeyError(
+                    f"Invalid local workflow agent config for {agent_name}: {local_error}"
+                ) from local_error
             raise KeyError(f"Unknown workflow agent: {agent_name}") from exc
         raise
     except AgentConfigError as exc:
@@ -111,7 +117,7 @@ def _config_from_module(
     exec_name = _required_attr(module, "EXEC", str)
     exit_sequence = _exit_sequence_from_module(module)
     get_session_id = _get_session_id_callable(module, session_context)
-    build_argv = _build_argv_callable(module, exec_name)
+    build_argv = _build_argv_callable(module)
     return AgentRuntimeConfig(
         name=agent_name,
         exec=exec_name,
@@ -183,26 +189,18 @@ def _require_positional_parameter_count(callable_value: Callable[..., Any], name
         raise AgentConfigError(f"{name} must accept nonce and context")
 
 
-def _build_argv_callable(module: ModuleType, exec_name: str) -> Callable[[str, bool, str | None, str | None], list[str]]:
+def _build_argv_callable(module: ModuleType) -> Callable[[str, bool, str | None, str | None], list[str]]:
     if hasattr(module, "build_argv"):
         build_argv = getattr(module, "build_argv")
         if not callable(build_argv):
             raise AgentConfigError("build_argv must be callable")
         return build_argv
 
-    def default_build_argv(
-        prompt_text: str,
-        interactive: bool = True,
-        resume_session_id: str | None = None,
-        fork_session_id: str | None = None,
-    ) -> list[str]:
-        if fork_session_id is not None:
-            raise AgentConfigError(f"Workflow agent '{exec_name}' does not support fork_session_id.")
-        if resume_session_id is None:
-            return [exec_name, prompt_text]
-        return [exec_name, "resume", resume_session_id, prompt_text]
-
-    return default_build_argv
+    raise AgentConfigError(
+        "missing build_argv; workflow agent configs must implement "
+        "build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None) "
+        "and return a list of argv strings."
+    )
 
 
 def _log(logger: Callable[[str], None] | None, message: str) -> None:

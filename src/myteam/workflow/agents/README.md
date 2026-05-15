@@ -32,11 +32,7 @@ EXIT_COMMAND = "/quit"
 
 def get_session_id(nonce: str, context: AgentSessionContext) -> str:
     ...
-```
 
-It may also define:
-
-```python
 def build_argv(
     prompt_text: str,
     interactive: bool = True,
@@ -46,8 +42,9 @@ def build_argv(
     ...
 ```
 
-For compatibility, existing configs may still define `EXIT_SEQUENCE` as bytes.
-When both `EXIT_SEQUENCE` and `EXIT_COMMAND` are present, `EXIT_SEQUENCE` wins.
+Instead of `EXIT_COMMAND` as a string that uses `encode_input` from `agent_utils.py`, you
+may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
+`EXIT_COMMAND` are present, `EXIT_SEQUENCE` takes precedence.
 
 ### `EXEC`
 
