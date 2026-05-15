@@ -22,8 +22,8 @@ def run_agent(
     agent: str | None = None,
     model: str | None = None,
     interactive: bool = True,
-    resume_session_id: str | None = None,
-    fork_session_id: str | None = None,
+    session_id: str | None = None,
+    fork: bool = False,
     extra_args: list[str] | None = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
@@ -37,8 +37,8 @@ def run_agent(
         agent: Workflow agent runtime name to launch.
         model: Optional model name appended to the agent argv as ``--model <model>``.
         interactive: Whether to launch the agent in interactive mode.
-        resume_session_id: Optional existing agent session to resume.
-        fork_session_id: Optional existing agent session to fork into a new session.
+        session_id: Optional existing agent session to resume or fork.
+        fork: Whether to fork ``session_id`` into a new session instead of resuming it.
         extra_args: Optional additional argv items passed to the agent adapter.
         cwd: Optional working directory for launching the agent process.
     """
@@ -47,8 +47,8 @@ def run_agent(
         resolved_input = input
         _validate_session_arguments(
             interactive=interactive,
-            resume_session_id=resume_session_id,
-            fork_session_id=fork_session_id,
+            session_id=session_id,
+            fork=fork,
         )
         agent_name = _require_agent_name(agent)
         project_root = _resolve_project_root()
@@ -70,8 +70,8 @@ def run_agent(
             agent_config=agent_config,
             prompt_text=prompt_text,
             interactive=interactive,
-            resume_session_id=resume_session_id,
-            fork_session_id=fork_session_id,
+            session_id=session_id,
+            fork=fork,
             model=model,
             extra_args=extra_args,
         )
@@ -90,7 +90,8 @@ def run_agent(
         _validate_step_output(output, session_result.payload)
         discovered_session_id = _resolve_session_id(
             payload=session_result.payload,
-            resume_session_id=resume_session_id,
+            session_id=session_id,
+            fork=fork,
             nonce=nonce,
             agent_config=agent_config,
         )
@@ -161,28 +162,28 @@ def _resolve_agent_config(agent_name: str, *, session_context: AgentSessionConte
 def _validate_session_arguments(
     *,
     interactive: bool,
-    resume_session_id: str | None,
-    fork_session_id: str | None,
+    session_id: str | None,
+    fork: bool,
 ) -> None:
     if not isinstance(interactive, bool):
         raise StepExecutionError(
             "argument_validation",
             "Step field 'interactive' must be a boolean when provided.",
         )
-    if resume_session_id is not None and fork_session_id is not None:
+    if not isinstance(fork, bool):
         raise StepExecutionError(
             "argument_validation",
-            "Step fields 'resume_session_id' and 'fork_session_id' are mutually exclusive.",
+            "Step field 'fork' must be a boolean when provided.",
         )
-    if resume_session_id is not None and (not isinstance(resume_session_id, str) or not resume_session_id):
+    if session_id is not None and (not isinstance(session_id, str) or not session_id):
         raise StepExecutionError(
             "argument_validation",
-            "Step field 'resume_session_id' must be a non-empty string when provided.",
+            "Step field 'session_id' must be a non-empty string when provided.",
         )
-    if fork_session_id is not None and (not isinstance(fork_session_id, str) or not fork_session_id):
+    if fork and session_id is None:
         raise StepExecutionError(
             "argument_validation",
-            "Step field 'fork_session_id' must be a non-empty string when provided.",
+            "Step field 'session_id' is required when 'fork' is true.",
         )
 
 
@@ -191,8 +192,8 @@ def _build_agent_argv(
     agent_config: AgentRuntimeConfig,
     prompt_text: str,
     interactive: bool,
-    resume_session_id: str | None,
-    fork_session_id: str | None,
+    session_id: str | None,
+    fork: bool,
     model: str | None,
     extra_args: list[str] | None,
 ) -> list[str]:
@@ -213,8 +214,8 @@ def _build_agent_argv(
         argv = agent_config.build_argv(
             prompt_text,
             interactive,
-            resume_session_id,
-            fork_session_id,
+            session_id,
+            fork,
             extra_args=extra_args,
         )
     except Exception as exc:
@@ -282,15 +283,16 @@ def _build_step_prompt(
 def _resolve_session_id(
     *,
     payload: Any,
-    resume_session_id: str | None,
+    session_id: str | None,
+    fork: bool,
     nonce: str | None,
     agent_config: AgentRuntimeConfig,
 ) -> str | None:
     payload_session_id = _extract_session_id(payload)
     if payload_session_id is not None:
         return payload_session_id
-    if resume_session_id is not None:
-        return resume_session_id
+    if session_id is not None and not fork:
+        return session_id
     if nonce is None:
         return None
     try:

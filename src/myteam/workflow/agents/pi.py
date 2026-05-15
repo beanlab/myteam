@@ -13,18 +13,19 @@ EXIT_COMMAND = "/quit"
 def build_argv(
     prompt_text: str,
     interactive: bool = True,
-    resume_session_id: str | None = None,
-    fork_session_id: str | None = None,
+    session_id: str | None = None,
+    fork: bool = False,
     extra_args: list[str] | None = None,
 ) -> list[str]:
     extras = extra_args or []
     argv = [EXEC]
     if not interactive:
         argv.append("--print")
-    if resume_session_id is not None:
-        argv.extend(["--session", resume_session_id])
-    if fork_session_id is not None:
-        argv.extend(["--fork", fork_session_id])
+    if session_id is not None:
+        if fork:
+            argv.extend(["--fork", session_id])
+        else:
+            argv.extend(["--session", session_id])
     argv.extend(extras)
     argv.append(prompt_text)
     return argv

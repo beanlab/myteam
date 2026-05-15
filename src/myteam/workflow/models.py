@@ -17,8 +17,8 @@ class StepDefinition(TypedDict, total=False):
     model: str
     extra_args: list[str]
     interactive: bool
-    resume_session_id: str
-    fork_session_id: str
+    session_id: str
+    fork: bool
 
 
 WorkflowDefinition = dict[str, StepDefinition]

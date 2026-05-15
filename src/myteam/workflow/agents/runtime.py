@@ -26,7 +26,7 @@ class AgentRuntimeConfig:
     exec: str
     exit_sequence: bytes
     get_session_id: Callable[[str], str]
-    build_argv: Callable[[str, bool, str | None, str | None, list[str] | None], list[str]]
+    build_argv: Callable[[str, bool, str | None, bool, list[str] | None], list[str]]
     source: Path | str
 
 
@@ -189,7 +189,7 @@ def _require_positional_parameter_count(callable_value: Callable[..., Any], name
         raise AgentConfigError(f"{name} must accept nonce and context")
 
 
-def _build_argv_callable(module: ModuleType) -> Callable[[str, bool, str | None, str | None, list[str] | None], list[str]]:
+def _build_argv_callable(module: ModuleType) -> Callable[[str, bool, str | None, bool, list[str] | None], list[str]]:
     if hasattr(module, "build_argv"):
         build_argv = getattr(module, "build_argv")
         if not callable(build_argv):
@@ -198,7 +198,7 @@ def _build_argv_callable(module: ModuleType) -> Callable[[str, bool, str | None,
 
     raise AgentConfigError(
         "missing build_argv; workflow agent configs must implement "
-        "build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None) "
+        "build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None) "
         "and return a list of argv strings."
     )
 

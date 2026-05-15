@@ -15,8 +15,8 @@ _OPTIONAL_STEP_KEYS = {
     "model",
     "extra_args",
     "interactive",
-    "resume_session_id",
-    "fork_session_id",
+    "session_id",
+    "fork",
 }
 _ALLOWED_STEP_KEYS = _REQUIRED_STEP_KEYS | _OPTIONAL_STEP_KEYS
 
@@ -112,22 +112,19 @@ def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition
             raise ValueError(f"Workflow step '{step_name}' field 'interactive' must be a boolean.")
         validated["interactive"] = interactive
 
-    if "resume_session_id" in definition and "fork_session_id" in definition:
-        raise ValueError(
-            f"Workflow step '{step_name}' fields 'resume_session_id' and 'fork_session_id' are mutually exclusive."
-        )
+    if "session_id" in definition:
+        session_id = definition["session_id"]
+        if not isinstance(session_id, str) or not session_id:
+            raise ValueError(f"Workflow step '{step_name}' field 'session_id' must be a non-empty string.")
+        validated["session_id"] = session_id
 
-    if "resume_session_id" in definition:
-        resume_session_id = definition["resume_session_id"]
-        if not isinstance(resume_session_id, str) or not resume_session_id:
-            raise ValueError(f"Workflow step '{step_name}' field 'resume_session_id' must be a non-empty string.")
-        validated["resume_session_id"] = resume_session_id
-
-    if "fork_session_id" in definition:
-        fork_session_id = definition["fork_session_id"]
-        if not isinstance(fork_session_id, str) or not fork_session_id:
-            raise ValueError(f"Workflow step '{step_name}' field 'fork_session_id' must be a non-empty string.")
-        validated["fork_session_id"] = fork_session_id
+    if "fork" in definition:
+        fork = definition["fork"]
+        if not isinstance(fork, bool):
+            raise ValueError(f"Workflow step '{step_name}' field 'fork' must be a boolean.")
+        if fork and "session_id" not in definition:
+            raise ValueError(f"Workflow step '{step_name}' field 'session_id' is required when 'fork' is true.")
+        validated["fork"] = fork
 
     return validated
 

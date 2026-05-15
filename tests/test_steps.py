@@ -13,15 +13,15 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
     def build_argv(
         prompt_text: str,
         interactive: bool = True,
-        resume_session_id: str | None = None,
-        fork_session_id: str | None = None,
+        session_id: str | None = None,
+        fork: bool = False,
         extra_args: list[str] | None = None,
     ) -> list[str]:
         extras = extra_args or []
-        if resume_session_id is not None:
-            return ["codex", "resume", resume_session_id, *extras, prompt_text]
-        if fork_session_id is not None:
-            return ["codex", "fork", fork_session_id, *extras, prompt_text]
+        if session_id is not None and fork:
+            return ["codex", "fork", session_id, *extras, prompt_text]
+        if session_id is not None:
+            return ["codex", "resume", session_id, *extras, prompt_text]
         if not interactive:
             return ["codex", "exec", *extras, prompt_text]
         return ["codex", *extras, prompt_text]
@@ -189,8 +189,8 @@ def test_run_agent_reports_build_argv_failure(monkeypatch):
     def failing_build_argv(
         _prompt_text,
         _interactive=True,
-        _resume_session_id=None,
-        _fork_session_id=None,
+        _session_id=None,
+        _fork=False,
         extra_args=None,
     ):
         raise RuntimeError("bad argv")
@@ -239,7 +239,7 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
 
     result = run_agent(
         agent="codex",
-        resume_session_id="thread-123",
+        session_id="thread-123",
         prompt="Write a summary.",
         output={"summary": "short summary", "session_id": "agent session ID"},
     )
@@ -273,7 +273,8 @@ def test_run_agent_forks_session_and_discovers_new_session_id(monkeypatch):
 
     result = run_agent(
         agent="codex",
-        fork_session_id="thread-123",
+        session_id="thread-123",
+        fork=True,
         prompt="Write a summary.",
         output={"summary": "short summary"},
     )
@@ -315,20 +316,19 @@ def test_run_agent_passes_interactive_false_to_build_argv(monkeypatch):
     assert seen["argv"][0:2] == ["codex", "exec"]
 
 
-def test_run_agent_rejects_resume_and_fork_together(monkeypatch):
+def test_run_agent_rejects_fork_without_session_id(monkeypatch):
     monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
-        resume_session_id="resume-thread",
-        fork_session_id="fork-thread",
+        fork=True,
         prompt="Write a summary.",
         output={"summary": "short summary"},
     )
 
     assert result.status == "failed"
     assert result.error_type == "argument_validation"
-    assert result.error_message == "Step fields 'resume_session_id' and 'fork_session_id' are mutually exclusive."
+    assert result.error_message == "Step field 'session_id' is required when 'fork' is true."
 
 
 def test_run_agent_rejects_invalid_interactive(monkeypatch):
@@ -346,19 +346,34 @@ def test_run_agent_rejects_invalid_interactive(monkeypatch):
     assert result.error_message == "Step field 'interactive' must be a boolean when provided."
 
 
-def test_run_agent_rejects_empty_resume_session_id(monkeypatch):
+def test_run_agent_rejects_invalid_fork(monkeypatch):
     monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
-        resume_session_id="",
+        fork="yes",  # type: ignore[arg-type]
         prompt="Write a summary.",
         output={"summary": "short summary"},
     )
 
     assert result.status == "failed"
     assert result.error_type == "argument_validation"
-    assert result.error_message == "Step field 'resume_session_id' must be a non-empty string when provided."
+    assert result.error_message == "Step field 'fork' must be a boolean when provided."
+
+
+def test_run_agent_rejects_empty_session_id(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        session_id="",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step field 'session_id' must be a non-empty string when provided."
 
 
 def test_run_agent_reports_session_discovery_failure(monkeypatch):

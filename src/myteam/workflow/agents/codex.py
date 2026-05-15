@@ -13,19 +13,19 @@ EXIT_COMMAND = "/quit"
 def build_argv(
     prompt_text: str,
     interactive: bool = True,
-    resume_session_id: str | None = None,
-    fork_session_id: str | None = None,
+    session_id: str | None = None,
+    fork: bool = False,
     extra_args: list[str] | None = None,
 ) -> list[str]:
     extras = extra_args or []
-    if not interactive and fork_session_id is not None:
-        raise ValueError("Codex non-interactive workflow steps do not support fork_session_id.")
-    if not interactive and resume_session_id is not None:
-        return [EXEC, "exec", "resume", resume_session_id, *extras, prompt_text]
-    if resume_session_id is not None:
-        return [EXEC, "resume", resume_session_id, *extras, prompt_text]
-    if fork_session_id is not None:
-        return [EXEC, "fork", fork_session_id, *extras, prompt_text]
+    if not interactive and fork:
+        raise ValueError("Codex non-interactive workflow steps do not support fork.")
+    if not interactive and session_id is not None:
+        return [EXEC, "exec", "resume", session_id, *extras, prompt_text]
+    if session_id is not None and fork:
+        return [EXEC, "fork", session_id, *extras, prompt_text]
+    if session_id is not None:
+        return [EXEC, "resume", session_id, *extras, prompt_text]
     if not interactive:
         return [EXEC, "exec", *extras, prompt_text]
     return [EXEC, *extras, prompt_text]
