@@ -15,14 +15,16 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
         interactive: bool = True,
         resume_session_id: str | None = None,
         fork_session_id: str | None = None,
+        extra_args: list[str] | None = None,
     ) -> list[str]:
+        extras = extra_args or []
         if resume_session_id is not None:
-            return ["codex", "resume", resume_session_id, prompt_text]
+            return ["codex", "resume", resume_session_id, *extras, prompt_text]
         if fork_session_id is not None:
-            return ["codex", "fork", fork_session_id, prompt_text]
+            return ["codex", "fork", fork_session_id, *extras, prompt_text]
         if not interactive:
-            return ["codex", "exec", prompt_text]
-        return ["codex", prompt_text]
+            return ["codex", "exec", *extras, prompt_text]
+        return ["codex", *extras, prompt_text]
 
     return AgentRuntimeConfig(
         name="codex",
@@ -134,7 +136,7 @@ def test_run_agent_preserves_literal_input(monkeypatch):
     assert '"topic": "release notes"' in seen["argv"][1]
 
 
-def test_run_agent_appends_model_and_extra_args(monkeypatch):
+def test_run_agent_passes_extra_args_to_build_argv(monkeypatch):
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -163,7 +165,9 @@ def test_run_agent_appends_model_and_extra_args(monkeypatch):
     )
 
     assert result.status == "completed"
-    assert seen["argv"][-4:] == ["--model", "gpt-5.4", "--exec", "pytest -q"]
+    assert seen["argv"][1:3] == ["--exec", "pytest -q"]
+    assert "workflow-result" in seen["argv"][3]
+    assert seen["argv"][-2:] == ["--model", "gpt-5.4"]
 
 
 def test_run_agent_reports_invalid_extra_args(monkeypatch):
@@ -182,7 +186,13 @@ def test_run_agent_reports_invalid_extra_args(monkeypatch):
 
 
 def test_run_agent_reports_build_argv_failure(monkeypatch):
-    def failing_build_argv(_prompt_text, _interactive=True, _resume_session_id=None, _fork_session_id=None):
+    def failing_build_argv(
+        _prompt_text,
+        _interactive=True,
+        _resume_session_id=None,
+        _fork_session_id=None,
+        extra_args=None,
+    ):
         raise RuntimeError("bad argv")
 
     config = fake_agent_config()

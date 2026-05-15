@@ -56,7 +56,7 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce, context):\n"
         "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n"
-        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
@@ -103,7 +103,7 @@ def test_resolve_rejects_local_get_session_id_without_context(tmp_path: Path, mo
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce):\n"
         "    return 'local-session'\n"
-        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
@@ -125,7 +125,7 @@ def test_resolve_accepts_legacy_local_exit_sequence(tmp_path: Path, monkeypatch)
         "EXIT_SEQUENCE = b'exit\\n'\n"
         "def get_session_id(nonce, context):\n"
         "    return 'local-session'\n"
-        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
@@ -149,7 +149,7 @@ def test_resolve_prefers_legacy_exit_sequence_over_exit_command(tmp_path: Path, 
         "EXIT_SEQUENCE = b'exit-sequence\\n'\n"
         "def get_session_id(nonce, context):\n"
         "    return 'local-session'\n"
-        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
@@ -203,7 +203,7 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce, context):\n"
         "    return 'local-session'\n"
-        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None):\n"
+        "def build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
     )
@@ -244,6 +244,32 @@ def test_codex_build_argv_supports_session_modes():
         "resume-session",
         "prompt",
     ]
+    assert build_codex_argv("prompt", True, None, None, ["--search"]) == [
+        "codex",
+        "--search",
+        "prompt",
+    ]
+    assert build_codex_argv("prompt", False, None, None, ["--sandbox", "workspace-write"]) == [
+        "codex",
+        "exec",
+        "--sandbox",
+        "workspace-write",
+        "prompt",
+    ]
+    assert build_codex_argv("prompt", True, "resume-session", None, ["--search"]) == [
+        "codex",
+        "resume",
+        "resume-session",
+        "--search",
+        "prompt",
+    ]
+    assert build_codex_argv("prompt", True, None, "fork-session", ["--search"]) == [
+        "codex",
+        "fork",
+        "fork-session",
+        "--search",
+        "prompt",
+    ]
 
 
 def test_codex_build_argv_rejects_noninteractive_fork():
@@ -278,6 +304,29 @@ def test_pi_build_argv_supports_session_modes():
         "--print",
         "--fork",
         "fork-session",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", True, None, None, ["--model", "opus"]) == [
+        "pi",
+        "--model",
+        "opus",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", False, "resume-session", None, ["--model", "opus"]) == [
+        "pi",
+        "--print",
+        "--session",
+        "resume-session",
+        "--model",
+        "opus",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", True, None, "fork-session", ["--model", "opus"]) == [
+        "pi",
+        "--fork",
+        "fork-session",
+        "--model",
+        "opus",
         "prompt",
     ]
 

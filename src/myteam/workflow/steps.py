@@ -39,7 +39,7 @@ def run_agent(
         interactive: Whether to launch the agent in interactive mode.
         resume_session_id: Optional existing agent session to resume.
         fork_session_id: Optional existing agent session to fork into a new session.
-        extra_args: Optional additional argv items appended after any model argument.
+        extra_args: Optional additional argv items passed to the agent adapter.
         cwd: Optional working directory for launching the agent process.
     """
     transcript = ""
@@ -196,8 +196,27 @@ def _build_agent_argv(
     model: str | None,
     extra_args: list[str] | None,
 ) -> list[str]:
+    if extra_args is not None:
+        if not isinstance(extra_args, list):
+            raise StepExecutionError(
+                "argument_validation",
+                "Step field 'extra_args' must be a list of strings when provided.",
+            )
+        for index, arg in enumerate(extra_args):
+            if not isinstance(arg, str):
+                raise StepExecutionError(
+                    "argument_validation",
+                    f"Step field 'extra_args[{index}]' must be a string.",
+                )
+
     try:
-        argv = agent_config.build_argv(prompt_text, interactive, resume_session_id, fork_session_id)
+        argv = agent_config.build_argv(
+            prompt_text,
+            interactive,
+            resume_session_id,
+            fork_session_id,
+            extra_args=extra_args,
+        )
     except Exception as exc:
         raise StepExecutionError(
             "agent_argv",
@@ -217,20 +236,6 @@ def _build_agent_argv(
                 "Step field 'model' must be a non-empty string when provided.",
             )
         argv.extend(["--model", model])
-
-    if extra_args is not None:
-        if not isinstance(extra_args, list):
-            raise StepExecutionError(
-                "argument_validation",
-                "Step field 'extra_args' must be a list of strings when provided.",
-            )
-        for index, arg in enumerate(extra_args):
-            if not isinstance(arg, str):
-                raise StepExecutionError(
-                    "argument_validation",
-                    f"Step field 'extra_args[{index}]' must be a string.",
-                )
-            argv.append(arg)
 
     return argv
 

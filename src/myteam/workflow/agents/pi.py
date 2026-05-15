@@ -15,7 +15,9 @@ def build_argv(
     interactive: bool = True,
     resume_session_id: str | None = None,
     fork_session_id: str | None = None,
+    extra_args: list[str] | None = None,
 ) -> list[str]:
+    extras = extra_args or []
     argv = [EXEC]
     if not interactive:
         argv.append("--print")
@@ -23,6 +25,7 @@ def build_argv(
         argv.extend(["--session", resume_session_id])
     if fork_session_id is not None:
         argv.extend(["--fork", fork_session_id])
+    argv.extend(extras)
     argv.append(prompt_text)
     return argv
 

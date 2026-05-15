@@ -38,6 +38,7 @@ def build_argv(
     interactive: bool = True,
     resume_session_id: str | None = None,
     fork_session_id: str | None = None,
+    extra_args: list[str] | None = None,
 ) -> list[str]:
     ...
 ```
@@ -50,12 +51,14 @@ may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
 
 `EXEC` is the command name used to launch the agent CLI. It must be a string.
 
-### `build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None)`
+### `build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None, extra_args=None)`
 
 `build_argv` returns the argv list used to start the agent process.
 
 Use `resume_session_id` to resume an existing session and `fork_session_id` to
-fork an existing session into a new one. Different CLIs use different syntax:
+fork an existing session into a new one. `extra_args` contains optional
+workflow-authored argv items that the agent config places wherever that CLI
+expects additional flags. Different CLIs use different syntax:
 
 ```python
 def build_argv(
@@ -63,14 +66,16 @@ def build_argv(
     interactive: bool = True,
     resume_session_id: str | None = None,
     fork_session_id: str | None = None,
+    extra_args: list[str] | None = None,
 ) -> list[str]:
+    extras = extra_args or []
     if resume_session_id is not None:
-        return ["codex", "resume", resume_session_id, prompt_text]
+        return ["codex", "resume", resume_session_id, *extras, prompt_text]
     if fork_session_id is not None:
-        return ["codex", "fork", fork_session_id, prompt_text]
+        return ["codex", "fork", fork_session_id, *extras, prompt_text]
     if not interactive:
-        return ["codex", "exec", prompt_text]
-    return ["codex", prompt_text]
+        return ["codex", "exec", *extras, prompt_text]
+    return ["codex", *extras, prompt_text]
 ```
 
 ### `EXIT_COMMAND`
@@ -139,12 +144,14 @@ def build_argv(
     interactive: bool = True,
     resume_session_id: str | None = None,
     fork_session_id: str | None = None,
+    extra_args: list[str] | None = None,
 ) -> list[str]:
     argv = build_codex_argv(
         prompt_text,
         interactive,
         resume_session_id,
         fork_session_id,
+        extra_args=extra_args,
     )
     argv[1:1] = ["--model", "gpt-5.4-mini"]
     return argv
