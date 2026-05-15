@@ -101,7 +101,7 @@ The `context` argument is an `AgentSessionContext` with explicit dependencies
 for session lookup:
 
 - `context.home`: resolved home directory for the parent process
-- `context.project_root`: resolved myteam project root
+- `context.project_root`: resolved project root
 - `context.launch_cwd`: resolved working directory used to launch the agent
 
 A typical implementation searches the agent CLI's session files newest-first,
@@ -115,77 +115,23 @@ Session discovery should be conservative:
 - match the nonce inside the file contents, not just by timestamp
 - raise an exception when discovery fails instead of guessing
 
-## Minimal Local Agent Example
+## Example
 
-Create a project-local config at `.myteam/.config/example.py`:
+See [codex.py](codex.py) or [pi.py](pi.py) for examples
 
-```python
-from __future__ import annotations
+## Recipe: making an agent alias for a specific configuration
 
-import re
-from pathlib import Path
-
-from myteam.workflow.agents import AgentSessionContext
-
-EXEC = "example-agent"
-SESSION_ID_RE = re.compile(r"session-([0-9a-f-]{36})\.jsonl$")
-EXIT_COMMAND = "/exit"
-
-
-def build_argv(
-    prompt_text: str,
-    interactive: bool = True,
-    resume_session_id: str | None = None,
-    fork_session_id: str | None = None,
-) -> list[str]:
-    argv = [EXEC]
-    if not interactive:
-        argv.append("--print")
-    if resume_session_id is not None:
-        argv.extend(["--resume", resume_session_id])
-    if fork_session_id is not None:
-        argv.extend(["--fork", fork_session_id])
-    argv.extend(["--prompt", prompt_text])
-    return argv
-
-
-def get_session_id(nonce: str, context: AgentSessionContext) -> str:
-    sessions_dir = context.home / ".example-agent" / "sessions"
-    for path in sorted(sessions_dir.rglob("*.jsonl"), key=_mtime, reverse=True):
-        try:
-            if nonce not in path.read_text(encoding="utf-8", errors="ignore"):
-                continue
-        except OSError:
-            continue
-
-        match = SESSION_ID_RE.search(path.name)
-        if match:
-            return match.group(1)
-
-    raise LookupError(f"No Example Agent session found for nonce: {nonce}")
-
-
-def _mtime(path: Path) -> float:
-    try:
-        return path.stat().st_mtime
-    except OSError:
-        return 0.0
-```
-
-## Example Alias for Codex Mini
-
-Create a project-local config at `.myteam/.config/codex_mini.py` when you want
-an adapter that behaves exactly like the built-in Codex adapter but launches
-with a different argv:
+Let's say you want to create an agent alias that launches codex with specific
+command-line flags included. For example, let's create an agent named
+`codex_mini` that uses `--model gpt-5.4-mini`. Create a file in
+`.myteam/.configs/`. If you named it `codex_mini.py`, you would run it by
+passing `agent="codex_mini"` into `run_agent`.
 
 ```python
 from __future__ import annotations
 
-from myteam.workflow.agents.codex import EXIT_COMMAND
+from myteam.workflow.agents.codex import EXEC, EXIT_COMMAND, get_session_id
 from myteam.workflow.agents.codex import build_argv as build_codex_argv
-from myteam.workflow.agents.codex import get_session_id
-
-EXEC = "codex"
 
 
 def build_argv(
