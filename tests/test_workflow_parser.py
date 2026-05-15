@@ -103,10 +103,12 @@ def test_load_workflow_accepts_model_and_extra_args(tmp_path: Path):
     workflow_file.write_text(
         "step1:\n"
         "  agent: codex\n"
+        "  interactive: false\n"
         "  model: gpt-5.4\n"
         "  extra_args:\n"
         "    - --exec\n"
         "    - pytest -q\n"
+        "  resume_session_id: thread-123\n"
         "  prompt: hello\n"
         "  output:\n"
         "    message: hi\n",
@@ -117,6 +119,8 @@ def test_load_workflow_accepts_model_and_extra_args(tmp_path: Path):
 
     assert workflow["step1"]["model"] == "gpt-5.4"
     assert workflow["step1"]["extra_args"] == ["--exec", "pytest -q"]
+    assert workflow["step1"]["interactive"] is False
+    assert workflow["step1"]["resume_session_id"] == "thread-123"
 
 
 def test_load_workflow_rejects_invalid_model(tmp_path: Path):
@@ -148,6 +152,52 @@ def test_load_workflow_rejects_invalid_extra_args(tmp_path: Path):
     )
 
     with pytest.raises(ValueError, match=r"field 'extra_args\[1\]' must be a string"):
+        load_workflow(workflow_file)
+
+
+def test_load_workflow_rejects_invalid_interactive(tmp_path: Path):
+    workflow_file = tmp_path / "bad-interactive.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  interactive: 'yes'\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    message: hi\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="field 'interactive' must be a boolean"):
+        load_workflow(workflow_file)
+
+
+def test_load_workflow_rejects_resume_and_fork_together(tmp_path: Path):
+    workflow_file = tmp_path / "bad-session-mode.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  resume_session_id: resume-thread\n"
+        "  fork_session_id: fork-thread\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    message: hi\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="fields 'resume_session_id' and 'fork_session_id' are mutually exclusive"):
+        load_workflow(workflow_file)
+
+
+def test_load_workflow_rejects_invalid_fork_session_id(tmp_path: Path):
+    workflow_file = tmp_path / "bad-fork-session.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  fork_session_id: ''\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    message: hi\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="field 'fork_session_id' must be a non-empty string"):
         load_workflow(workflow_file)
 
 

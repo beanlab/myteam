@@ -37,7 +37,12 @@ def get_session_id(nonce: str) -> str:
 It may also define:
 
 ```python
-def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    resume_session_id: str | None = None,
+    fork_session_id: str | None = None,
+) -> list[str]:
     ...
 ```
 
@@ -48,18 +53,27 @@ When both `EXIT_SEQUENCE` and `EXIT_COMMAND` are present, `EXIT_SEQUENCE` wins.
 
 `EXEC` is the command name used to launch the agent CLI. It must be a string.
 
-### `build_argv(prompt_text, session_id=None)`
+### `build_argv(prompt_text, interactive=True, resume_session_id=None, fork_session_id=None)`
 
 `build_argv` returns the argv list used to start the agent process.
 
-Use `session_id is None` for a new session, and the non-`None` branch for
-resuming an existing session. Different CLIs use different resume syntax:
+Use `resume_session_id` to resume an existing session and `fork_session_id` to
+fork an existing session into a new one. Different CLIs use different syntax:
 
 ```python
-def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-    if session_id is None:
-        return ["codex", prompt_text]
-    return ["codex", "resume", session_id, prompt_text]
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    resume_session_id: str | None = None,
+    fork_session_id: str | None = None,
+) -> list[str]:
+    if resume_session_id is not None:
+        return ["codex", "resume", resume_session_id, prompt_text]
+    if fork_session_id is not None:
+        return ["codex", "fork", fork_session_id, prompt_text]
+    if not interactive:
+        return ["codex", "exec", prompt_text]
+    return ["codex", prompt_text]
 ```
 
 ### `EXIT_COMMAND`
@@ -112,10 +126,21 @@ SESSION_ID_RE = re.compile(r"session-([0-9a-f-]{36})\.jsonl$")
 EXIT_COMMAND = "/exit"
 
 
-def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-    if session_id is None:
-        return [EXEC, "--prompt", prompt_text]
-    return [EXEC, "--resume", session_id, "--prompt", prompt_text]
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    resume_session_id: str | None = None,
+    fork_session_id: str | None = None,
+) -> list[str]:
+    argv = [EXEC]
+    if not interactive:
+        argv.append("--print")
+    if resume_session_id is not None:
+        argv.extend(["--resume", resume_session_id])
+    if fork_session_id is not None:
+        argv.extend(["--fork", fork_session_id])
+    argv.extend(["--prompt", prompt_text])
+    return argv
 
 
 def get_session_id(nonce: str) -> str:

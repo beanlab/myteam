@@ -8,10 +8,21 @@ SESSION_ID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 EXIT_COMMAND = "/quit"
 
 
-def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-    if session_id is None:
-        return [EXEC, prompt_text]
-    return [EXEC, "--session", session_id, prompt_text]
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    resume_session_id: str | None = None,
+    fork_session_id: str | None = None,
+) -> list[str]:
+    argv = [EXEC]
+    if not interactive:
+        argv.append("--print")
+    if resume_session_id is not None:
+        argv.extend(["--session", resume_session_id])
+    if fork_session_id is not None:
+        argv.extend(["--fork", fork_session_id])
+    argv.append(prompt_text)
+    return argv
 
 
 def get_session_id(nonce: str) -> str:

@@ -9,16 +9,26 @@ from myteam.workflow.terminal.session import TerminalSessionResult
 
 
 def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntimeConfig:
+    def build_argv(
+        prompt_text: str,
+        interactive: bool = True,
+        resume_session_id: str | None = None,
+        fork_session_id: str | None = None,
+    ) -> list[str]:
+        if resume_session_id is not None:
+            return ["codex", "resume", resume_session_id, prompt_text]
+        if fork_session_id is not None:
+            return ["codex", "fork", fork_session_id, prompt_text]
+        if not interactive:
+            return ["codex", "exec", prompt_text]
+        return ["codex", prompt_text]
+
     return AgentRuntimeConfig(
         name="codex",
         exec="codex",
         exit_sequence=b"/quit",
         get_session_id=lambda nonce: session_id,
-        build_argv=lambda prompt_text, current_session_id=None: (
-            ["codex", "resume", current_session_id, prompt_text]
-            if current_session_id is not None
-            else ["codex", prompt_text]
-        ),
+        build_argv=build_argv,
         source="test",
     )
 
@@ -171,7 +181,7 @@ def test_run_agent_reports_invalid_extra_args(monkeypatch):
 
 
 def test_run_agent_reports_build_argv_failure(monkeypatch):
-    def failing_build_argv(_prompt_text, _current_session_id=None):
+    def failing_build_argv(_prompt_text, _interactive=True, _resume_session_id=None, _fork_session_id=None):
         raise RuntimeError("bad argv")
 
     config = fake_agent_config()
@@ -218,7 +228,7 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
 
     result = run_agent(
         agent="codex",
-        session_id="thread-123",
+        resume_session_id="thread-123",
         prompt="Write a summary.",
         output={"summary": "short summary", "session_id": "agent session ID"},
     )
@@ -227,6 +237,117 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
     assert result.session_id == "thread-123"
     assert seen["argv"][0:3] == ["codex", "resume", "thread-123"]
     assert "workflow-result" in seen["argv"][3]
+    assert "Session nonce:" in seen["argv"][3]
+
+
+def test_run_agent_forks_session_and_discovers_new_session_id(monkeypatch):
+    seen: dict[str, Any] = {}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        fork_session_id="thread-123",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert result.session_id == "discovered-session"
+    assert seen["argv"][0:3] == ["codex", "fork", "thread-123"]
+    assert "Session nonce:" in seen["argv"][3]
+
+
+def test_run_agent_passes_interactive_false_to_build_argv(monkeypatch):
+    seen: dict[str, Any] = {}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        interactive=False,
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert seen["argv"][0:2] == ["codex", "exec"]
+
+
+def test_run_agent_rejects_resume_and_fork_together(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        resume_session_id="resume-thread",
+        fork_session_id="fork-thread",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step fields 'resume_session_id' and 'fork_session_id' are mutually exclusive."
+
+
+def test_run_agent_rejects_invalid_interactive(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        interactive="yes",  # type: ignore[arg-type]
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step field 'interactive' must be a boolean when provided."
+
+
+def test_run_agent_rejects_empty_resume_session_id(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        resume_session_id="",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step field 'resume_session_id' must be a non-empty string when provided."
 
 
 def test_run_agent_reports_session_discovery_failure(monkeypatch):

@@ -9,7 +9,15 @@ from .agents import get_agent_config
 from .models import StepDefinition, WorkflowDefinition
 
 _REQUIRED_STEP_KEYS = {"prompt", "output"}
-_OPTIONAL_STEP_KEYS = {"input", "agent", "model", "extra_args"}
+_OPTIONAL_STEP_KEYS = {
+    "input",
+    "agent",
+    "model",
+    "extra_args",
+    "interactive",
+    "resume_session_id",
+    "fork_session_id",
+}
 _ALLOWED_STEP_KEYS = _REQUIRED_STEP_KEYS | _OPTIONAL_STEP_KEYS
 
 
@@ -97,6 +105,29 @@ def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition
             if not isinstance(arg, str):
                 raise ValueError(f"Workflow step '{step_name}' field 'extra_args[{index}]' must be a string.")
         validated["extra_args"] = extra_args
+
+    if "interactive" in definition:
+        interactive = definition["interactive"]
+        if not isinstance(interactive, bool):
+            raise ValueError(f"Workflow step '{step_name}' field 'interactive' must be a boolean.")
+        validated["interactive"] = interactive
+
+    if "resume_session_id" in definition and "fork_session_id" in definition:
+        raise ValueError(
+            f"Workflow step '{step_name}' fields 'resume_session_id' and 'fork_session_id' are mutually exclusive."
+        )
+
+    if "resume_session_id" in definition:
+        resume_session_id = definition["resume_session_id"]
+        if not isinstance(resume_session_id, str) or not resume_session_id:
+            raise ValueError(f"Workflow step '{step_name}' field 'resume_session_id' must be a non-empty string.")
+        validated["resume_session_id"] = resume_session_id
+
+    if "fork_session_id" in definition:
+        fork_session_id = definition["fork_session_id"]
+        if not isinstance(fork_session_id, str) or not fork_session_id:
+            raise ValueError(f"Workflow step '{step_name}' field 'fork_session_id' must be a non-empty string.")
+        validated["fork_session_id"] = fork_session_id
 
     return validated
 

@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from myteam.workflow.agents.codex import build_argv as build_codex_argv
 from myteam.workflow.agents.codex import get_session_id as get_codex_session_id
+from myteam.workflow.agents.pi import build_argv as build_pi_argv
 from myteam.workflow.agents.pi import get_session_id as get_pi_session_id
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
 from myteam.workflow.parser import load_workflow
@@ -126,6 +128,61 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
     workflow = load_workflow(workflow_file)
 
     assert workflow["step1"]["agent"] == "custom"
+
+
+def test_codex_build_argv_supports_session_modes():
+    assert build_codex_argv("prompt") == ["codex", "prompt"]
+    assert build_codex_argv("prompt", False) == ["codex", "exec", "prompt"]
+    assert build_codex_argv("prompt", True, "resume-session", None) == [
+        "codex",
+        "resume",
+        "resume-session",
+        "prompt",
+    ]
+    assert build_codex_argv("prompt", True, None, "fork-session") == [
+        "codex",
+        "fork",
+        "fork-session",
+        "prompt",
+    ]
+
+
+def test_codex_build_argv_rejects_noninteractive_resume_or_fork():
+    with pytest.raises(ValueError, match="non-interactive workflow steps do not support"):
+        build_codex_argv("prompt", False, "resume-session", None)
+    with pytest.raises(ValueError, match="non-interactive workflow steps do not support"):
+        build_codex_argv("prompt", False, None, "fork-session")
+
+
+def test_pi_build_argv_supports_session_modes():
+    assert build_pi_argv("prompt") == ["pi", "prompt"]
+    assert build_pi_argv("prompt", False) == ["pi", "--print", "prompt"]
+    assert build_pi_argv("prompt", True, "resume-session", None) == [
+        "pi",
+        "--session",
+        "resume-session",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", True, None, "fork-session") == [
+        "pi",
+        "--fork",
+        "fork-session",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", False, "resume-session", None) == [
+        "pi",
+        "--print",
+        "--session",
+        "resume-session",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", False, None, "fork-session") == [
+        "pi",
+        "--print",
+        "--fork",
+        "fork-session",
+        "prompt",
+    ]
 
 
 def test_codex_get_session_id_finds_newest_matching_rollout(tmp_path: Path, monkeypatch):

@@ -8,10 +8,21 @@ SESSION_ID_RE = re.compile(r"rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-([0-9a-
 EXIT_COMMAND = "/quit"
 
 
-def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-    if session_id is None:
-        return [EXEC, prompt_text]
-    return [EXEC, "resume", session_id, prompt_text]
+def build_argv(
+    prompt_text: str,
+    interactive: bool = True,
+    resume_session_id: str | None = None,
+    fork_session_id: str | None = None,
+) -> list[str]:
+    if not interactive and (resume_session_id is not None or fork_session_id is not None):
+        raise ValueError("Codex non-interactive workflow steps do not support resume_session_id or fork_session_id.")
+    if resume_session_id is not None:
+        return [EXEC, "resume", resume_session_id, prompt_text]
+    if fork_session_id is not None:
+        return [EXEC, "fork", fork_session_id, prompt_text]
+    if not interactive:
+        return [EXEC, "exec", prompt_text]
+    return [EXEC, prompt_text]
 
 
 def get_session_id(nonce: str) -> str:

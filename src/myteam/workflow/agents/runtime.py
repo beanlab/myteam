@@ -18,7 +18,7 @@ class AgentRuntimeConfig:
     exec: str
     exit_sequence: bytes
     get_session_id: Callable[[str], str]
-    build_argv: Callable[[str, str | None], list[str]]
+    build_argv: Callable[[str, bool, str | None, str | None], list[str]]
     source: Path | str
 
 
@@ -127,17 +127,24 @@ def _required_callable(module: ModuleType, name: str) -> Callable[..., Any]:
     return value
 
 
-def _build_argv_callable(module: ModuleType, exec_name: str) -> Callable[[str, str | None], list[str]]:
+def _build_argv_callable(module: ModuleType, exec_name: str) -> Callable[[str, bool, str | None, str | None], list[str]]:
     if hasattr(module, "build_argv"):
         build_argv = getattr(module, "build_argv")
         if not callable(build_argv):
             raise AgentConfigError("build_argv must be callable")
         return build_argv
 
-    def default_build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:
-        if session_id is None:
+    def default_build_argv(
+        prompt_text: str,
+        interactive: bool = True,
+        resume_session_id: str | None = None,
+        fork_session_id: str | None = None,
+    ) -> list[str]:
+        if fork_session_id is not None:
+            raise AgentConfigError(f"Workflow agent '{exec_name}' does not support fork_session_id.")
+        if resume_session_id is None:
             return [exec_name, prompt_text]
-        return [exec_name, "resume", session_id, prompt_text]
+        return [exec_name, "resume", resume_session_id, prompt_text]
 
     return default_build_argv
 
