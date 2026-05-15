@@ -1,1 +1,0 @@
-PTY_RIGHT_ARROW = b"\x1b[C"

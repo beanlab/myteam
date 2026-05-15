@@ -3,19 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .agent_utils import encode_input
+
 EXEC = "pi"
-
-PTY_RIGHT_ARROW = b"\x1b[C"
-SESSION_ID_RE = re.compile(
-    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$"
-)
-
-
-def encode_input(text: str) -> bytes:
-    payload = text.rstrip("\r\n")
-    return payload.encode("utf-8") + PTY_RIGHT_ARROW + b"\r"
-
-
+SESSION_ID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")
 EXIT_SEQUENCE = encode_input("/quit")
 
 
