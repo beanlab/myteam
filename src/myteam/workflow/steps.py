@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
+import uuid
 from typing import Any
 
-from .agents import get_agent_config, get_backend
-from .models import AgentConfig, StepResult
+from myteam.disclosure import PROJECT_ROOT_ENV_VAR
+
+from .agents import resolve_agent_runtime_config
+from .agents.runtime import AgentRuntimeConfig
+from .models import StepResult
 from .terminal.session import run_terminal_session
 
 
@@ -14,22 +20,27 @@ def run_agent(
     output: dict[str, Any],
     input: Any = None,
     agent: str | None = None,
+    session_id: str | None = None,
+    cwd: Path | str | None = None,
 ) -> StepResult:
     transcript = ""
     try:
         resolved_input = input
         agent_name = _require_agent_name(agent)
-        agent_config = _resolve_agent_config(agent_name)
-        backend = get_backend(agent_config["backend"])
+        project_root = _resolve_project_root()
+        launch_cwd = project_root if cwd is None else Path(cwd).resolve()
+        agent_config = _resolve_agent_config(agent_name, project_root=project_root)
+        nonce = str(uuid.uuid4()) if session_id is None else None
         prompt_text = _build_step_prompt(
             resolved_input=resolved_input,
             objective_text=prompt,
             output_template=output,
+            session_nonce=nonce,
         )
         session_result = run_terminal_session(
-            agent_config["argv"],
-            initial_input=backend.encode_input(prompt_text),
-            exit_input=backend.encode_exit(),
+            agent_config.build_argv(prompt_text, session_id),
+            exit_input=agent_config.exit_sequence,
+            cwd=launch_cwd,
             inactivity_timeout_seconds=300,
         )
         transcript = session_result.transcript
@@ -39,6 +50,12 @@ def run_agent(
                 "Workflow agent exited before reporting a structured result.",
             )
         _validate_step_output(output, session_result.payload)
+        discovered_session_id = _resolve_session_id(
+            payload=session_result.payload,
+            current_session_id=session_id,
+            nonce=nonce,
+            agent_config=agent_config,
+        )
         return StepResult(
             status="completed",
             output=session_result.payload,
@@ -46,6 +63,7 @@ def run_agent(
             agent_name=agent_name,
             transcript=transcript,
             exit_code=session_result.exit_code,
+            session_id=discovered_session_id,
         )
     except StepExecutionError as exc:
         return StepResult(
@@ -79,9 +97,21 @@ def _require_agent_name(agent_name: str | None) -> str:
     return agent_name
 
 
-def _resolve_agent_config(agent_name: str) -> AgentConfig:
+def _resolve_project_root() -> Path:
+    configured_agent_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    if configured_agent_root:
+        return Path(configured_agent_root).resolve().parent
+
+    cwd = Path.cwd().resolve()
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / ".myteam").is_dir():
+            return candidate
+    return cwd
+
+
+def _resolve_agent_config(agent_name: str, *, project_root: Path) -> AgentRuntimeConfig:
     try:
-        return get_agent_config(agent_name)
+        return resolve_agent_runtime_config(agent_name, project_root=project_root)
     except KeyError as exc:
         raise StepExecutionError("agent_resolution", str(exc)) from exc
 
@@ -91,11 +121,12 @@ def _build_step_prompt(
     resolved_input: Any,
     objective_text: str,
     output_template: dict[str, Any],
+    session_nonce: str | None,
 ) -> str:
     sections = [
         "Complete the objective below.",
         "",
-        "Return the final workflow result by calling this command exactly once:",
+        "Return the final workflow result by calling this command:",
         "Replace the placeholder values below with the real final result content.",
         "",
         "myteam workflow-result <<'JSON'",
@@ -104,6 +135,8 @@ def _build_step_prompt(
         "",
         "Do not print result markers in the terminal.",
     ]
+    if session_nonce is not None:
+        sections.append(f"Session nonce: {session_nonce}")
     if resolved_input is not None:
         sections.extend(
             [
@@ -120,6 +153,35 @@ def _build_step_prompt(
         ]
     )
     return "\n".join(sections)
+
+
+def _resolve_session_id(
+    *,
+    payload: Any,
+    current_session_id: str | None,
+    nonce: str | None,
+    agent_config: AgentRuntimeConfig,
+) -> str | None:
+    payload_session_id = _extract_session_id(payload)
+    if payload_session_id is not None:
+        return payload_session_id
+    if current_session_id is not None:
+        return current_session_id
+    if nonce is None:
+        return None
+    try:
+        return agent_config.get_session_id(nonce)
+    except LookupError as exc:
+        raise StepExecutionError("session_discovery", str(exc)) from exc
+
+
+def _extract_session_id(output_value: Any) -> str | None:
+    if not isinstance(output_value, dict):
+        return None
+    value = output_value.get("session_id")
+    if isinstance(value, str) and value:
+        return value
+    return None
 
 
 def _validate_step_output(output_template: dict[str, Any], output_value: Any) -> None:

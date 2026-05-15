@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 import threading
 
@@ -19,8 +20,8 @@ class TerminalSessionResult:
 def run_terminal_session(
     argv: list[str],
     *,
-    initial_input: bytes,
     exit_input: bytes,
+    cwd: Path | str | None = None,
     inactivity_timeout_seconds: int = 300,
 ) -> TerminalSessionResult:
     recording = TerminalRecording()
@@ -28,6 +29,7 @@ def run_terminal_session(
         with PtySession(
             argv,
             env=result_channel.env,
+            cwd=cwd,
             inactivity_timeout_seconds=inactivity_timeout_seconds,
         ) as session:
             _start_result_watcher(
@@ -36,7 +38,6 @@ def run_terminal_session(
                 exit_input=exit_input,
             )
 
-            sent_initial_input = False
             events = session.events()
             while True:
                 try:
@@ -46,9 +47,6 @@ def run_terminal_session(
                     break
 
                 recording.feed(chunk)
-                if not sent_initial_input:
-                    session.enqueue_input(initial_input)
-                    sent_initial_input = True
 
             payload = result_channel.wait(timeout=0.1)
             return TerminalSessionResult(

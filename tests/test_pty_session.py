@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.agents.backends import get_backend
+from myteam.workflow.agents.codex import EXIT_SEQUENCE
 from myteam.workflow.terminal.pty_session import PtySession
 from myteam.workflow.terminal.recording import TerminalRecording
 
@@ -18,10 +18,9 @@ def _helper_argv(mode: str, *args: str) -> list[str]:
 
 
 def test_pty_session_events_yield_output_and_support_enqueued_input(capfd: pytest.CaptureFixture[str]):
-    backend = get_backend("codex")
     recording = TerminalRecording()
 
-    with PtySession(_helper_argv("echo_initial"), inactivity_timeout_seconds=1) as session:
+    with PtySession(_helper_argv("wait_for_quit"), inactivity_timeout_seconds=1) as session:
         events = session.events()
         while True:
             try:
@@ -30,17 +29,16 @@ def test_pty_session_events_yield_output_and_support_enqueued_input(capfd: pytes
                 exit_code = exc.value
                 break
             recording.feed(chunk)
-            if "READY" in recording.snapshot() and "ECHO:" not in recording.snapshot():
-                session.enqueue_input(backend.encode_input("hello from session"))
+            if "dog" in recording.snapshot() and "QUIT_ACK" not in recording.snapshot():
+                session.enqueue_input(b"/quit\n")
 
     captured = capfd.readouterr()
     assert exit_code == 0
-    assert "ECHO:hello from session" in recording.snapshot()
-    assert "ECHO:hello from session" in captured.out
+    assert "QUIT_ACK" in recording.snapshot()
+    assert "QUIT_ACK" in captured.out
 
 
-def test_pty_session_preserves_backend_submit_sequence(capfd: pytest.CaptureFixture[str]):
-    backend = get_backend("codex")
+def test_pty_session_exit_input_preserves_backend_submit_sequence(capfd: pytest.CaptureFixture[str]):
     recording = TerminalRecording()
 
     with PtySession(_helper_argv("require_submit_sequence"), inactivity_timeout_seconds=1) as session:
@@ -53,10 +51,11 @@ def test_pty_session_preserves_backend_submit_sequence(capfd: pytest.CaptureFixt
                 break
             recording.feed(chunk)
             if "READY" in recording.snapshot() and "RIGHT_ARROW_SUBMIT" not in recording.snapshot():
-                session.enqueue_input(backend.encode_input("hello from session"))
+                session.enqueue_input(EXIT_SEQUENCE)
 
     capfd.readouterr()
     assert exit_code == 0
+    assert "RAW_ECHO:/quit" in recording.snapshot()
     assert "RIGHT_ARROW_SUBMIT" in recording.snapshot()
     assert "MISSING_RIGHT_ARROW" not in recording.snapshot()
 

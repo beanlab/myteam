@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Mapping
+from pathlib import Path
 from queue import Empty, Queue
+import errno
 import os
 import pty
 import select
@@ -20,12 +22,14 @@ class PtySession:
         argv: list[str],
         *,
         env: Mapping[str, str] | None = None,
-        inactivity_timeout_seconds: int = 300,
+        cwd: Path | str | None = None,
+        inactivity_timeout_seconds: int = 600,
         mirror_stdout: bool = True,
         forward_stdin: bool = True,
     ) -> None:
         self.argv = argv
         self.env = None if env is None else dict(env)
+        self.cwd = None if cwd is None else Path(cwd)
         self.inactivity_timeout_seconds = inactivity_timeout_seconds
         self.mirror_stdout = mirror_stdout
         self.forward_stdin = forward_stdin
@@ -51,6 +55,7 @@ class PtySession:
             stdout=self._slave_fd,
             stderr=self._slave_fd,
             env=None if self.env is None else {**os.environ, **self.env},
+            cwd=self.cwd,
             start_new_session=True,
             close_fds=True,
         )
@@ -97,10 +102,7 @@ class PtySession:
         last_output_at = time.monotonic()
         while True:
             if self.process.poll() is not None:
-                try:
-                    chunk = os.read(self._master_fd, 4096)
-                except OSError:
-                    chunk = b""
+                chunk = self._read_master()
                 if chunk:
                     if self.mirror_stdout:
                         os.write(sys.stdout.fileno(), chunk)
@@ -125,7 +127,7 @@ class PtySession:
                 self._flush_enqueued_input()
 
             if self._master_fd in ready:
-                chunk = os.read(self._master_fd, 4096)
+                chunk = self._read_master()
                 if not chunk:
                     return self.process.wait()
                 if self.mirror_stdout:
@@ -139,6 +141,14 @@ class PtySession:
                     self._stdin_closed = True
                 else:
                     self._write_all(parent_input)
+
+    def _read_master(self) -> bytes:
+        try:
+            return os.read(self._master_fd, 4096)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                return b""
+            raise
 
     def _flush_enqueued_input(self) -> None:
         while True:
