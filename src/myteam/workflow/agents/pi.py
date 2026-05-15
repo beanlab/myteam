@@ -3,11 +3,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .agent_utils import encode_input
-
 EXEC = "pi"
 SESSION_ID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")
-EXIT_SEQUENCE = encode_input("/quit")
+EXIT_COMMAND = "/quit"
 
 
 def build_argv(prompt_text: str, session_id: str | None = None) -> list[str]:

@@ -9,13 +9,14 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from .agent_utils import encode_input
+
 
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
     name: str
     exec: str
     exit_sequence: bytes
-    encode_input: Callable[[str], bytes]
     get_session_id: Callable[[str], str]
     build_argv: Callable[[str, str | None], list[str]]
     source: Path | str
@@ -88,19 +89,24 @@ def _load_module_from_path(agent_name: str, path: Path) -> ModuleType:
 
 def _config_from_module(agent_name: str, module: ModuleType, *, source: Path | str) -> AgentRuntimeConfig:
     exec_name = _required_attr(module, "EXEC", str)
-    exit_sequence = _required_attr(module, "EXIT_SEQUENCE", bytes)
-    encode_input = _required_callable(module, "encode_input")
+    exit_sequence = _exit_sequence_from_module(module)
     get_session_id = _required_callable(module, "get_session_id")
     build_argv = _build_argv_callable(module, exec_name)
     return AgentRuntimeConfig(
         name=agent_name,
         exec=exec_name,
         exit_sequence=exit_sequence,
-        encode_input=encode_input,
         get_session_id=get_session_id,
         build_argv=build_argv,
         source=source,
     )
+
+
+def _exit_sequence_from_module(module: ModuleType) -> bytes:
+    if hasattr(module, "EXIT_SEQUENCE"):
+        return _required_attr(module, "EXIT_SEQUENCE", bytes)
+    exit_command = _required_attr(module, "EXIT_COMMAND", str)
+    return encode_input(exit_command)
 
 
 def _required_attr(module: ModuleType, name: str, expected_type: type) -> Any:

@@ -30,9 +30,7 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     config_dir.mkdir(parents=True)
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
-        "EXIT_SEQUENCE = b'exit\\n'\n"
-        "def encode_input(text):\n"
-        "    return text.encode('utf-8')\n"
+        "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce):\n"
         "    return 'local-session'\n",
         encoding="utf-8",
@@ -42,8 +40,44 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
 
     assert config.name == "custom"
     assert config.exec == "custom-agent"
+    assert config.exit_sequence == b"exit\x1b[C\r"
     assert config.build_argv("prompt") == ["custom-agent", "prompt"]
     assert config.get_session_id("nonce") == "local-session"
+
+
+def test_resolve_accepts_legacy_local_exit_sequence(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_dir = tmp_path / ".myteam" / ".config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "custom.py").write_text(
+        "EXEC = 'custom-agent'\n"
+        "EXIT_SEQUENCE = b'exit\\n'\n"
+        "def get_session_id(nonce):\n"
+        "    return 'local-session'\n",
+        encoding="utf-8",
+    )
+
+    config = resolve_agent_runtime_config("custom")
+
+    assert config.exit_sequence == b"exit\n"
+
+
+def test_resolve_prefers_legacy_exit_sequence_over_exit_command(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_dir = tmp_path / ".myteam" / ".config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "custom.py").write_text(
+        "EXEC = 'custom-agent'\n"
+        "EXIT_COMMAND = 'exit-command'\n"
+        "EXIT_SEQUENCE = b'exit-sequence\\n'\n"
+        "def get_session_id(nonce):\n"
+        "    return 'local-session'\n",
+        encoding="utf-8",
+    )
+
+    config = resolve_agent_runtime_config("custom")
+
+    assert config.exit_sequence == b"exit-sequence\n"
 
 
 def test_resolve_falls_back_when_local_override_is_invalid(tmp_path: Path, monkeypatch):
@@ -74,9 +108,7 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
     config_dir.mkdir(parents=True)
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
-        "EXIT_SEQUENCE = b'exit\\n'\n"
-        "def encode_input(text):\n"
-        "    return text.encode('utf-8')\n"
+        "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce):\n"
         "    return 'local-session'\n",
         encoding="utf-8",

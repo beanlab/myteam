@@ -13,7 +13,6 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
         name="codex",
         exec="codex",
         exit_sequence=b"/quit",
-        encode_input=lambda text: text.encode("utf-8"),
         get_session_id=lambda nonce: session_id,
         build_argv=lambda prompt_text, current_session_id=None: (
             ["codex", "resume", current_session_id, prompt_text]
@@ -173,7 +172,6 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
         name=config.name,
         exec=config.exec,
         exit_sequence=config.exit_sequence,
-        encode_input=config.encode_input,
         get_session_id=missing_session_id,
         build_argv=config.build_argv,
         source=config.source,
