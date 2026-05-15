@@ -20,9 +20,24 @@ def run_agent(
     output: dict[str, Any],
     input: Any = None,
     agent: str | None = None,
+    model: str | None = None,
+    extra_args: list[str] | None = None,
     session_id: str | None = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
+    """
+    Execute one workflow step with an interactive agent runtime.
+
+    Args:
+        prompt: Objective text the agent should complete.
+        output: Expected structured result shape the agent must report.
+        input: Optional resolved input data included in the step prompt.
+        agent: Workflow agent runtime name to launch.
+        model: Optional model name appended to the agent argv as ``--model <model>``.
+        extra_args: Optional additional argv items appended after any model argument.
+        session_id: Optional existing agent session to resume.
+        cwd: Optional working directory for launching the agent process.
+    """
     transcript = ""
     try:
         resolved_input = input
@@ -37,8 +52,15 @@ def run_agent(
             output_template=output,
             session_nonce=nonce,
         )
+        argv = _build_agent_argv(
+            agent_config=agent_config,
+            prompt_text=prompt_text,
+            session_id=session_id,
+            model=model,
+            extra_args=extra_args,
+        )
         session_result = run_terminal_session(
-            agent_config.build_argv(prompt_text, session_id),
+            argv,
             exit_input=agent_config.exit_sequence,
             cwd=launch_cwd,
             inactivity_timeout_seconds=300,
@@ -114,6 +136,53 @@ def _resolve_agent_config(agent_name: str, *, project_root: Path) -> AgentRuntim
         return resolve_agent_runtime_config(agent_name, project_root=project_root)
     except KeyError as exc:
         raise StepExecutionError("agent_resolution", str(exc)) from exc
+
+
+def _build_agent_argv(
+    *,
+    agent_config: AgentRuntimeConfig,
+    prompt_text: str,
+    session_id: str | None,
+    model: str | None,
+    extra_args: list[str] | None,
+) -> list[str]:
+    try:
+        argv = agent_config.build_argv(prompt_text, session_id)
+    except Exception as exc:
+        raise StepExecutionError(
+            "agent_argv",
+            f"Failed to build argv for workflow agent '{agent_config.name}': {exc}",
+        ) from exc
+
+    if not isinstance(argv, list) or any(not isinstance(item, str) for item in argv):
+        raise StepExecutionError(
+            "agent_argv",
+            f"Workflow agent '{agent_config.name}' build_argv must return a list of strings.",
+        )
+
+    if model is not None:
+        if not isinstance(model, str) or not model:
+            raise StepExecutionError(
+                "argument_validation",
+                "Step field 'model' must be a non-empty string when provided.",
+            )
+        argv.extend(["--model", model])
+
+    if extra_args is not None:
+        if not isinstance(extra_args, list):
+            raise StepExecutionError(
+                "argument_validation",
+                "Step field 'extra_args' must be a list of strings when provided.",
+            )
+        for index, arg in enumerate(extra_args):
+            if not isinstance(arg, str):
+                raise StepExecutionError(
+                    "argument_validation",
+                    f"Step field 'extra_args[{index}]' must be a string.",
+                )
+            argv.append(arg)
+
+    return argv
 
 
 def _build_step_prompt(

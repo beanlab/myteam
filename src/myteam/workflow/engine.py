@@ -55,6 +55,8 @@ def run_workflow(
 
         step_result = run_agent(
             agent=resolved_step_definition["agent"],
+            model=resolved_step_definition.get("model"),
+            extra_args=resolved_step_definition.get("extra_args"),
             input=resolved_step_definition["input"],
             output=resolved_step_definition["output"],
             prompt=resolved_step_definition["prompt"],

@@ -14,6 +14,8 @@ class StepDefinition(TypedDict, total=False):
     output: dict[str, Any]
     input: Any
     agent: str
+    model: str
+    extra_args: list[str]
 
 
 WorkflowDefinition = dict[str, StepDefinition]

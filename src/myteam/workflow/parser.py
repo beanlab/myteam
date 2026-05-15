@@ -9,7 +9,7 @@ from .agents import get_agent_config
 from .models import StepDefinition, WorkflowDefinition
 
 _REQUIRED_STEP_KEYS = {"prompt", "output"}
-_OPTIONAL_STEP_KEYS = {"input", "agent"}
+_OPTIONAL_STEP_KEYS = {"input", "agent", "model", "extra_args"}
 _ALLOWED_STEP_KEYS = _REQUIRED_STEP_KEYS | _OPTIONAL_STEP_KEYS
 
 
@@ -82,6 +82,21 @@ def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition
         except KeyError as exc:
             raise ValueError(str(exc)) from exc
         validated["agent"] = agent
+
+    if "model" in definition:
+        model = definition["model"]
+        if not isinstance(model, str) or not model:
+            raise ValueError(f"Workflow step '{step_name}' field 'model' must be a non-empty string.")
+        validated["model"] = model
+
+    if "extra_args" in definition:
+        extra_args = definition["extra_args"]
+        if not isinstance(extra_args, list):
+            raise ValueError(f"Workflow step '{step_name}' field 'extra_args' must be a list of strings.")
+        for index, arg in enumerate(extra_args):
+            if not isinstance(arg, str):
+                raise ValueError(f"Workflow step '{step_name}' field 'extra_args[{index}]' must be a string.")
+        validated["extra_args"] = extra_args
 
     return validated
 

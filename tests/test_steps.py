@@ -123,6 +123,79 @@ def test_run_agent_preserves_literal_input(monkeypatch):
     assert '"topic": "release notes"' in seen["argv"][1]
 
 
+def test_run_agent_appends_model_and_extra_args(monkeypatch):
+    seen: dict[str, Any] = {}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        model="gpt-5.4",
+        extra_args=["--exec", "pytest -q"],
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert seen["argv"][-4:] == ["--model", "gpt-5.4", "--exec", "pytest -q"]
+
+
+def test_run_agent_reports_invalid_extra_args(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        agent="codex",
+        extra_args=["--exec", 3],  # type: ignore[list-item]
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step field 'extra_args[1]' must be a string."
+
+
+def test_run_agent_reports_build_argv_failure(monkeypatch):
+    def failing_build_argv(_prompt_text, _current_session_id=None):
+        raise RuntimeError("bad argv")
+
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_id=config.get_session_id,
+        build_argv=failing_build_argv,
+        source=config.source,
+    )
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    result = run_agent(
+        agent="codex",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "agent_argv"
+    assert result.error_message == "Failed to build argv for workflow agent 'codex': bad argv"
+
+
 def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
     seen: dict[str, Any] = {}
 
