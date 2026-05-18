@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -22,17 +23,38 @@ def load_pricing() -> dict[str, dict[str, float]]:
 
     normalized: dict[str, dict[str, float]] = {}
     for model, model_pricing in pricing.items():
-        if not isinstance(model, str) or not isinstance(model_pricing, dict):
+        if not isinstance(model, str):
             continue
+
+        parsed = _normalize_model_pricing(model_pricing)
+        if parsed is not None:
+            normalized[model] = parsed
+    return normalized
+
+
+def _normalize_model_pricing(model_pricing: Any) -> dict[str, float] | None:
+    if isinstance(model_pricing, dict):
         try:
-            normalized[model] = {
+            return {
                 "input_per_million": float(model_pricing["input_per_million"]),
                 "cached_input_per_million": float(model_pricing["cached_input_per_million"]),
                 "output_per_million": float(model_pricing["output_per_million"]),
             }
         except (KeyError, TypeError, ValueError):
-            continue
-    return normalized
+            return None
+
+    if isinstance(model_pricing, (list, tuple)) and len(model_pricing) == 3:
+        try:
+            input_per_million, cached_input_per_million, output_per_million = model_pricing
+            return {
+                "input_per_million": float(input_per_million),
+                "cached_input_per_million": float(cached_input_per_million),
+                "output_per_million": float(output_per_million),
+            }
+        except (TypeError, ValueError):
+            return None
+
+    return None
 
 
 def estimate_usage_cost(
