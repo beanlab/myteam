@@ -51,7 +51,7 @@ def get_usage_info(
     try:
         session_path = _resolve_pi_session_path(nonce, context)
         return _usage_info_from_session_path(session_path)
-    except (LookupError, OSError, ValueError, json.JSONDecodeError):
+    except (LookupError, ValueError, json.JSONDecodeError):
         return None
 
 

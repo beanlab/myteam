@@ -62,33 +62,29 @@ def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None
             (context.home / ".codex" / "sessions",),
             "rollout-*.jsonl",
         )
-    except (LookupError, OSError):
+    except LookupError:
         return None
     model = None
     usage: dict[str, object] | None = None
-    try:
-        for event in iter_jsonl_reverse(path):
-            # capture model (first valid from bottom = last in file)
-            if model is None:
-                payload = event.get("payload")
-                if isinstance(payload, dict):
-                    m = payload.get("model")
-                    if isinstance(m, str):
-                        model = m
-                elif isinstance(event.get("model"), str):
-                    model = event["model"]
+    for event in iter_jsonl_reverse(path):
+        # capture model (first valid from bottom = last in file)
+        if model is None:
+            payload = event.get("payload")
+            if isinstance(payload, dict):
+                m = payload.get("model")
+                if isinstance(m, str):
+                    model = m
+            elif isinstance(event.get("model"), str):
+                model = event["model"]
 
-            if usage is None:
-                usage = _extract_usage_payload(event)
+        if usage is None:
+            usage = _extract_usage_payload(event)
 
-            if model is not None and usage is not None:
-                # found final usage → stop immediately
-                break
+        if model is not None and usage is not None:
+            # found final usage → stop immediately
+            break
 
-        else:
-            return None
-
-    except OSError:
+    else:
         return None
 
     if not model:

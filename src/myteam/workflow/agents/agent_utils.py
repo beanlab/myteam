@@ -30,32 +30,35 @@ def estimate_usage_cost(
 
 
 def iter_jsonl_reverse(path: Path, block_size: int = 1024 * 1024) -> Iterator[dict[str, Any]]:
-    with path.open("rb") as f:
-        f.seek(0, 2)
-        pos = f.tell()
-        buffer = bytearray()
+    try:
+        with path.open("rb") as f:
+            f.seek(0, 2)
+            pos = f.tell()
+            buffer = bytearray()
 
-        while pos > 0:
-            read_size = min(block_size, pos)
-            pos -= read_size
-            f.seek(pos)
+            while pos > 0:
+                read_size = min(block_size, pos)
+                pos -= read_size
+                f.seek(pos)
 
-            buffer[:0] = f.read(read_size)
+                buffer[:0] = f.read(read_size)
 
-            lines = buffer.split(b"\n")
-            buffer = lines.pop(0)
+                lines = buffer.split(b"\n")
+                buffer = lines.pop(0)
 
-            for line in reversed(lines):
-                obj = _decode_json_object(line)
-                if obj is None:
-                    continue
+                for line in reversed(lines):
+                    obj = _decode_json_object(line)
+                    if obj is None:
+                        continue
+                    if isinstance(obj, dict):
+                        yield obj
+
+            if buffer:
+                obj = _decode_json_object(buffer)
                 if isinstance(obj, dict):
                     yield obj
-
-        if buffer:
-            obj = _decode_json_object(buffer)
-            if isinstance(obj, dict):
-                yield obj
+    except OSError:
+        return
 
 
 def _decode_json_object(data: bytes) -> Any | None:
@@ -81,9 +84,9 @@ def resolve_session_path(
     pattern: str,
 ) -> Path:
     for root in search_roots:
-        if not root.exists():
-            continue
         try:
+            if not root.exists():
+                continue
             candidates = sorted(root.rglob(pattern), key=_mtime, reverse=True)
         except OSError:
             continue
