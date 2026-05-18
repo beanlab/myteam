@@ -91,7 +91,7 @@ def run_agent(
                 "Workflow agent exited before reporting a structured result.",
             )
         _validate_step_output(output, session_result.payload)
-        discovered_session_id = _resolve_session_id(
+        discovered_session_id, session_path = _resolve_session_id(
             payload=session_result.payload,
             session_id=session_id,
             fork=fork,
@@ -319,7 +319,7 @@ def _resolve_session_id(
     fork: bool,
     nonce: str | None,
     agent_config: AgentRuntimeConfig,
-) -> str | None:
+) -> tuple[str, Path] | None:
     payload_session_id = _extract_session_id(payload)
     if payload_session_id is not None:
         return payload_session_id
@@ -328,9 +328,10 @@ def _resolve_session_id(
     if nonce is None:
         return None
     try:
-        return agent_config.get_session_info(nonce)
+        session_info = agent_config.get_session_info(nonce)
     except LookupError as exc:
         raise StepExecutionError("session_discovery", str(exc)) from exc
+    return session_info
 
 
 def _resolve_usage_tracking(

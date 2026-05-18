@@ -7,10 +7,10 @@ import pytest
 
 from myteam.workflow.agents.codex import build_argv as build_codex_argv
 from myteam.workflow.agents.codex import get_usage_info as get_codex_usage_info
-from myteam.workflow.agents.codex import get_session_id as get_codex_session_id
+from myteam.workflow.agents.codex import get_session_info as get_codex_session_info
 from myteam.workflow.agents.pi import build_argv as build_pi_argv
 from myteam.workflow.agents.pi import get_usage_info as get_pi_usage_info
-from myteam.workflow.agents.pi import get_session_id as get_pi_session_id
+from myteam.workflow.agents.pi import get_session_info as get_pi_session_info
 from myteam.workflow.agents.agent_utils import estimate_usage_cost
 from myteam.workflow.agents.runtime import AgentSessionContext
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
@@ -57,8 +57,8 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
-        "def get_session_id(nonce, context):\n"
-        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n"
+        "def get_session_info(nonce, context):\n"
+        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}', context.launch_cwd\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
         "def get_usage_info(nonce, context):\n"
@@ -76,7 +76,10 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     assert config.exec == "custom-agent"
     assert config.exit_sequence == b"exit\x1b[C\r"
     assert config.build_argv("prompt") == ["custom-agent", "prompt"]
-    assert config.get_session_info("nonce") == f"nonce:{tmp_path.name}:{tmp_path.name}"
+    assert config.get_session_info("nonce") == (
+        f"nonce:{tmp_path.name}:{tmp_path.name}",
+        tmp_path,
+    )
     assert config.get_usage_info("nonce") is None
 
 
@@ -87,8 +90,8 @@ def test_resolve_allows_local_override_without_get_usage_info(tmp_path: Path, mo
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
-        "def get_session_id(nonce, context):\n"
-        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n"
+        "def get_session_info(nonce, context):\n"
+        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}', context.launch_cwd\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n",
         encoding="utf-8",
@@ -113,7 +116,7 @@ def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monke
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
-        "def get_session_id(nonce, context):\n"
+        "def get_session_info(nonce, context):\n"
         "    return 'local-session'\n"
         "def get_usage_info(nonce, context):\n"
         "    return None\n",
@@ -128,14 +131,14 @@ def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monke
         )
 
 
-def test_resolve_rejects_local_get_session_id_without_context(tmp_path: Path, monkeypatch):
+def test_resolve_rejects_local_get_session_info_without_context(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_dir = tmp_path / ".myteam" / ".config"
     config_dir.mkdir(parents=True)
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
-        "def get_session_id(nonce):\n"
+        "def get_session_info(nonce):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
@@ -144,7 +147,7 @@ def test_resolve_rejects_local_get_session_id_without_context(tmp_path: Path, mo
         encoding="utf-8",
     )
 
-    with pytest.raises(KeyError, match="get_session_id must accept nonce and context"):
+    with pytest.raises(KeyError, match="get_session_info must accept nonce and context"):
         resolve_agent_runtime_config(
             "custom",
             project_root=tmp_path,
@@ -159,7 +162,7 @@ def test_resolve_accepts_legacy_local_exit_sequence(tmp_path: Path, monkeypatch)
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
         "EXIT_SEQUENCE = b'exit\\n'\n"
-        "def get_session_id(nonce, context):\n"
+        "def get_session_info(nonce, context):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
@@ -185,7 +188,7 @@ def test_resolve_prefers_legacy_exit_sequence_over_exit_command(tmp_path: Path, 
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit-command'\n"
         "EXIT_SEQUENCE = b'exit-sequence\\n'\n"
-        "def get_session_id(nonce, context):\n"
+        "def get_session_info(nonce, context):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
@@ -241,7 +244,7 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
     (config_dir / "custom.py").write_text(
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
-        "def get_session_id(nonce, context):\n"
+        "def get_session_info(nonce, context):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
@@ -373,7 +376,7 @@ def test_pi_build_argv_supports_session_modes():
     ]
 
 
-def test_codex_get_session_id_finds_newest_matching_rollout(tmp_path: Path):
+def test_codex_get_session_info_finds_newest_matching_rollout(tmp_path: Path):
     sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
     sessions_dir.mkdir(parents=True)
     older_match = sessions_dir / "rollout-2026-05-14T10-00-00-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
@@ -386,12 +389,13 @@ def test_codex_get_session_id_finds_newest_matching_rollout(tmp_path: Path):
     os.utime(newest_nonmatch, (2, 2))
     os.utime(newest_match, (3, 3))
 
-    assert get_codex_session_id("nonce-123", agent_session_context(tmp_path)) == (
-        "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    assert get_codex_session_info("nonce-123", agent_session_context(tmp_path)) == (
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        newest_match,
     )
 
 
-def test_pi_get_session_id_finds_newest_matching_session(tmp_path: Path):
+def test_pi_get_session_info_finds_newest_matching_session(tmp_path: Path):
     project_dir = tmp_path / "workspace" / "project"
     project_dir.mkdir(parents=True)
     project_slug = project_dir.resolve().as_posix().strip("/").replace("/", "-")
@@ -407,12 +411,13 @@ def test_pi_get_session_id_finds_newest_matching_session(tmp_path: Path):
     os.utime(newest_nonmatch, (2, 2))
     os.utime(newest_match, (3, 3))
 
-    assert get_pi_session_id("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir)) == (
-        "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    assert get_pi_session_info("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir)) == (
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        newest_match,
     )
 
 
-def test_pi_get_session_id_prefers_injected_launch_cwd_session_dir(tmp_path: Path):
+def test_pi_get_session_info_prefers_injected_launch_cwd_session_dir(tmp_path: Path):
     project_dir = tmp_path / "workspace" / "project"
     project_dir.mkdir(parents=True)
 
@@ -430,8 +435,9 @@ def test_pi_get_session_id_prefers_injected_launch_cwd_session_dir(tmp_path: Pat
     os.utime(project_match, (1, 1))
     os.utime(newer_unrelated_match, (2, 2))
 
-    assert get_pi_session_id("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir)) == (
-        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert get_pi_session_info("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir)) == (
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        project_match,
     )
 
 
