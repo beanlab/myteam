@@ -328,7 +328,7 @@ def _resolve_session_id(
     if nonce is None:
         return None
     try:
-        return agent_config.get_session_id(nonce)
+        return agent_config.get_session_info(nonce)
     except LookupError as exc:
         raise StepExecutionError("session_discovery", str(exc)) from exc
 

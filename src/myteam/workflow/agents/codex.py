@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from .agent_utils import resolve_session_path, iter_jsonl_reverse, estimate_usage_cost
 from .runtime import AgentSessionContext
@@ -41,7 +42,7 @@ def build_argv(
     return [EXEC, *extras, prompt_text]
 
 
-def get_session_id(nonce: str, context: AgentSessionContext) -> str:
+def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Path]:
     path = resolve_session_path(
         nonce,
         (context.home / ".codex" / "sessions",),
@@ -52,7 +53,7 @@ def get_session_id(nonce: str, context: AgentSessionContext) -> str:
     if match is None:
         raise LookupError(f"No Codex session found for nonce: {nonce}")
 
-    return match.group(1)
+    return match.group(1), path
 
 
 def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None:

@@ -26,7 +26,7 @@ class AgentRuntimeConfig:
     name: str
     exec: str
     exit_sequence: bytes
-    get_session_id: Callable[[str], str]
+    get_session_info: Callable[[str], tuple[str, Path]]
     build_argv: Callable[[str, bool, str | None, bool, list[str] | None], list[str]]
     source: Path | str
     get_usage_info: Callable[[str], UsageInfo | None] | None = None
@@ -118,14 +118,14 @@ def _config_from_module(
 ) -> AgentRuntimeConfig:
     exec_name = _required_attr(module, "EXEC", str)
     exit_sequence = _exit_sequence_from_module(module)
-    get_session_id = _get_session_id_callable(module, session_context)
+    get_session_info = _get_session_info_callable(module, session_context)
     build_argv = _build_argv_callable(module)
     get_usage_info = _get_usage_info_callable(module, session_context)
     return AgentRuntimeConfig(
         name=agent_name,
         exec=exec_name,
         exit_sequence=exit_sequence,
-        get_session_id=get_session_id,
+        get_session_info=get_session_info,
         build_argv=build_argv,
         source=source,
         get_usage_info=get_usage_info,
@@ -157,17 +157,17 @@ def _required_callable(module: ModuleType, name: str) -> Callable[..., Any]:
     return value
 
 
-def _get_session_id_callable(
+def _get_session_info_callable(
     module: ModuleType,
     session_context: AgentSessionContext,
-) -> Callable[[str], str]:
-    module_get_session_id = _required_callable(module, "get_session_id")
-    _require_positional_parameter_count(module_get_session_id, "get_session_id", 2)
+) -> Callable[[str], tuple[str, Path]]:
+    module_get_session_info = _required_callable(module, "get_session_info")
+    _require_positional_parameter_count(module_get_session_info, "get_session_info", 2)
 
-    def get_session_id(nonce: str) -> str:
-        return module_get_session_id(nonce, session_context)
+    def get_session_info(nonce: str) -> str:
+        return module_get_session_info(nonce, session_context)
 
-    return get_session_id
+    return get_session_info
 
 
 def _get_usage_info_callable(

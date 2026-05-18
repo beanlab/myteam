@@ -36,12 +36,12 @@ def build_argv(
     return argv
 
 
-def get_session_id(nonce: str, context: AgentSessionContext) -> str:
+def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Path]:
     session_path = _resolve_pi_session_path(nonce, context)
     match = SESSION_ID_RE.search(session_path.name)
     if match is None:
         raise LookupError(f"No Pi session found for nonce: {nonce}")
-    return match.group(1)
+    return match.group(1), session_path
 
 
 def get_usage_info(

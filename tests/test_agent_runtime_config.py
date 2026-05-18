@@ -76,7 +76,7 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     assert config.exec == "custom-agent"
     assert config.exit_sequence == b"exit\x1b[C\r"
     assert config.build_argv("prompt") == ["custom-agent", "prompt"]
-    assert config.get_session_id("nonce") == f"nonce:{tmp_path.name}:{tmp_path.name}"
+    assert config.get_session_info("nonce") == f"nonce:{tmp_path.name}:{tmp_path.name}"
     assert config.get_usage_info("nonce") is None
 
 
