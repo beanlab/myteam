@@ -11,6 +11,7 @@ from types import ModuleType
 from typing import Any
 
 from .agent_utils import encode_input
+from ..models import UsageInfo
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class AgentRuntimeConfig:
     exit_sequence: bytes
     get_session_id: Callable[[str], str]
     build_argv: Callable[[str, bool, str | None, bool, list[str] | None], list[str]]
+    get_usage_info: Callable[[str], UsageInfo | None]
     source: Path | str
 
 
@@ -118,12 +120,14 @@ def _config_from_module(
     exit_sequence = _exit_sequence_from_module(module)
     get_session_id = _get_session_id_callable(module, session_context)
     build_argv = _build_argv_callable(module)
+    get_usage_info = _get_usage_info_callable(module, session_context)
     return AgentRuntimeConfig(
         name=agent_name,
         exec=exec_name,
         exit_sequence=exit_sequence,
         get_session_id=get_session_id,
         build_argv=build_argv,
+        get_usage_info=get_usage_info,
         source=source,
     )
 
@@ -166,7 +170,31 @@ def _get_session_id_callable(
     return get_session_id
 
 
-def _require_positional_parameter_count(callable_value: Callable[..., Any], name: str, count: int) -> None:
+def _get_usage_info_callable(
+    module: ModuleType,
+    session_context: AgentSessionContext,
+) -> Callable[[str], UsageInfo | None]:
+    module_get_usage_info = _required_callable(module, "get_usage_info")
+    _require_positional_parameter_count(
+        module_get_usage_info,
+        "get_usage_info",
+        2,
+        error_message="get_usage_info must accept nonce and context",
+    )
+
+    def get_usage_info(nonce: str) -> UsageInfo | None:
+        return module_get_usage_info(nonce, session_context)
+
+    return get_usage_info
+
+
+def _require_positional_parameter_count(
+    callable_value: Callable[..., Any],
+    name: str,
+    count: int,
+    *,
+    error_message: str | None = None,
+) -> None:
     try:
         signature = inspect.signature(callable_value)
     except (TypeError, ValueError) as exc:
@@ -186,6 +214,8 @@ def _require_positional_parameter_count(callable_value: Callable[..., Any], name
         for parameter in signature.parameters.values()
     )
     if not has_varargs and len(positional_parameters) != count:
+        if error_message is not None:
+            raise AgentConfigError(error_message)
         raise AgentConfigError(f"{name} must accept nonce and context")
 
 

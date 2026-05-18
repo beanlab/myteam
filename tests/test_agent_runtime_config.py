@@ -6,8 +6,10 @@ from pathlib import Path
 import pytest
 
 from myteam.workflow.agents.codex import build_argv as build_codex_argv
+from myteam.workflow.agents.codex import get_usage_info as get_codex_usage_info
 from myteam.workflow.agents.codex import get_session_id as get_codex_session_id
 from myteam.workflow.agents.pi import build_argv as build_pi_argv
+from myteam.workflow.agents.pi import get_usage_info as get_pi_usage_info
 from myteam.workflow.agents.pi import get_session_id as get_pi_session_id
 from myteam.workflow.agents.runtime import AgentSessionContext
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
@@ -57,7 +59,9 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
         "def get_session_id(nonce, context):\n"
         "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "    return ['custom-agent', prompt_text]\n",
+        "    return ['custom-agent', prompt_text]\n"
+        "def get_usage_info(nonce, context):\n"
+        "    return None\n",
         encoding="utf-8",
     )
 
@@ -72,6 +76,7 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     assert config.exit_sequence == b"exit\x1b[C\r"
     assert config.build_argv("prompt") == ["custom-agent", "prompt"]
     assert config.get_session_id("nonce") == f"nonce:{tmp_path.name}:{tmp_path.name}"
+    assert config.get_usage_info("nonce") is None
 
 
 def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monkeypatch):
@@ -82,7 +87,9 @@ def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monke
         "EXEC = 'custom-agent'\n"
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_id(nonce, context):\n"
-        "    return 'local-session'\n",
+        "    return 'local-session'\n"
+        "def get_usage_info(nonce, context):\n"
+        "    return None\n",
         encoding="utf-8",
     )
 
@@ -104,7 +111,9 @@ def test_resolve_rejects_local_get_session_id_without_context(tmp_path: Path, mo
         "def get_session_id(nonce):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "    return ['custom-agent', prompt_text]\n",
+        "    return ['custom-agent', prompt_text]\n"
+        "def get_usage_info(nonce, context):\n"
+        "    return None\n",
         encoding="utf-8",
     )
 
@@ -126,7 +135,9 @@ def test_resolve_accepts_legacy_local_exit_sequence(tmp_path: Path, monkeypatch)
         "def get_session_id(nonce, context):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "    return ['custom-agent', prompt_text]\n",
+        "    return ['custom-agent', prompt_text]\n"
+        "def get_usage_info(nonce, context):\n"
+        "    return None\n",
         encoding="utf-8",
     )
 
@@ -150,7 +161,9 @@ def test_resolve_prefers_legacy_exit_sequence_over_exit_command(tmp_path: Path, 
         "def get_session_id(nonce, context):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "    return ['custom-agent', prompt_text]\n",
+        "    return ['custom-agent', prompt_text]\n"
+        "def get_usage_info(nonce, context):\n"
+        "    return None\n",
         encoding="utf-8",
     )
 
@@ -204,7 +217,9 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
         "def get_session_id(nonce, context):\n"
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "    return ['custom-agent', prompt_text]\n",
+        "    return ['custom-agent', prompt_text]\n"
+        "def get_usage_info(nonce, context):\n"
+        "    return None\n",
         encoding="utf-8",
     )
     workflow_file = tmp_path / "workflow.yaml"
@@ -391,3 +406,99 @@ def test_pi_get_session_id_prefers_injected_launch_cwd_session_dir(tmp_path: Pat
     assert get_pi_session_id("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir)) == (
         "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     )
+
+
+def test_codex_get_usage_info_extracts_tokens_and_estimates_cost(tmp_path: Path):
+    sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "rollout-2026-05-14T10-02-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text(
+        '{"model":"gpt-5.4","nonce":"nonce-123"}\n'
+        '{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":10,"reasoning_output_tokens":5,"total_tokens":110}}}\n',
+        encoding="utf-8",
+    )
+
+    usage = get_codex_usage_info("nonce-123", agent_session_context(tmp_path))
+
+    assert usage is not None
+    assert usage.model == "gpt-5.4"
+    assert usage.input_tokens == 100
+    assert usage.cached_input_tokens == 20
+    assert usage.output_tokens == 10
+    assert usage.reasoning_output_tokens == 5
+    assert usage.total_tokens == 110
+    assert usage.estimated_cost == pytest.approx(0.000355)
+
+
+def test_codex_get_usage_info_returns_none_without_token_count_event(tmp_path: Path):
+    sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "rollout-2026-05-14T10-02-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text('{"model":"gpt-5.4","nonce":"nonce-123"}\n', encoding="utf-8")
+
+    assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
+
+
+def test_codex_get_usage_info_returns_none_without_model(tmp_path: Path):
+    sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "rollout-2026-05-14T10-02-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text(
+        '{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":10,"reasoning_output_tokens":5,"total_tokens":110}},"nonce":"nonce-123"}\n',
+        encoding="utf-8",
+    )
+
+    assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
+
+
+def test_codex_get_usage_info_returns_none_for_malformed_jsonl_lines(tmp_path: Path):
+    sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "rollout-2026-05-14T10-02-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text(
+        '{"model":"gpt-5.4","nonce":"nonce-123"}\n'
+        '{"type":"token_count","info":{"total_token_usage":\n',
+        encoding="utf-8",
+    )
+
+    assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
+
+
+def test_codex_get_usage_info_returns_usage_for_unknown_pricing(tmp_path: Path):
+    sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "rollout-2026-05-14T10-02-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text(
+        '{"model":"gpt-unknown","nonce":"nonce-123"}\n'
+        '{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":10,"reasoning_output_tokens":5,"total_tokens":110}}}\n',
+        encoding="utf-8",
+    )
+
+    usage = get_codex_usage_info("nonce-123", agent_session_context(tmp_path))
+
+    assert usage is not None
+    assert usage.estimated_cost == 0.0
+
+
+def test_pi_get_usage_info_extracts_usage_and_uses_session_cost(tmp_path: Path):
+    project_dir = tmp_path / "workspace" / "project"
+    project_dir.mkdir(parents=True)
+    project_slug = project_dir.resolve().as_posix().strip("/").replace("/", "-")
+    sessions_dir = tmp_path / ".pi" / "agent" / "sessions" / f"--{project_slug}--"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "2026-05-14T10-02-00-000Z_cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text(
+        '"api":"openai-responses","provider":"openai","model":"gpt-5.5","usage":{"input":1338,"output":63,"cacheRead":0,"cacheWrite":0,"totalTokens":1401,"cost":{"input":0.006690000000000001,"output":0.00189,"cacheRead":0,"cacheWrite":0,"total":0.00858}},"nonce":"nonce-123"\n',
+        encoding="utf-8",
+    )
+
+    usage = get_pi_usage_info("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir))
+
+    assert usage is not None
+    assert usage.model == "gpt-5.5"
+    assert usage.input_tokens == 1338
+    assert usage.cached_input_tokens == 0
+    assert usage.output_tokens == 63
+    assert usage.reasoning_output_tokens == 0
+    assert usage.total_tokens == 1401
+    assert usage.estimated_cost == pytest.approx(0.00858)

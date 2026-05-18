@@ -10,7 +10,7 @@ from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from .models import StepResult
+from .models import StepResult, UsageInfo
 from .terminal.session import run_terminal_session
 
 
@@ -95,6 +95,9 @@ def run_agent(
             nonce=nonce,
             agent_config=agent_config,
         )
+        usage = _resolve_usage_info(agent_config=agent_config, nonce=nonce)
+        if usage is not None:
+            _print_usage_summary(usage)
         return StepResult(
             status="completed",
             output=session_result.payload,
@@ -103,6 +106,7 @@ def run_agent(
             transcript=transcript,
             exit_code=session_result.exit_code,
             session_id=discovered_session_id,
+            usage=usage,
         )
     except StepExecutionError as exc:
         return StepResult(
@@ -301,6 +305,13 @@ def _resolve_session_id(
         raise StepExecutionError("session_discovery", str(exc)) from exc
 
 
+def _resolve_usage_info(*, agent_config: AgentRuntimeConfig, nonce: str) -> UsageInfo | None:
+    try:
+        return agent_config.get_usage_info(nonce)
+    except Exception:
+        return None
+
+
 def _extract_session_id(output_value: Any) -> str | None:
     if not isinstance(output_value, dict):
         return None
@@ -326,6 +337,17 @@ def _validate_output_node(template: Any, value: Any, *, path: str) -> None:
         if key not in value:
             raise ValueError(f"{path}.{key} is missing.")
         _validate_output_node(nested, value[key], path=f"{path}.{key}")
+
+
+def _print_usage_summary(usage: UsageInfo) -> None:
+    print("Usage:")
+    print(f"  Model: {usage.model}")
+    print(f"  Input: {usage.input_tokens}")
+    print(f"  Cached Input: {usage.cached_input_tokens}")
+    print(f"  Output: {usage.output_tokens}")
+    print(f"  Reasoning: {usage.reasoning_output_tokens}")
+    print(f"  Total: {usage.total_tokens}")
+    print(f"  Cost: ${usage.estimated_cost:.4f}")
 
 
 class StepExecutionError(Exception):

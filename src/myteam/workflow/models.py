@@ -34,6 +34,17 @@ class CompletedStepState(TypedDict, total=False):
 WorkflowOutput = dict[str, CompletedStepState]
 
 
+@dataclass(frozen=True)
+class UsageInfo:
+    model: str
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    reasoning_output_tokens: int
+    total_tokens: int
+    estimated_cost: float
+
+
 @dataclass
 class StepResult:
     """
@@ -64,6 +75,7 @@ class StepResult:
     transcript: str = ""
     exit_code: int | None = None
     session_id: str | None = None
+    usage: UsageInfo | None = None
 
 
 @dataclass
