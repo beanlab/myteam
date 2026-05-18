@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import re
 
-from .pricing import estimate_usage_cost
-from .agent_utils import resolve_session_path, iter_jsonl_reverse
+from .agent_utils import resolve_session_path, iter_jsonl_reverse, estimate_usage_cost
 from .runtime import AgentSessionContext
 from ..models import UsageInfo
 
@@ -12,6 +11,13 @@ EXIT_COMMAND = "/quit"
 SESSION_ID_RE = re.compile(
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
 )
+# model: [input, cached, output]
+PRICING_INFO = {
+    "gpt-5.5": [5.0, 0.5, 30.0],
+    "gpt-5.4": [2.5, 0.25, 15.0],
+    "gpt-5.4-mini": [0.75, 0.075, 4.5],
+    "gpt-5.4-nano": [0.2, 0.02, 1.25],
+}
 
 
 def build_argv(
@@ -106,6 +112,7 @@ def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None
         reasoning_output_tokens=reasoning_tokens,
         total_tokens=total_tokens,
         estimated_cost=estimate_usage_cost(
+            PRICING_INFO,
             model,
             input_tokens,
             cached_input_tokens,

@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
-from .agent_utils import resolve_session_path, iter_jsonl_reverse
+from .agent_utils import resolve_session_path, iter_jsonl_reverse, estimate_usage_cost
 from .runtime import AgentSessionContext
+from .codex import PRICING_INFO
 from ..models import UsageInfo
 
 EXEC = "pi"
@@ -92,7 +93,15 @@ def _usage_info_from_session_path(path: Path) -> UsageInfo | None:
     if not latest_model or not latest_usage:
         return None
 
-    cost = latest_usage.get("cost") or {}
+    estimated_cost = _get_explicit_total_cost(latest_usage)
+    if estimated_cost is None:
+        estimated_cost = estimate_usage_cost(
+            PRICING_INFO,
+            latest_model,
+            int(latest_usage.get("input", 0)),
+            int(latest_usage.get("cacheRead", 0)),
+            int(latest_usage.get("output", 0)),
+        )
 
     return UsageInfo(
         model=latest_model,
@@ -101,10 +110,21 @@ def _usage_info_from_session_path(path: Path) -> UsageInfo | None:
         output_tokens=int(latest_usage.get("output", 0)),
         reasoning_output_tokens=0,
         total_tokens=int(latest_usage.get("totalTokens", 0)),
-        estimated_cost=float(cost.get("total", 0.0)),
+        estimated_cost=estimated_cost,
     )
 
 
 def _project_session_dir_name(path: Path) -> str:
     project_path = path.resolve().as_posix().strip("/")
     return f"--{project_path.replace('/', '-')}--"
+
+
+def _get_explicit_total_cost(usage: dict[str, Any]) -> float | None:
+    cost = usage.get("cost")
+    if not isinstance(cost, dict) or "total" not in cost:
+        return None
+
+    try:
+        return float(cost["total"])
+    except (TypeError, ValueError):
+        return None

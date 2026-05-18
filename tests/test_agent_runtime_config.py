@@ -11,6 +11,7 @@ from myteam.workflow.agents.codex import get_session_id as get_codex_session_id
 from myteam.workflow.agents.pi import build_argv as build_pi_argv
 from myteam.workflow.agents.pi import get_usage_info as get_pi_usage_info
 from myteam.workflow.agents.pi import get_session_id as get_pi_session_id
+from myteam.workflow.agents.agent_utils import estimate_usage_cost
 from myteam.workflow.agents.runtime import AgentSessionContext
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
 from myteam.workflow.parser import load_workflow
@@ -477,6 +478,18 @@ def test_codex_get_usage_info_returns_none_without_model(tmp_path: Path):
     assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
 
 
+def test_estimate_usage_cost_uses_passed_pricing_mapping():
+    pricing = {"gpt-test": [2.5, 0.25, 15.0]}
+
+    cost = estimate_usage_cost(pricing, "gpt-test", 100, 20, 10)
+
+    assert cost == pytest.approx(0.000355)
+
+
+def test_estimate_usage_cost_returns_zero_for_unknown_model():
+    assert estimate_usage_cost({}, "missing", 100, 20, 10) == 0.0
+
+
 def test_codex_get_usage_info_returns_none_for_malformed_jsonl_lines(tmp_path: Path):
     sessions_dir = tmp_path / ".codex" / "sessions" / "2026" / "05" / "14"
     sessions_dir.mkdir(parents=True)
@@ -527,4 +540,23 @@ def test_pi_get_usage_info_extracts_usage_and_uses_session_cost(tmp_path: Path):
     assert usage.output_tokens == 63
     assert usage.reasoning_output_tokens == 0
     assert usage.total_tokens == 1401
+    assert usage.estimated_cost == pytest.approx(0.00858)
+
+
+def test_pi_get_usage_info_falls_back_to_codex_pricing_when_cost_missing(tmp_path: Path):
+    project_dir = tmp_path / "workspace" / "project"
+    project_dir.mkdir(parents=True)
+    project_slug = project_dir.resolve().as_posix().strip("/").replace("/", "-")
+    sessions_dir = tmp_path / ".pi" / "agent" / "sessions" / f"--{project_slug}--"
+    sessions_dir.mkdir(parents=True)
+    session_path = sessions_dir / "2026-05-14T10-02-00-000Z_cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
+    session_path.write_text(
+        '"api":"openai-responses","provider":"openai","model":"gpt-5.5","usage":{"input":1338,"output":63,"cacheRead":0,"cacheWrite":0,"totalTokens":1401},"nonce":"nonce-123"\n',
+        encoding="utf-8",
+    )
+
+    usage = get_pi_usage_info("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir))
+
+    assert usage is not None
+    assert usage.model == "gpt-5.5"
     assert usage.estimated_cost == pytest.approx(0.00858)

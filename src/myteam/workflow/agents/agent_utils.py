@@ -9,6 +9,26 @@ def encode_input(text: str) -> bytes:
     payload = text.rstrip("\r\n")
     return payload.encode("utf-8") + PTY_RIGHT_ARROW + b"\r"
 
+
+def estimate_usage_cost(
+    pricing: dict[str, list[int]],
+    model: str,
+    input_tokens: int,
+    cached_input_tokens: int,
+    output_tokens: int,
+) -> float:
+    model_pricing = pricing.get(model)
+    if model_pricing is None:
+        return 0.0
+
+    non_cached_input_tokens = max(input_tokens - cached_input_tokens, 0)
+    return (
+        non_cached_input_tokens * model_pricing[0]
+        + cached_input_tokens * model_pricing[1]
+        + output_tokens * model_pricing[2]
+    ) / 1_000_000
+
+
 def iter_jsonl_reverse(path: Path, block_size: int = 1024 * 1024) -> Iterator[dict[str, Any]]:
     with path.open("rb") as f:
         f.seek(0, 2)
