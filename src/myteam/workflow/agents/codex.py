@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import re
 
 from .pricing import estimate_usage_cost
 from .agent_utils import resolve_session_path, iter_jsonl_reverse
@@ -9,6 +9,9 @@ from ..models import UsageInfo
 
 EXEC = "codex"
 EXIT_COMMAND = "/quit"
+SESSION_ID_RE = re.compile(
+    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+)
 
 
 def build_argv(
@@ -39,11 +42,11 @@ def get_session_id(nonce: str, context: AgentSessionContext) -> str:
         "rollout-*.jsonl",
     )
 
-    stem = path.stem
-    if "-" not in stem:
+    match = SESSION_ID_RE.search(path.stem)
+    if match is None:
         raise LookupError(f"No Codex session found for nonce: {nonce}")
 
-    return stem.rsplit("-", 1)[-1]
+    return match.group(1)
 
 
 def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None:
@@ -56,16 +59,9 @@ def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None
     except (LookupError, OSError):
         return None
     model = None
+    usage: dict[str, object] | None = None
     try:
-        for line in iter_jsonl_reverse(path):
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(event, dict):
-                continue
+        for event in iter_jsonl_reverse(path):
             # capture model (first valid from bottom = last in file)
             if model is None:
                 payload = event.get("payload")
@@ -73,21 +69,15 @@ def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None
                     m = payload.get("model")
                     if isinstance(m, str):
                         model = m
-            if event.get("type") != "event_msg":
-                continue
-            payload = event.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            if payload.get("type") != "token_count":
-                continue
-            info = payload.get("info")
-            if not isinstance(info, dict):
-                continue
-            usage = info.get("total_token_usage")
-            if not isinstance(usage, dict):
-                continue
-            # found final usage → stop immediately
-            break
+                elif isinstance(event.get("model"), str):
+                    model = event["model"]
+
+            if usage is None:
+                usage = _extract_usage_payload(event)
+
+            if model is not None and usage is not None:
+                # found final usage → stop immediately
+                break
 
         else:
             return None
@@ -122,3 +112,30 @@ def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None
             output_tokens,
         ),
     )
+
+
+def _extract_usage_payload(event: dict[str, object]) -> dict[str, object] | None:
+    payload = event.get("payload")
+    if isinstance(payload, dict):
+        if payload.get("type") == "token_count":
+            info = payload.get("info")
+            if isinstance(info, dict):
+                usage = info.get("total_token_usage")
+                if isinstance(usage, dict):
+                    return usage
+        nested_usage = payload.get("total_token_usage")
+        if isinstance(nested_usage, dict):
+            return nested_usage
+
+    if event.get("type") == "token_count":
+        info = event.get("info")
+        if isinstance(info, dict):
+            usage = info.get("total_token_usage")
+            if isinstance(usage, dict):
+                return usage
+
+    usage = event.get("usage")
+    if isinstance(usage, dict):
+        return usage
+
+    return None
