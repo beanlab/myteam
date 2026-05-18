@@ -23,36 +23,12 @@ def main() -> dict[str, Any]:
     ranking = rank_poems(poems.output)
     total_cost += ranking.usage.estimated_cost
     print(f"Total cost: ${total_cost:.4f}")
-    print_summary(ranking.output)
+    print(ranking.output)
     return ranking
 
-
-def run_step(
-    *,
-    prompt: str,
-    output: dict[str, Any],
-    input: Any | None = None,
-    agent: str = WORKFLOW_AGENT,
-) -> dict[str, Any]:
-    result = run_agent(
-        agent=agent,
-        input=input,
-        output=output,
-        prompt=prompt,
-    )
-    return require_completed(result)
-
-
-def require_completed(result: StepResult) -> dict[str, Any]:
-    if result.status != "completed":
-        raise RuntimeError(f"{result.error_type}: {result.error_message}")
-    if not isinstance(result.output, dict):
-        raise RuntimeError("Workflow step completed without a mapping output.")
-    return result
-
-
 def generate_poems() -> dict[str, Any]:
-    return run_step(
+    return run_agent(
+        agent=WORKFLOW_AGENT,
         prompt=(
             "Generate 3 poems on topics provided by the user. Ask them for the topics."
         ),
@@ -65,7 +41,8 @@ def generate_poems() -> dict[str, Any]:
 
 
 def rank_poems(poems: dict[str, Any]) -> dict[str, Any]:
-    return run_step(
+    return run_agent(
+        agent=WORKFLOW_AGENT,
         input=poems,
         prompt=(
             "Rank the provided poems by how well each poem captures the essence of its style"
@@ -75,10 +52,6 @@ def rank_poems(poems: dict[str, Any]) -> dict[str, Any]:
             "reasons": "why that poem was chosen over the others",
         },
     )
-
-
-def print_summary(result: dict[str, Any]) -> None:
-    print(result)
 
 
 if __name__ == "__main__":
