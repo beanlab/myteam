@@ -46,6 +46,7 @@ def run_agent(
     usage: UsageInfo | None = None
     usage_state = "not_attempted"
     usage_error_message: str | None = None
+    session_path: Path | None = None
     try:
         resolved_input = input
         _validate_session_arguments(
@@ -100,7 +101,7 @@ def run_agent(
         )
         usage, usage_state, usage_error_message = _resolve_usage_tracking(
             agent_config=agent_config,
-            nonce=nonce,
+            session_path=session_path,
         )
         if usage is not None:
             _print_usage_summary(usage)
@@ -118,12 +119,16 @@ def run_agent(
         )
     except StepExecutionError as exc:
         if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
-            usage, usage_state, usage_error_message = _resolve_usage_tracking(
-                agent_config=agent_config,
-                nonce=nonce,
-            )
-            if usage is not None:
-                _print_usage_summary(usage)
+            usage_session_path = session_path
+            if usage_session_path is None:
+                usage_session_path = _resolve_usage_session_path(agent_config=agent_config, nonce=nonce)
+            if usage_session_path is not None:
+                usage, usage_state, usage_error_message = _resolve_usage_tracking(
+                    agent_config=agent_config,
+                    session_path=usage_session_path,
+                )
+                if usage is not None:
+                    _print_usage_summary(usage)
         return StepResult(
             status="failed",
             error_type=exc.error_type,
@@ -134,12 +139,16 @@ def run_agent(
             usage_error_message=usage_error_message,
         )
     except TimeoutError as exc:
-        usage, usage_state, usage_error_message = _resolve_usage_tracking(
-            agent_config=agent_config,
-            nonce=nonce,
-        )
-        if usage is not None:
-            _print_usage_summary(usage)
+        usage_session_path = session_path
+        if usage_session_path is None:
+            usage_session_path = _resolve_usage_session_path(agent_config=agent_config, nonce=nonce)
+        if usage_session_path is not None:
+            usage, usage_state, usage_error_message = _resolve_usage_tracking(
+                agent_config=agent_config,
+                session_path=usage_session_path,
+            )
+            if usage is not None:
+                _print_usage_summary(usage)
         return StepResult(
             status="failed",
             error_type="timeout",
@@ -319,31 +328,38 @@ def _resolve_session_id(
     fork: bool,
     nonce: str | None,
     agent_config: AgentRuntimeConfig,
-) -> tuple[str, Path] | None:
-    payload_session_id = _extract_session_id(payload)
-    if payload_session_id is not None:
-        return payload_session_id
-    if session_id is not None and not fork:
-        return session_id
+) -> tuple[str, Path | None] | None:
     if nonce is None:
         return None
+
+    session_lookup_error: LookupError | None = None
     try:
         session_info = agent_config.get_session_info(nonce)
     except LookupError as exc:
-        raise StepExecutionError("session_discovery", str(exc)) from exc
+        session_lookup_error = exc
+        session_info = None
+
+    payload_session_id = _extract_session_id(payload)
+    if payload_session_id is not None:
+        return payload_session_id, None if session_info is None else session_info[1]
+    if session_id is not None and not fork:
+        return session_id, None if session_info is None else session_info[1]
+    if session_info is None:
+        assert session_lookup_error is not None
+        raise StepExecutionError("session_discovery", str(session_lookup_error)) from session_lookup_error
     return session_info
 
 
 def _resolve_usage_tracking(
     *,
     agent_config: AgentRuntimeConfig,
-    nonce: str,
+    session_path: Path,
 ) -> tuple[UsageInfo | None, str, str | None]:
     if agent_config.get_usage_info is None:
         return None, "no_get_usage_info_implemented", "workflow agent config does not implement get_usage_info"
 
     try:
-        usage = agent_config.get_usage_info(nonce)
+        usage = agent_config.get_usage_info(session_path)
     except Exception as exc:
         return None, "unavailable", str(exc)
 
@@ -351,6 +367,22 @@ def _resolve_usage_tracking(
         return None, "unavailable", None
 
     return usage, "collected", None
+
+
+def _resolve_usage_session_path(
+    *,
+    agent_config: AgentRuntimeConfig,
+    nonce: str | None,
+) -> Path | None:
+    if nonce is None:
+        return None
+
+    try:
+        _, session_path = agent_config.get_session_info(nonce)
+    except LookupError:
+        return None
+
+    return session_path
 
 
 def _extract_session_id(output_value: Any) -> str | None:

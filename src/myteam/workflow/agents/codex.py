@@ -56,18 +56,10 @@ def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Pat
     return match.group(1), path
 
 
-def get_usage_info(nonce: str, context: AgentSessionContext) -> UsageInfo | None:
-    try:
-        path = resolve_session_path(
-            nonce,
-            (context.home / ".codex" / "sessions",),
-            "rollout-*.jsonl",
-        )
-    except LookupError:
-        return None
+def get_usage_info(session_path: Path) -> UsageInfo | None:
     model = None
     usage: dict[str, object] | None = None
-    for event in iter_jsonl_reverse(path):
+    for event in iter_jsonl_reverse(session_path):
         # capture model (first valid from bottom = last in file)
         if model is None:
             payload = event.get("payload")

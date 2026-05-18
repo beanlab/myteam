@@ -33,7 +33,7 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
         exit_sequence=b"/quit",
         get_session_info=lambda nonce: (session_id, Path("session.jsonl")),
         build_argv=build_argv,
-        get_usage_info=lambda nonce: None,
+        get_usage_info=lambda session_path: None,
         source="test",
     )
 
@@ -135,7 +135,7 @@ def test_run_agent_reports_missing_result(monkeypatch):
     def fake_run_terminal_session(*_args, **_kwargs) -> TerminalSessionResult:
         return TerminalSessionResult(exit_code=0, transcript="runner transcript", payload=None)
 
-    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
         return usage
 
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
@@ -465,7 +465,7 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
             payload={"summary": "done"},
         )
 
-    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
         return usage
 
     def missing_session_id(_nonce: str) -> str:
@@ -493,8 +493,8 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
     assert result.status == "failed"
     assert result.error_type == "session_discovery"
     assert result.error_message == "No session found"
-    assert result.usage == usage
-    assert result.usage_state == "collected"
+    assert result.usage is None
+    assert result.usage_state == "not_attempted"
 
 
 def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
@@ -521,7 +521,7 @@ def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
             payload={"summary": "done"},
         )
 
-    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
         return usage
 
     config = fake_agent_config()
@@ -566,7 +566,7 @@ def test_run_agent_records_unavailable_usage_lookup(monkeypatch, capsys):
             payload={"summary": "done"},
         )
 
-    def failing_get_usage_info(_nonce: str):
+    def failing_get_usage_info(_session_path: Path):
         raise OSError("usage unavailable")
 
     config = fake_agent_config()
@@ -610,7 +610,7 @@ def test_run_agent_attempts_usage_lookup_for_timeout(monkeypatch, capsys):
     def fake_run_terminal_session(*_args, **_kwargs):
         raise TimeoutError("timed out waiting for completion")
 
-    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
         return usage
 
     config = fake_agent_config()
@@ -643,7 +643,7 @@ def test_run_agent_attempts_usage_lookup_for_timeout(monkeypatch, capsys):
 def test_run_agent_does_not_attempt_usage_lookup_before_launch(monkeypatch):
     calls: list[str] = []
 
-    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
         calls.append("usage")
         return None
 

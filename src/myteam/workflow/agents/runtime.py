@@ -29,7 +29,7 @@ class AgentRuntimeConfig:
     get_session_info: Callable[[str], tuple[str, Path]]
     build_argv: Callable[[str, bool, str | None, bool, list[str] | None], list[str]]
     source: Path | str
-    get_usage_info: Callable[[str], UsageInfo | None] | None = None
+    get_usage_info: Callable[[Path], UsageInfo | None] | None = None
 
 
 class AgentConfigError(Exception):
@@ -173,7 +173,7 @@ def _get_session_info_callable(
 def _get_usage_info_callable(
     module: ModuleType,
     session_context: AgentSessionContext,
-) -> Callable[[str], UsageInfo | None] | None:
+) -> Callable[[Path], UsageInfo | None] | None:
     if not hasattr(module, "get_usage_info"):
         return None
 
@@ -181,12 +181,12 @@ def _get_usage_info_callable(
     _require_positional_parameter_count(
         module_get_usage_info,
         "get_usage_info",
-        2,
-        error_message="get_usage_info must accept nonce and context",
+        1,
+        error_message="get_usage_info must accept session_path",
     )
 
-    def get_usage_info(nonce: str) -> UsageInfo | None:
-        return module_get_usage_info(nonce, session_context)
+    def get_usage_info(session_path: Path) -> UsageInfo | None:
+        return module_get_usage_info(session_path)
 
     return get_usage_info
 

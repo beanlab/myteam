@@ -44,12 +44,8 @@ def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Pat
     return match.group(1), session_path
 
 
-def get_usage_info(
-    nonce: str,
-    context: AgentSessionContext,
-) -> UsageInfo | None:
+def get_usage_info(session_path: Path) -> UsageInfo | None:
     try:
-        session_path = _resolve_pi_session_path(nonce, context)
         return _usage_info_from_session_path(session_path)
     except (LookupError, ValueError, json.JSONDecodeError):
         return None

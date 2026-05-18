@@ -61,7 +61,7 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
         "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}', context.launch_cwd\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
-        "def get_usage_info(nonce, context):\n"
+        "def get_usage_info(session_path):\n"
         "    return None\n",
         encoding="utf-8",
     )
@@ -76,11 +76,12 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     assert config.exec == "custom-agent"
     assert config.exit_sequence == b"exit\x1b[C\r"
     assert config.build_argv("prompt") == ["custom-agent", "prompt"]
-    assert config.get_session_info("nonce") == (
+    session_id, session_path = config.get_session_info("nonce")
+    assert (session_id, session_path) == (
         f"nonce:{tmp_path.name}:{tmp_path.name}",
         tmp_path,
     )
-    assert config.get_usage_info("nonce") is None
+    assert config.get_usage_info(session_path) is None
 
 
 def test_resolve_allows_local_override_without_get_usage_info(tmp_path: Path, monkeypatch):
@@ -118,7 +119,7 @@ def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monke
         "EXIT_COMMAND = 'exit'\n"
         "def get_session_info(nonce, context):\n"
         "    return 'local-session'\n"
-        "def get_usage_info(nonce, context):\n"
+        "def get_usage_info(session_path):\n"
         "    return None\n",
         encoding="utf-8",
     )
@@ -142,7 +143,7 @@ def test_resolve_rejects_local_get_session_info_without_context(tmp_path: Path, 
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
-        "def get_usage_info(nonce, context):\n"
+        "def get_usage_info(session_path):\n"
         "    return None\n",
         encoding="utf-8",
     )
@@ -166,7 +167,7 @@ def test_resolve_accepts_legacy_local_exit_sequence(tmp_path: Path, monkeypatch)
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
-        "def get_usage_info(nonce, context):\n"
+        "def get_usage_info(session_path):\n"
         "    return None\n",
         encoding="utf-8",
     )
@@ -192,7 +193,7 @@ def test_resolve_prefers_legacy_exit_sequence_over_exit_command(tmp_path: Path, 
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
-        "def get_usage_info(nonce, context):\n"
+        "def get_usage_info(session_path):\n"
         "    return None\n",
         encoding="utf-8",
     )
@@ -248,7 +249,7 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
         "    return 'local-session'\n"
         "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
         "    return ['custom-agent', prompt_text]\n"
-        "def get_usage_info(nonce, context):\n"
+        "def get_usage_info(session_path):\n"
         "    return None\n",
         encoding="utf-8",
     )
@@ -451,7 +452,7 @@ def test_codex_get_usage_info_extracts_tokens_and_estimates_cost(tmp_path: Path)
         encoding="utf-8",
     )
 
-    usage = get_codex_usage_info("nonce-123", agent_session_context(tmp_path))
+    usage = get_codex_usage_info(session_path)
 
     assert usage is not None
     assert usage.model == "gpt-5.4"
@@ -469,7 +470,7 @@ def test_codex_get_usage_info_returns_none_without_token_count_event(tmp_path: P
     session_path = sessions_dir / "rollout-2026-05-14T10-02-00-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl"
     session_path.write_text('{"model":"gpt-5.4","nonce":"nonce-123"}\n', encoding="utf-8")
 
-    assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
+    assert get_codex_usage_info(session_path) is None
 
 
 def test_codex_get_usage_info_returns_none_without_model(tmp_path: Path):
@@ -481,7 +482,7 @@ def test_codex_get_usage_info_returns_none_without_model(tmp_path: Path):
         encoding="utf-8",
     )
 
-    assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
+    assert get_codex_usage_info(session_path) is None
 
 
 def test_estimate_usage_cost_uses_passed_pricing_mapping():
@@ -506,7 +507,7 @@ def test_codex_get_usage_info_returns_none_for_malformed_jsonl_lines(tmp_path: P
         encoding="utf-8",
     )
 
-    assert get_codex_usage_info("nonce-123", agent_session_context(tmp_path)) is None
+    assert get_codex_usage_info(session_path) is None
 
 
 def test_codex_get_usage_info_returns_usage_for_unknown_pricing(tmp_path: Path):
@@ -519,7 +520,7 @@ def test_codex_get_usage_info_returns_usage_for_unknown_pricing(tmp_path: Path):
         encoding="utf-8",
     )
 
-    usage = get_codex_usage_info("nonce-123", agent_session_context(tmp_path))
+    usage = get_codex_usage_info(session_path)
 
     assert usage is not None
     assert usage.estimated_cost == 0.0
@@ -537,7 +538,7 @@ def test_pi_get_usage_info_extracts_usage_and_uses_session_cost(tmp_path: Path):
         encoding="utf-8",
     )
 
-    usage = get_pi_usage_info("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir))
+    usage = get_pi_usage_info(session_path)
 
     assert usage is not None
     assert usage.model == "gpt-5.5"
@@ -561,7 +562,7 @@ def test_pi_get_usage_info_falls_back_to_codex_pricing_when_cost_missing(tmp_pat
         encoding="utf-8",
     )
 
-    usage = get_pi_usage_info("nonce-123", agent_session_context(tmp_path, launch_cwd=project_dir))
+    usage = get_pi_usage_info(session_path)
 
     assert usage is not None
     assert usage.model == "gpt-5.5"
