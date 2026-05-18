@@ -79,6 +79,32 @@ def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
     assert config.get_usage_info("nonce") is None
 
 
+def test_resolve_allows_local_override_without_get_usage_info(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_dir = tmp_path / ".myteam" / ".config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "custom.py").write_text(
+        "EXEC = 'custom-agent'\n"
+        "EXIT_COMMAND = 'exit'\n"
+        "def get_session_id(nonce, context):\n"
+        "    return f'{nonce}:{context.project_root.name}:{context.launch_cwd.name}'\n"
+        "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None):\n"
+        "    return ['custom-agent', prompt_text]\n",
+        encoding="utf-8",
+    )
+
+    config = resolve_agent_runtime_config(
+        "custom",
+        project_root=tmp_path,
+        session_context=agent_session_context(tmp_path),
+    )
+
+    assert config.name == "custom"
+    assert config.exec == "custom-agent"
+    assert config.get_usage_info is None
+    assert config.build_argv("prompt") == ["custom-agent", "prompt"]
+
+
 def test_resolve_rejects_local_override_without_build_argv(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_dir = tmp_path / ".myteam" / ".config"

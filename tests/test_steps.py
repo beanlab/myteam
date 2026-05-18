@@ -80,6 +80,47 @@ def test_run_agent_returns_completed_result(monkeypatch):
     assert result.usage_state == "unavailable"
 
 
+def test_run_agent_marks_missing_usage_hook_as_not_implemented(monkeypatch, capsys):
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_id=config.get_session_id,
+        build_argv=config.build_argv,
+        source=config.source,
+        get_usage_info=None,
+    )
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    result = run_agent(
+        agent="codex",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    captured = capsys.readouterr().out
+    assert result.status == "completed"
+    assert result.usage is None
+    assert result.usage_state == "no_get_usage_info_implemented"
+    assert result.usage_error_message == "workflow agent config does not implement get_usage_info"
+    assert "Usage:" not in captured
+
+
 def test_run_agent_reports_missing_result(monkeypatch):
     usage = UsageInfo(
         model="gpt-5-codex",

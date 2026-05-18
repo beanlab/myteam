@@ -338,6 +338,9 @@ def _resolve_usage_tracking(
     agent_config: AgentRuntimeConfig,
     nonce: str,
 ) -> tuple[UsageInfo | None, str, str | None]:
+    if agent_config.get_usage_info is None:
+        return None, "no_get_usage_info_implemented", "workflow agent config does not implement get_usage_info"
+
     try:
         usage = agent_config.get_usage_info(nonce)
     except Exception as exc:

@@ -28,8 +28,8 @@ class AgentRuntimeConfig:
     exit_sequence: bytes
     get_session_id: Callable[[str], str]
     build_argv: Callable[[str, bool, str | None, bool, list[str] | None], list[str]]
-    get_usage_info: Callable[[str], UsageInfo | None]
     source: Path | str
+    get_usage_info: Callable[[str], UsageInfo | None] | None = None
 
 
 class AgentConfigError(Exception):
@@ -127,8 +127,8 @@ def _config_from_module(
         exit_sequence=exit_sequence,
         get_session_id=get_session_id,
         build_argv=build_argv,
-        get_usage_info=get_usage_info,
         source=source,
+        get_usage_info=get_usage_info,
     )
 
 
@@ -173,7 +173,10 @@ def _get_session_id_callable(
 def _get_usage_info_callable(
     module: ModuleType,
     session_context: AgentSessionContext,
-) -> Callable[[str], UsageInfo | None]:
+) -> Callable[[str], UsageInfo | None] | None:
+    if not hasattr(module, "get_usage_info"):
+        return None
+
     module_get_usage_info = _required_callable(module, "get_usage_info")
     _require_positional_parameter_count(
         module_get_usage_info,

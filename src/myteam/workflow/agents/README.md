@@ -43,6 +43,10 @@ def build_argv(
     ...
 ```
 
+`get_usage_info` is optional. When it is omitted, `run_agent(...)` records the
+step usage state as `no_get_usage_info_implemented` instead of failing config
+resolution.
+
 Instead of `EXIT_COMMAND` as a string that uses `encode_input` from `agent_utils.py`, you
 may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
 `EXIT_COMMAND` are present, `EXIT_SEQUENCE` takes precedence.

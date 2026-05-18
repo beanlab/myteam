@@ -70,6 +70,7 @@ class StepResult:
     - ``not_attempted``: usage lookup was skipped because the step failed before launch.
     - ``collected``: usage lookup succeeded and ``usage`` is populated.
     - ``unavailable``: usage lookup was attempted, but the runtime could not provide usage data.
+    - ``no_get_usage_info_implemented``: the agent config does not define ``get_usage_info``.
     """
     status: str
     output: Any | None = None
