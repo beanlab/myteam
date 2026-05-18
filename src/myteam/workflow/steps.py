@@ -43,6 +43,9 @@ def run_agent(
         cwd: Optional working directory for launching the agent process.
     """
     transcript = ""
+    usage: UsageInfo | None = None
+    usage_state = "not_attempted"
+    usage_error_message: str | None = None
     try:
         resolved_input = input
         _validate_session_arguments(
@@ -95,7 +98,10 @@ def run_agent(
             nonce=nonce,
             agent_config=agent_config,
         )
-        usage = _resolve_usage_info(agent_config=agent_config, nonce=nonce)
+        usage, usage_state, usage_error_message = _resolve_usage_tracking(
+            agent_config=agent_config,
+            nonce=nonce,
+        )
         if usage is not None:
             _print_usage_summary(usage)
         return StepResult(
@@ -107,20 +113,41 @@ def run_agent(
             exit_code=session_result.exit_code,
             session_id=discovered_session_id,
             usage=usage,
+            usage_state=usage_state,
+            usage_error_message=usage_error_message,
         )
     except StepExecutionError as exc:
+        if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
+            usage, usage_state, usage_error_message = _resolve_usage_tracking(
+                agent_config=agent_config,
+                nonce=nonce,
+            )
+            if usage is not None:
+                _print_usage_summary(usage)
         return StepResult(
             status="failed",
             error_type=exc.error_type,
             error_message=exc.error_message,
             transcript=transcript,
+            usage=usage,
+            usage_state=usage_state,
+            usage_error_message=usage_error_message,
         )
     except TimeoutError as exc:
+        usage, usage_state, usage_error_message = _resolve_usage_tracking(
+            agent_config=agent_config,
+            nonce=nonce,
+        )
+        if usage is not None:
+            _print_usage_summary(usage)
         return StepResult(
             status="failed",
             error_type="timeout",
             error_message=str(exc),
             transcript=transcript,
+            usage=usage,
+            usage_state=usage_state,
+            usage_error_message=usage_error_message,
         )
     except OSError as exc:
         return StepResult(
@@ -128,6 +155,7 @@ def run_agent(
             error_type="agent_launch",
             error_message=f"Failed to launch workflow agent: {exc}",
             transcript=transcript,
+            usage_state="not_attempted",
         )
 
 
@@ -305,11 +333,20 @@ def _resolve_session_id(
         raise StepExecutionError("session_discovery", str(exc)) from exc
 
 
-def _resolve_usage_info(*, agent_config: AgentRuntimeConfig, nonce: str) -> UsageInfo | None:
+def _resolve_usage_tracking(
+    *,
+    agent_config: AgentRuntimeConfig,
+    nonce: str,
+) -> tuple[UsageInfo | None, str, str | None]:
     try:
-        return agent_config.get_usage_info(nonce)
-    except Exception:
-        return None
+        usage = agent_config.get_usage_info(nonce)
+    except Exception as exc:
+        return None, "unavailable", str(exc)
+
+    if usage is None:
+        return None, "unavailable", None
+
+    return usage, "collected", None
 
 
 def _extract_session_id(output_value: Any) -> str | None:

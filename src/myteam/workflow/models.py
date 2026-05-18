@@ -65,6 +65,11 @@ class StepResult:
     - ``completion_missing``: the agent session ended without producing a structured result.
     - ``output_validation``: the completion payload content did not satisfy the authored output template.
     - ``session_discovery``: the step completed but the runtime could not discover the new agent session id.
+
+    Usage tracking values:
+    - ``not_attempted``: usage lookup was skipped because the step failed before launch.
+    - ``collected``: usage lookup succeeded and ``usage`` is populated.
+    - ``unavailable``: usage lookup was attempted, but the runtime could not provide usage data.
     """
     status: str
     output: Any | None = None
@@ -76,6 +81,8 @@ class StepResult:
     exit_code: int | None = None
     session_id: str | None = None
     usage: UsageInfo | None = None
+    usage_state: str = "not_attempted"
+    usage_error_message: str | None = None
 
 
 @dataclass
