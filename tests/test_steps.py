@@ -77,14 +77,38 @@ def test_run_agent_returns_completed_result(monkeypatch):
     assert seen["cwd"] is not None
     assert result.session_id == "discovered-session"
     assert result.usage is None
+    assert result.usage_state == "unavailable"
 
 
 def test_run_agent_reports_missing_result(monkeypatch):
+    usage = UsageInfo(
+        model="gpt-5-codex",
+        input_tokens=14248,
+        cached_input_tokens=0,
+        output_tokens=144,
+        reasoning_output_tokens=70,
+        total_tokens=14392,
+        estimated_cost=0.1234,
+    )
+
     def fake_run_terminal_session(*_args, **_kwargs) -> TerminalSessionResult:
         return TerminalSessionResult(exit_code=0, transcript="runner transcript", payload=None)
 
+    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+        return usage
+
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_id=config.get_session_id,
+        build_argv=config.build_argv,
+        get_usage_info=fake_get_usage_info,
+        source=config.source,
+    )
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -94,6 +118,8 @@ def test_run_agent_reports_missing_result(monkeypatch):
 
     assert result.status == "failed"
     assert result.error_type == "completion_missing"
+    assert result.usage == usage
+    assert result.usage_state == "collected"
 
 
 def test_run_agent_requires_explicit_agent():
@@ -381,12 +407,25 @@ def test_run_agent_rejects_empty_session_id(monkeypatch):
 
 
 def test_run_agent_reports_session_discovery_failure(monkeypatch):
+    usage = UsageInfo(
+        model="gpt-5-codex",
+        input_tokens=14248,
+        cached_input_tokens=0,
+        output_tokens=144,
+        reasoning_output_tokens=70,
+        total_tokens=14392,
+        estimated_cost=0.1234,
+    )
+
     def fake_run_terminal_session(*_args, **_kwargs) -> TerminalSessionResult:
         return TerminalSessionResult(
             exit_code=0,
             transcript="runner transcript",
             payload={"summary": "done"},
         )
+
+    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+        return usage
 
     def missing_session_id(_nonce: str) -> str:
         raise LookupError("No session found")
@@ -398,7 +437,7 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
         exit_sequence=config.exit_sequence,
         get_session_id=missing_session_id,
         build_argv=config.build_argv,
-        get_usage_info=config.get_usage_info,
+        get_usage_info=fake_get_usage_info,
         source=config.source,
     )
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
@@ -413,6 +452,8 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
     assert result.status == "failed"
     assert result.error_type == "session_discovery"
     assert result.error_message == "No session found"
+    assert result.usage == usage
+    assert result.usage_state == "collected"
 
 
 def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
@@ -464,12 +505,13 @@ def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
     captured = capsys.readouterr().out
     assert result.status == "completed"
     assert result.usage == usage
+    assert result.usage_state == "collected"
     assert "Usage:" in captured
     assert "Model: gpt-5-codex" in captured
     assert "Cost: $0.1234" in captured
 
 
-def test_run_agent_ignores_usage_lookup_failures(monkeypatch, capsys):
+def test_run_agent_records_unavailable_usage_lookup(monkeypatch, capsys):
     def fake_run_terminal_session(
         argv: list[str],
         *,
@@ -508,7 +550,86 @@ def test_run_agent_ignores_usage_lookup_failures(monkeypatch, capsys):
     captured = capsys.readouterr().out
     assert result.status == "completed"
     assert result.usage is None
+    assert result.usage_state == "unavailable"
+    assert result.usage_error_message == "usage unavailable"
     assert "Usage:" not in captured
+
+
+def test_run_agent_attempts_usage_lookup_for_timeout(monkeypatch, capsys):
+    usage = UsageInfo(
+        model="gpt-5-codex",
+        input_tokens=14248,
+        cached_input_tokens=0,
+        output_tokens=144,
+        reasoning_output_tokens=70,
+        total_tokens=14392,
+        estimated_cost=0.1234,
+    )
+
+    def fake_run_terminal_session(*_args, **_kwargs):
+        raise TimeoutError("timed out waiting for completion")
+
+    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+        return usage
+
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_id=config.get_session_id,
+        build_argv=config.build_argv,
+        get_usage_info=fake_get_usage_info,
+        source=config.source,
+    )
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    result = run_agent(
+        agent="codex",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    captured = capsys.readouterr().out
+    assert result.status == "failed"
+    assert result.error_type == "timeout"
+    assert result.usage == usage
+    assert result.usage_state == "collected"
+    assert "Usage:" in captured
+
+
+def test_run_agent_does_not_attempt_usage_lookup_before_launch(monkeypatch):
+    calls: list[str] = []
+
+    def fake_get_usage_info(_nonce: str) -> UsageInfo | None:
+        calls.append("usage")
+        return None
+
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_id=config.get_session_id,
+        build_argv=config.build_argv,
+        get_usage_info=fake_get_usage_info,
+        source=config.source,
+    )
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    result = run_agent(
+        agent="codex",
+        interactive="yes",  # type: ignore[arg-type]
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.usage is None
+    assert result.usage_state == "not_attempted"
+    assert calls == []
 
 
 def test_run_agent_launches_from_project_root_when_called_under_active_root(tmp_path, monkeypatch):
