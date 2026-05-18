@@ -1,7 +1,7 @@
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterator, Any
+from typing import Any, Iterator
 
 PTY_RIGHT_ARROW = b"\x1b[C"
 
@@ -26,20 +26,33 @@ def iter_jsonl_reverse(path: Path, block_size: int = 1024 * 1024) -> Iterator[di
             buffer = lines.pop(0)
 
             for line in reversed(lines):
-                try:
-                    obj = json.loads(line.decode("utf-8", errors="ignore"))
-                except json.JSONDecodeError:
+                obj = _decode_json_object(line)
+                if obj is None:
                     continue
                 if isinstance(obj, dict):
                     yield obj
 
         if buffer:
-            try:
-                obj = json.loads(buffer.decode("utf-8", errors="ignore"))
-                if isinstance(obj, dict):
-                    yield obj
-            except json.JSONDecodeError:
-                pass
+            obj = _decode_json_object(buffer)
+            if isinstance(obj, dict):
+                yield obj
+
+
+def _decode_json_object(data: bytes) -> Any | None:
+    text = data.decode("utf-8", errors="ignore").strip()
+    if not text:
+        return None
+
+    candidates = [text]
+    if not text.startswith("{") and not text.startswith("["):
+        candidates.append(f"{{{text}}}")
+
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    return None
 
 @lru_cache(maxsize=None)
 def resolve_session_path(
