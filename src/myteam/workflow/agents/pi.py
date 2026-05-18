@@ -73,12 +73,9 @@ def _usage_info_from_session_path(path: Path) -> UsageInfo | None:
     latest_usage: dict[str, Any] | None = None
 
     for payload in iter_jsonl_reverse(path):
-        if payload.get("type") != "message":
-            continue
-
         message = payload.get("message")
         if not isinstance(message, dict):
-            continue
+            message = payload
 
         model = message.get("model")
         usage = message.get("usage")
