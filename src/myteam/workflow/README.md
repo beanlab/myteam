@@ -65,7 +65,7 @@ The terminal contract is:
 - [parser.py](parser.py)
   Owns workflow-file loading and top-level orchestration around workflow schema validation.
 
-- [parser_validation.py](parser_validation.py)
+- [parser_validation.py](validation/parser_validation.py)
   Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, and step-definition validation.
 
 - [models.py](models.py)

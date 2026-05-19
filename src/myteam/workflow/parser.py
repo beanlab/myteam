@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 from .models import WorkflowDefinition
-from .parser_validation import is_identifier_key, validate_step_definition
+from src.myteam.workflow.validation.parser_validation import is_identifier_key, validate_step_definition
 
 
 def load_workflow(path: Path) -> WorkflowDefinition:
