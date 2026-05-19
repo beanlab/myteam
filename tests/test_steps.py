@@ -103,6 +103,89 @@ def test_agent_context_exit_calls_print_usage(monkeypatch):
     assert calls == ["print"]
 
 
+def test_agent_context_aggregates_usage_across_runs(monkeypatch, capsys):
+    usages = iter(
+        [
+            UsageInfo(
+                model="gpt-5-codex",
+                input_tokens=1,
+                cached_input_tokens=0,
+                output_tokens=2,
+                reasoning_output_tokens=3,
+                total_tokens=4,
+                estimated_cost=0.1,
+            ),
+            UsageInfo(
+                model="gpt-5-codex",
+                input_tokens=2,
+                cached_input_tokens=1,
+                output_tokens=3,
+                reasoning_output_tokens=4,
+                total_tokens=5,
+                estimated_cost=0.2,
+            ),
+            UsageInfo(
+                model="gpt-5.5",
+                input_tokens=3,
+                cached_input_tokens=2,
+                output_tokens=4,
+                reasoning_output_tokens=5,
+                total_tokens=6,
+                estimated_cost=0.3,
+            ),
+        ]
+    )
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
+        return next(usages)
+
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_info=config.get_session_info,
+        build_argv=config.build_argv,
+        get_usage_info=fake_get_usage_info,
+        source=config.source,
+    )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    with AgentContext() as ctx:
+        for _ in range(3):
+            result = ctx.run_agent(
+                agent="codex",
+                prompt="Write a summary.",
+                output={"summary": "short summary"},
+            )
+            assert result.status == "completed"
+
+    captured = capsys.readouterr().out
+    assert captured.count("Usage:\n") == 3
+    assert "Usage Summary:" in captured
+    assert captured.count("Model: gpt-5-codex") == 3
+    assert captured.count("Model: gpt-5.5") == 2
+    assert "    Input: 3" in captured
+    assert "  Grand Total:" in captured
+    assert "    Input: 6" in captured
+    assert "    Cost: $0.6000" in captured
+
+
 def test_run_agent_returns_completed_result(monkeypatch):
     seen: dict[str, Any] = {}
 
@@ -826,6 +909,55 @@ def test_run_agent_launches_from_project_root_when_called_under_active_root(tmp_
         home=Path.home().resolve(),
         project_root=tmp_path.resolve(),
         launch_cwd=tmp_path.resolve(),
+    )
+
+
+def test_run_agent_resolves_project_root_from_requested_cwd(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    nested_cwd = workspace / "nested"
+    workspace.mkdir()
+    nested_cwd.mkdir()
+    (workspace / ".myteam").mkdir()
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    monkeypatch.chdir(tmp_path)
+    seen: dict[str, Any] = {}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["cwd"] = cwd
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    def fake_resolve_agent_runtime_config(_agent, **kwargs):
+        seen["project_root"] = kwargs["project_root"]
+        seen["session_context"] = kwargs["session_context"]
+        return fake_agent_config()
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+
+    result = run_agent(
+        agent="codex",
+        cwd=nested_cwd,
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert seen["cwd"] == nested_cwd.resolve()
+    assert seen["project_root"] == workspace.resolve()
+    assert seen["session_context"] == AgentSessionContext(
+        home=Path.home().resolve(),
+        project_root=workspace.resolve(),
+        launch_cwd=nested_cwd.resolve(),
     )
 
 

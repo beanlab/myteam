@@ -24,7 +24,24 @@ class _RunState:
     session_path: Path | None = None
     nonce: str | None = None
     agent_config: AgentRuntimeConfig | None = None
-    usage_printed: bool = False
+
+
+@dataclass
+class _UsageTotals:
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_output_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost: float = 0.0
+
+    def add(self, usage: UsageInfo) -> None:
+        self.input_tokens += usage.input_tokens
+        self.cached_input_tokens += usage.cached_input_tokens
+        self.output_tokens += usage.output_tokens
+        self.reasoning_output_tokens += usage.reasoning_output_tokens
+        self.total_tokens += usage.total_tokens
+        self.estimated_cost += usage.estimated_cost
 
 
 class AgentContext:
@@ -35,7 +52,7 @@ class AgentContext:
         inactivity_timeout_seconds: int = 300,
     ) -> None:
         self.cwd = None if cwd is None else Path(cwd).resolve()
-        self.project_root = _resolve_project_root()
+        self.project_root = _resolve_project_root(cwd=self.cwd)
         self.timeout = inactivity_timeout_seconds
         self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
         self.session_context = AgentSessionContext(
@@ -44,19 +61,18 @@ class AgentContext:
             launch_cwd=self.launch_cwd,
         )
         self._agent_configs: dict[str, AgentRuntimeConfig] = {}
-        self._state = _RunState()
+        self._usage_totals_by_model: dict[str, _UsageTotals] = {}
 
     def __enter__(self) -> "AgentContext":
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        self.print_usage()
+        self.print_total_usage()
 
-    def print_usage(self) -> None:
-        if self._state.usage is None or self._state.usage_printed:
+    def print_total_usage(self) -> None:
+        if not self._usage_totals_by_model:
             return
-        _print_usage_summary(self._state.usage)
-        self._state.usage_printed = True
+        _print_aggregated_usage_summary(self._usage_totals_by_model)
 
     def run_agent(
         self,
@@ -71,10 +87,10 @@ class AgentContext:
         fork: bool = False,
         extra_args: list[str] | None = None,
     ) -> StepResult:
-        self._state = _RunState()
+        state = _RunState()
         resolved_input = input
         nonce = str(uuid.uuid4())
-        self._state.nonce = nonce
+        state.nonce = nonce
 
         try:
             _validate_step_execution_args(
@@ -86,7 +102,7 @@ class AgentContext:
             )
             agent_name = _require_agent_name(agent)
             agent_config = self._resolve_agent_config(agent_name)
-            self._state.agent_config = agent_config
+            state.agent_config = agent_config
 
             prompt_text = _build_step_prompt(
                 resolved_input=resolved_input,
@@ -110,7 +126,7 @@ class AgentContext:
                 cwd=self.launch_cwd,
                 inactivity_timeout_seconds=self.timeout,
             )
-            self._state.transcript = session_result.transcript
+            state.transcript = session_result.transcript
 
             if session_result.payload is None:
                 raise StepExecutionError(
@@ -126,66 +142,62 @@ class AgentContext:
                 nonce=nonce,
                 agent_config=agent_config,
             )
-            self._state.session_path = session_path
+            state.session_path = session_path
             usage, usage_state, usage_error_message = _resolve_usage_tracking(
                 agent_config=agent_config,
                 session_path=session_path,
             )
             self._set_usage_state(
+                state=state,
                 usage=usage,
                 usage_state=usage_state,
                 usage_error_message=usage_error_message,
             )
-            self.print_usage()
+            self._record_usage(usage)
+            self._print_usage(state)
             return StepResult(
                 status="completed",
                 output=session_result.payload,
                 resolved_input=resolved_input,
                 agent_name=agent_name,
-                transcript=self._state.transcript,
+                transcript=state.transcript,
                 exit_code=session_result.exit_code,
                 session_id=discovered_session_id,
-                usage=self._state.usage,
-                usage_state=self._state.usage_state,
-                usage_error_message=self._state.usage_error_message,
+                usage=state.usage,
+                usage_state=state.usage_state,
+                usage_error_message=state.usage_error_message,
             )
         except StepExecutionError as exc:
             if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
-                self._collect_usage_after_failure(
-                    agent_config=self._state.agent_config,
-                    nonce=self._state.nonce,
-                )
-                self.print_usage()
+                self._collect_usage_after_failure(state=state)
+                self._print_usage(state)
             return StepResult(
                 status="failed",
                 error_type=exc.error_type,
                 error_message=exc.error_message,
-                transcript=self._state.transcript,
-                usage=self._state.usage,
-                usage_state=self._state.usage_state,
-                usage_error_message=self._state.usage_error_message,
+                transcript=state.transcript,
+                usage=state.usage,
+                usage_state=state.usage_state,
+                usage_error_message=state.usage_error_message,
             )
         except TimeoutError as exc:
-            self._collect_usage_after_failure(
-                agent_config=self._state.agent_config,
-                nonce=self._state.nonce,
-            )
-            self.print_usage()
+            self._collect_usage_after_failure(state=state)
+            self._print_usage(state)
             return StepResult(
                 status="failed",
                 error_type="timeout",
                 error_message=str(exc),
-                transcript=self._state.transcript,
-                usage=self._state.usage,
-                usage_state=self._state.usage_state,
-                usage_error_message=self._state.usage_error_message,
+                transcript=state.transcript,
+                usage=state.usage,
+                usage_state=state.usage_state,
+                usage_error_message=state.usage_error_message,
             )
         except OSError as exc:
             return StepResult(
                 status="failed",
                 error_type="agent_launch",
                 error_message=f"Failed to launch workflow agent: {exc}",
-                transcript=self._state.transcript,
+                transcript=state.transcript,
                 usage_state="not_attempted",
             )
 
@@ -207,39 +219,55 @@ class AgentContext:
     def _collect_usage_after_failure(
         self,
         *,
-        agent_config: AgentRuntimeConfig | None,
-        nonce: str | None,
+        state: _RunState,
     ) -> None:
-        if agent_config is None:
+        if state.agent_config is None:
             return
-        session_path = self._state.session_path
+        session_path = state.session_path
         if session_path is None:
             session_path = _resolve_usage_session_path(
-                agent_config=agent_config,
-                nonce=nonce,
+                agent_config=state.agent_config,
+                nonce=state.nonce,
             )
         if session_path is None:
             return
         usage, usage_state, usage_error_message = _resolve_usage_tracking(
-            agent_config=agent_config,
+            agent_config=state.agent_config,
             session_path=session_path,
         )
         self._set_usage_state(
+            state=state,
             usage=usage,
             usage_state=usage_state,
             usage_error_message=usage_error_message,
         )
+        self._record_usage(usage)
 
     def _set_usage_state(
         self,
         *,
+        state: _RunState,
         usage: UsageInfo | None,
         usage_state: str,
         usage_error_message: str | None,
     ) -> None:
-        self._state.usage = usage
-        self._state.usage_state = usage_state
-        self._state.usage_error_message = usage_error_message
+        state.usage = usage
+        state.usage_state = usage_state
+        state.usage_error_message = usage_error_message
+
+    def _record_usage(self, usage: UsageInfo | None) -> None:
+        if usage is None:
+            return
+        totals = self._usage_totals_by_model.get(usage.model)
+        if totals is None:
+            totals = _UsageTotals()
+            self._usage_totals_by_model[usage.model] = totals
+        totals.add(usage)
+
+    def _print_usage(self, state: _RunState) -> None:
+        if state.usage is None:
+            return
+        _print_usage_summary(state.usage)
 
 
 def run_agent(
@@ -293,12 +321,15 @@ def _require_agent_name(agent_name: str | None) -> str:
     return agent_name
 
 
-def _resolve_project_root() -> Path:
+def _resolve_project_root(cwd: Path | None = None) -> Path:
     configured_agent_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
     if configured_agent_root:
         return Path(configured_agent_root).resolve().parent
 
-    cwd = Path.cwd().resolve()
+    if cwd is None:
+        cwd = Path.cwd()
+
+    cwd = cwd.resolve()
     for candidate in (cwd, *cwd.parents):
         if (candidate / ".myteam").is_dir():
             return candidate
@@ -525,6 +556,34 @@ def _print_usage_summary(usage: UsageInfo) -> None:
     print(f"  Reasoning: {usage.reasoning_output_tokens}")
     print(f"  Total: {usage.total_tokens}")
     print(f"  Cost: ${usage.estimated_cost:.4f}")
+
+
+def _print_aggregated_usage_summary(usage_totals_by_model: dict[str, _UsageTotals]) -> None:
+    print("Usage Summary:")
+    for model, totals in usage_totals_by_model.items():
+        print(f"  Model: {model}")
+        print(f"    Input: {totals.input_tokens}")
+        print(f"    Cached Input: {totals.cached_input_tokens}")
+        print(f"    Output: {totals.output_tokens}")
+        print(f"    Reasoning: {totals.reasoning_output_tokens}")
+        print(f"    Total: {totals.total_tokens}")
+        print(f"    Cost: ${totals.estimated_cost:.4f}")
+
+    grand_totals = _UsageTotals()
+    for totals in usage_totals_by_model.values():
+        grand_totals.input_tokens += totals.input_tokens
+        grand_totals.cached_input_tokens += totals.cached_input_tokens
+        grand_totals.output_tokens += totals.output_tokens
+        grand_totals.reasoning_output_tokens += totals.reasoning_output_tokens
+        grand_totals.total_tokens += totals.total_tokens
+        grand_totals.estimated_cost += totals.estimated_cost
+
+    print("Grand Totals:")
+    print(f"  Input: {grand_totals.input_tokens}")
+    print(f"  Cached Input: {grand_totals.cached_input_tokens}")
+    print(f"  Output: {grand_totals.output_tokens}")
+    print(f"  Total: {grand_totals.total_tokens}")
+    print(f"  Cost: ${grand_totals.estimated_cost:.4f}")
 
 
 class StepExecutionError(Exception):
