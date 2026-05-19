@@ -7,6 +7,7 @@
 Its job is to:
 
 - load and validate authored workflow files
+- resolve workflow file paths for YAML and Python workflows
 - resolve references between completed steps
 - run each step through an interactive terminal-backed agent session
 - collect the final structured step result through an out-of-band result channel
@@ -20,25 +21,26 @@ This package is intentionally split into two layers:
 The workflow layer is further split so each file stays narrow:
 
 - `parser.py` loads authored YAML
-- `parser_validation.py` owns parser/schema validation for step definitions
+- `reference_resolver.py` resolves `$step.path` references
+- `validation/parser_validation.py` owns parser/schema validation for step definitions
 - `engine.py` handles multi-step orchestration
 - `steps.py` handles single-step execution and prompt/argv construction
 - `usage.py` owns usage tracking and reporting helpers
-- `validation.py` owns execution-time step validation
+- `validation/step_validation.py` owns execution-time step validation
 
 ## Black-Box View
 
 From outside the package, the flow is:
 
-1. `commands.start(...)` resolves a workflow file path.
-2. `workflow.parser.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.parser_validation`.
+1. `commands.start(...)` resolves a workflow file path and either executes a Python workflow script or loads YAML.
+2. `workflow.parser.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation.parser_validation`.
 3. `workflow.engine.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.steps.run_agent(...)`:
    - receives the resolved step values from the engine
    - resolves the configured agent runtime config
    - builds the prompt
    - runs or resumes an interactive terminal session
-   - waits for the agent to call `myteam workflow-result`
+   - waits for the agent to call `myteam workflow-result` over the private result channel
    - validates the returned payload against the authored output shape
 5. The engine stores completed step state for later `$step.path` references.
 6. The engine returns either:
@@ -49,7 +51,7 @@ The terminal contract is:
 
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
-- the child reports its final result over a private Unix socket
+- the child reports its final result over a private Unix socket using `MYTEAM_RESULT_SOCKET` and `MYTEAM_RESULT_TOKEN`
 - Python workflow authors can pass `session_id` to `run_agent(...)` to resume, set `fork=True`
   to fork that session, and read `StepResult.session_id` from completed steps that return one
 - `run_agent(...)` launches agents from the detected project root by default; Python workflow
@@ -65,7 +67,7 @@ The terminal contract is:
 - [parser.py](parser.py)
   Owns workflow-file loading and top-level orchestration around workflow schema validation.
 
-- [parser_validation.py](validation/parser_validation.py)
+- [validation/parser_validation.py](validation/parser_validation.py)
   Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, and step-definition validation.
 
 - [models.py](models.py)
@@ -83,7 +85,7 @@ The terminal contract is:
 - [usage.py](usage.py)
   Owns usage-tracking helpers and usage-summary formatting.
 
-- [validation.py](validation.py)
+- [validation/step_validation.py](validation/step_validation.py)
   Owns runtime validation for step execution arguments and returned step output.
 
 - [result_tool.py](result_tool.py)
