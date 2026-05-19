@@ -26,9 +26,12 @@ def build_argv(
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
+    model: str | None = None,
     extra_args: list[str] | None = None,
 ) -> list[str]:
     extras = extra_args or []
+    if model is not None:
+        extras = ["--model", model, *extras]
     if not interactive and fork:
         raise ValueError("Codex non-interactive workflow steps do not support fork.")
     if not interactive and session_id is not None:

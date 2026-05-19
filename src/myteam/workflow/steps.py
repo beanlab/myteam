@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import uuid
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
@@ -12,6 +13,233 @@ from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult, UsageInfo
 from .terminal.session import run_terminal_session
+
+
+@dataclass
+class _RunState:
+    transcript: str = ""
+    usage: UsageInfo | None = None
+    usage_state: str = "not_attempted"
+    usage_error_message: str | None = None
+    session_path: Path | None = None
+    nonce: str | None = None
+    agent_config: AgentRuntimeConfig | None = None
+    usage_printed: bool = False
+
+
+class AgentContext:
+    def __init__(
+        self,
+        *,
+        cwd: Path | str | None = None,
+        inactivity_timeout_seconds: int = 300,
+    ) -> None:
+        self.cwd = None if cwd is None else Path(cwd).resolve()
+        self.project_root = _resolve_project_root()
+        self.timeout = inactivity_timeout_seconds
+        self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
+        self.session_context = AgentSessionContext(
+            home=Path.home().resolve(),
+            project_root=self.project_root,
+            launch_cwd=self.launch_cwd,
+        )
+        self._agent_configs: dict[str, AgentRuntimeConfig] = {}
+        self._state = _RunState()
+
+    def __enter__(self) -> "AgentContext":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.print_usage()
+
+    def print_usage(self) -> None:
+        if self._state.usage is None or self._state.usage_printed:
+            return
+        _print_usage_summary(self._state.usage)
+        self._state.usage_printed = True
+
+    def run_agent(
+        self,
+        *,
+        prompt: str,
+        output: dict[str, Any],
+        input: Any = None,
+        agent: str | None = None,
+        model: str | None = None,
+        interactive: bool = True,
+        session_id: str | None = None,
+        fork: bool = False,
+        extra_args: list[str] | None = None,
+    ) -> StepResult:
+        self._state = _RunState()
+        resolved_input = input
+        nonce = str(uuid.uuid4())
+        self._state.nonce = nonce
+
+        try:
+            _validate_step_execution_args(
+                interactive=interactive,
+                session_id=session_id,
+                fork=fork,
+                extra_args=extra_args,
+                model=model,
+            )
+            agent_name = _require_agent_name(agent)
+            agent_config = self._resolve_agent_config(agent_name)
+            self._state.agent_config = agent_config
+
+            prompt_text = _build_step_prompt(
+                resolved_input=resolved_input,
+                objective_text=prompt,
+                output_template=output,
+                session_nonce=nonce,
+            )
+            argv = _build_agent_argv(
+                agent_config=agent_config,
+                prompt_text=prompt_text,
+                interactive=interactive,
+                session_id=session_id,
+                fork=fork,
+                model=model,
+                extra_args=extra_args,
+            )
+
+            session_result = run_terminal_session(
+                argv,
+                exit_input=agent_config.exit_sequence,
+                cwd=self.launch_cwd,
+                inactivity_timeout_seconds=self.timeout,
+            )
+            self._state.transcript = session_result.transcript
+
+            if session_result.payload is None:
+                raise StepExecutionError(
+                    "completion_missing",
+                    "Workflow agent exited before reporting a structured result.",
+                )
+
+            _validate_step_output(output, session_result.payload)
+            discovered_session_id, session_path = _resolve_session_id(
+                payload=session_result.payload,
+                session_id=session_id,
+                fork=fork,
+                nonce=nonce,
+                agent_config=agent_config,
+            )
+            self._state.session_path = session_path
+            usage, usage_state, usage_error_message = _resolve_usage_tracking(
+                agent_config=agent_config,
+                session_path=session_path,
+            )
+            self._set_usage_state(
+                usage=usage,
+                usage_state=usage_state,
+                usage_error_message=usage_error_message,
+            )
+            self.print_usage()
+            return StepResult(
+                status="completed",
+                output=session_result.payload,
+                resolved_input=resolved_input,
+                agent_name=agent_name,
+                transcript=self._state.transcript,
+                exit_code=session_result.exit_code,
+                session_id=discovered_session_id,
+                usage=self._state.usage,
+                usage_state=self._state.usage_state,
+                usage_error_message=self._state.usage_error_message,
+            )
+        except StepExecutionError as exc:
+            if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
+                self._collect_usage_after_failure(
+                    agent_config=self._state.agent_config,
+                    nonce=self._state.nonce,
+                )
+                self.print_usage()
+            return StepResult(
+                status="failed",
+                error_type=exc.error_type,
+                error_message=exc.error_message,
+                transcript=self._state.transcript,
+                usage=self._state.usage,
+                usage_state=self._state.usage_state,
+                usage_error_message=self._state.usage_error_message,
+            )
+        except TimeoutError as exc:
+            self._collect_usage_after_failure(
+                agent_config=self._state.agent_config,
+                nonce=self._state.nonce,
+            )
+            self.print_usage()
+            return StepResult(
+                status="failed",
+                error_type="timeout",
+                error_message=str(exc),
+                transcript=self._state.transcript,
+                usage=self._state.usage,
+                usage_state=self._state.usage_state,
+                usage_error_message=self._state.usage_error_message,
+            )
+        except OSError as exc:
+            return StepResult(
+                status="failed",
+                error_type="agent_launch",
+                error_message=f"Failed to launch workflow agent: {exc}",
+                transcript=self._state.transcript,
+                usage_state="not_attempted",
+            )
+
+    def _resolve_agent_config(self, agent_name: str) -> AgentRuntimeConfig:
+        cached_config = self._agent_configs.get(agent_name)
+        if cached_config is not None:
+            return cached_config
+        try:
+            config = resolve_agent_runtime_config(
+                agent_name,
+                project_root=self.project_root,
+                session_context=self.session_context,
+            )
+        except KeyError as exc:
+            raise StepExecutionError("agent_resolution", str(exc)) from exc
+        self._agent_configs[agent_name] = config
+        return config
+
+    def _collect_usage_after_failure(
+        self,
+        *,
+        agent_config: AgentRuntimeConfig | None,
+        nonce: str | None,
+    ) -> None:
+        if agent_config is None:
+            return
+        session_path = self._state.session_path
+        if session_path is None:
+            session_path = _resolve_usage_session_path(
+                agent_config=agent_config,
+                nonce=nonce,
+            )
+        if session_path is None:
+            return
+        usage, usage_state, usage_error_message = _resolve_usage_tracking(
+            agent_config=agent_config,
+            session_path=session_path,
+        )
+        self._set_usage_state(
+            usage=usage,
+            usage_state=usage_state,
+            usage_error_message=usage_error_message,
+        )
+
+    def _set_usage_state(
+        self,
+        *,
+        usage: UsageInfo | None,
+        usage_state: str,
+        usage_error_message: str | None,
+    ) -> None:
+        self._state.usage = usage
+        self._state.usage_state = usage_state
+        self._state.usage_error_message = usage_error_message
 
 
 def run_agent(
@@ -35,136 +263,24 @@ def run_agent(
         output: Expected structured result shape the agent must report.
         input: Optional resolved input data included in the step prompt.
         agent: Workflow agent runtime name to launch.
-        model: Optional model name appended to the agent argv as ``--model <model>``.
+        model: Optional model name forwarded to the agent adapter.
         interactive: Whether to launch the agent in interactive mode.
         session_id: Optional existing agent session to resume or fork.
         fork: Whether to fork ``session_id`` into a new session instead of resuming it.
         extra_args: Optional additional argv items passed to the agent adapter.
         cwd: Optional working directory for launching the agent process.
     """
-    transcript = ""
-    usage: UsageInfo | None = None
-    usage_state = "not_attempted"
-    usage_error_message: str | None = None
-    session_path: Path | None = None
-    try:
-        resolved_input = input
-        _validate_session_arguments(
-            interactive=interactive,
-            session_id=session_id,
-            fork=fork,
-        )
-        agent_name = _require_agent_name(agent)
-        project_root = _resolve_project_root()
-        launch_cwd = project_root if cwd is None else Path(cwd).resolve()
-        session_context = AgentSessionContext(
-            home=Path.home().resolve(),
-            project_root=project_root,
-            launch_cwd=launch_cwd,
-        )
-        agent_config = _resolve_agent_config(agent_name, session_context=session_context)
-        nonce = str(uuid.uuid4())
-        prompt_text = _build_step_prompt(
-            resolved_input=resolved_input,
-            objective_text=prompt,
-            output_template=output,
-            session_nonce=nonce,
-        )
-        argv = _build_agent_argv(
-            agent_config=agent_config,
-            prompt_text=prompt_text,
-            interactive=interactive,
-            session_id=session_id,
-            fork=fork,
+    with AgentContext(cwd=cwd, inactivity_timeout_seconds=300) as ctx:
+        return ctx.run_agent(
+            prompt=prompt,
+            output=output,
+            input=input,
+            agent=agent,
             model=model,
-            extra_args=extra_args,
-        )
-        session_result = run_terminal_session(
-            argv,
-            exit_input=agent_config.exit_sequence,
-            cwd=launch_cwd,
-            inactivity_timeout_seconds=300,
-        )
-        transcript = session_result.transcript
-        if session_result.payload is None:
-            raise StepExecutionError(
-                "completion_missing",
-                "Workflow agent exited before reporting a structured result.",
-            )
-        _validate_step_output(output, session_result.payload)
-        discovered_session_id, session_path = _resolve_session_id(
-            payload=session_result.payload,
+            interactive=interactive,
             session_id=session_id,
             fork=fork,
-            nonce=nonce,
-            agent_config=agent_config,
-        )
-        usage, usage_state, usage_error_message = _resolve_usage_tracking(
-            agent_config=agent_config,
-            session_path=session_path,
-        )
-        if usage is not None:
-            _print_usage_summary(usage)
-        return StepResult(
-            status="completed",
-            output=session_result.payload,
-            resolved_input=resolved_input,
-            agent_name=agent_name,
-            transcript=transcript,
-            exit_code=session_result.exit_code,
-            session_id=discovered_session_id,
-            usage=usage,
-            usage_state=usage_state,
-            usage_error_message=usage_error_message,
-        )
-    except StepExecutionError as exc:
-        if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
-            usage_session_path = session_path
-            if usage_session_path is None:
-                usage_session_path = _resolve_usage_session_path(agent_config=agent_config, nonce=nonce)
-            if usage_session_path is not None:
-                usage, usage_state, usage_error_message = _resolve_usage_tracking(
-                    agent_config=agent_config,
-                    session_path=usage_session_path,
-                )
-                if usage is not None:
-                    _print_usage_summary(usage)
-        return StepResult(
-            status="failed",
-            error_type=exc.error_type,
-            error_message=exc.error_message,
-            transcript=transcript,
-            usage=usage,
-            usage_state=usage_state,
-            usage_error_message=usage_error_message,
-        )
-    except TimeoutError as exc:
-        usage_session_path = session_path
-        if usage_session_path is None:
-            usage_session_path = _resolve_usage_session_path(agent_config=agent_config, nonce=nonce)
-        if usage_session_path is not None:
-            usage, usage_state, usage_error_message = _resolve_usage_tracking(
-                agent_config=agent_config,
-                session_path=usage_session_path,
-            )
-            if usage is not None:
-                _print_usage_summary(usage)
-        return StepResult(
-            status="failed",
-            error_type="timeout",
-            error_message=str(exc),
-            transcript=transcript,
-            usage=usage,
-            usage_state=usage_state,
-            usage_error_message=usage_error_message,
-        )
-    except OSError as exc:
-        return StepResult(
-            status="failed",
-            error_type="agent_launch",
-            error_message=f"Failed to launch workflow agent: {exc}",
-            transcript=transcript,
-            usage_state="not_attempted",
+            extra_args=extra_args,
         )
 
 
@@ -189,22 +305,13 @@ def _resolve_project_root() -> Path:
     return cwd
 
 
-def _resolve_agent_config(agent_name: str, *, session_context: AgentSessionContext) -> AgentRuntimeConfig:
-    try:
-        return resolve_agent_runtime_config(
-            agent_name,
-            project_root=session_context.project_root,
-            session_context=session_context,
-        )
-    except KeyError as exc:
-        raise StepExecutionError("agent_resolution", str(exc)) from exc
-
-
-def _validate_session_arguments(
+def _validate_step_execution_args(
     *,
     interactive: bool,
     session_id: str | None,
     fork: bool,
+    extra_args: list[str] | None,
+    model: str | None,
 ) -> None:
     if not isinstance(interactive, bool):
         raise StepExecutionError(
@@ -226,18 +333,6 @@ def _validate_session_arguments(
             "argument_validation",
             "Step field 'session_id' is required when 'fork' is true.",
         )
-
-
-def _build_agent_argv(
-    *,
-    agent_config: AgentRuntimeConfig,
-    prompt_text: str,
-    interactive: bool,
-    session_id: str | None,
-    fork: bool,
-    model: str | None,
-    extra_args: list[str] | None,
-) -> list[str]:
     if extra_args is not None:
         if not isinstance(extra_args, list):
             raise StepExecutionError(
@@ -250,13 +345,30 @@ def _build_agent_argv(
                     "argument_validation",
                     f"Step field 'extra_args[{index}]' must be a string.",
                 )
+    if model is not None and (not isinstance(model, str) or not model):
+        raise StepExecutionError(
+            "argument_validation",
+            "Step field 'model' must be a non-empty string when provided.",
+        )
 
+
+def _build_agent_argv(
+    *,
+    agent_config: AgentRuntimeConfig,
+    prompt_text: str,
+    interactive: bool,
+    session_id: str | None,
+    fork: bool,
+    model: str | None,
+    extra_args: list[str] | None,
+) -> list[str]:
     try:
         argv = agent_config.build_argv(
             prompt_text,
             interactive,
             session_id,
             fork,
+            model,
             extra_args=extra_args,
         )
     except Exception as exc:
@@ -270,14 +382,6 @@ def _build_agent_argv(
             "agent_argv",
             f"Workflow agent '{agent_config.name}' build_argv must return a list of strings.",
         )
-
-    if model is not None:
-        if not isinstance(model, str) or not model:
-            raise StepExecutionError(
-                "argument_validation",
-                "Step field 'model' must be a non-empty string when provided.",
-            )
-        argv.extend(["--model", model])
 
     return argv
 

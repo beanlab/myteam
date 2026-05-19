@@ -5,8 +5,8 @@ from typing import Any
 
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from myteam.workflow.models import UsageInfo
-from myteam.workflow.steps import run_agent
+from myteam.workflow.models import StepResult, UsageInfo
+from myteam.workflow.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 
 
@@ -16,9 +16,12 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
         interactive: bool = True,
         session_id: str | None = None,
         fork: bool = False,
+        model: str | None = None,
         extra_args: list[str] | None = None,
     ) -> list[str]:
         extras = extra_args or []
+        if model is not None:
+            extras = ["--model", model, *extras]
         if session_id is not None and fork:
             return ["codex", "fork", session_id, *extras, prompt_text]
         if session_id is not None:
@@ -36,6 +39,68 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
         get_usage_info=lambda session_path: None,
         source="test",
     )
+
+
+def test_run_agent_wrapper_delegates_through_agent_context(monkeypatch, tmp_path):
+    seen: dict[str, Any] = {}
+
+    class FakeAgentContext:
+        def __init__(self, *, cwd=None, inactivity_timeout_seconds=300):
+            seen["init"] = (cwd, inactivity_timeout_seconds)
+
+        def __enter__(self):
+            seen["enter"] = True
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            seen["exit"] = (exc_type, exc)
+
+        def run_agent(self, **kwargs):
+            seen["kwargs"] = kwargs
+            return StepResult(status="completed", output={"summary": "done"}, agent_name="codex")
+
+    monkeypatch.setattr("myteam.workflow.steps.AgentContext", FakeAgentContext)
+
+    result = run_agent(
+        agent="codex",
+        cwd=tmp_path,
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+        input={"topic": "release notes"},
+        model="gpt-5.4",
+        interactive=False,
+        session_id="thread-123",
+        fork=False,
+        extra_args=["--exec", "pytest -q"],
+    )
+
+    assert result.status == "completed"
+    assert seen["init"] == (tmp_path, 300)
+    assert seen["enter"] is True
+    assert seen["exit"] == (None, None)
+    assert seen["kwargs"] == {
+        "prompt": "Write a summary.",
+        "output": {"summary": "short summary"},
+        "input": {"topic": "release notes"},
+        "agent": "codex",
+        "model": "gpt-5.4",
+        "interactive": False,
+        "session_id": "thread-123",
+        "fork": False,
+        "extra_args": ["--exec", "pytest -q"],
+    }
+
+
+def test_agent_context_exit_calls_print_usage(monkeypatch):
+    ctx = AgentContext()
+    calls: list[str] = []
+
+    monkeypatch.setattr(ctx, "print_usage", lambda: calls.append("print"))
+
+    assert ctx.__enter__() is ctx
+    ctx.__exit__(None, None, None)
+
+    assert calls == ["print"]
 
 
 def test_run_agent_returns_completed_result(monkeypatch):
@@ -235,9 +300,8 @@ def test_run_agent_passes_extra_args_to_build_argv(monkeypatch):
     )
 
     assert result.status == "completed"
-    assert seen["argv"][1:3] == ["--exec", "pytest -q"]
-    assert "workflow-result" in seen["argv"][3]
-    assert seen["argv"][-2:] == ["--model", "gpt-5.4"]
+    assert seen["argv"][1:5] == ["--model", "gpt-5.4", "--exec", "pytest -q"]
+    assert "workflow-result" in seen["argv"][5]
 
 
 def test_run_agent_reports_invalid_extra_args(monkeypatch):
@@ -255,12 +319,35 @@ def test_run_agent_reports_invalid_extra_args(monkeypatch):
     assert result.error_message == "Step field 'extra_args[1]' must be a string."
 
 
+def test_run_agent_reports_invalid_model(monkeypatch):
+    calls: list[str] = []
+
+    def fake_resolve_agent_runtime_config(*_args, **_kwargs):
+        calls.append("called")
+        return fake_agent_config()
+
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+
+    result = run_agent(
+        agent="codex",
+        model="",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step field 'model' must be a non-empty string when provided."
+    assert calls == []
+
+
 def test_run_agent_reports_build_argv_failure(monkeypatch):
     def failing_build_argv(
         _prompt_text,
         _interactive=True,
         _session_id=None,
         _fork=False,
+        _model=None,
         extra_args=None,
     ):
         raise RuntimeError("bad argv")
@@ -286,6 +373,30 @@ def test_run_agent_reports_build_argv_failure(monkeypatch):
     assert result.status == "failed"
     assert result.error_type == "agent_argv"
     assert result.error_message == "Failed to build argv for workflow agent 'codex': bad argv"
+
+
+def test_run_agent_reports_invalid_argv_shape(monkeypatch):
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_info=config.get_session_info,
+        build_argv=lambda *_args, **_kwargs: ["codex", 1],  # type: ignore[list-item]
+        get_usage_info=config.get_usage_info,
+        source=config.source,
+    )
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    result = run_agent(
+        agent="codex",
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "agent_argv"
+    assert result.error_message == "Workflow agent 'codex' build_argv must return a list of strings."
 
 
 def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
