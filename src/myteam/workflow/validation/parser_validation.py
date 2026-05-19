@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.myteam.workflow.agents import get_agent_config
-from src.myteam.workflow.models import StepDefinition
+from ..agents import get_agent_config
+from ..models import StepDefinition
 
 _REQUIRED_STEP_KEYS = {"prompt", "output"}
 _OPTIONAL_STEP_KEYS = {
