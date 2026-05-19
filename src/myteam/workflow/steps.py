@@ -7,12 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from myteam.disclosure import PROJECT_ROOT_ENV_VAR
-
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult, UsageInfo
 from .terminal.session import run_terminal_session
+from ..disclosure import PROJECT_ROOT_ENV_VAR
 
 
 @dataclass
