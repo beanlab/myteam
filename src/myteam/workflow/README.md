@@ -2,16 +2,8 @@
 
 ## Purpose
 
-`src/myteam/workflow/` implements the `myteam start <workflow>` feature.
-
-Its job is to:
-
-- load and validate authored workflow files
-- resolve workflow file paths for YAML and Python workflows
-- resolve references between completed steps
-- run each step through an interactive terminal-backed agent session
-- collect the final structured step result through an out-of-band result channel
-- stop on the first failing step and return completed step state
+`src/myteam/workflow/` supports Python workflow scripts that use `myteam start <workflow>` and
+`myteam workflow-result`.
 
 This package is intentionally split into two layers:
 
@@ -20,10 +12,6 @@ This package is intentionally split into two layers:
 
 The workflow layer is further split so each file stays narrow:
 
-- `parser.py` loads authored YAML
-- `reference_resolver.py` resolves `$step.path` references
-- `validation/parser_validation.py` owns parser/schema validation for step definitions
-- `engine.py` handles multi-step orchestration
 - `steps.py` handles single-step execution and prompt/argv construction
 - `usage.py` owns usage tracking and reporting helpers
 - `validation/step_validation.py` owns execution-time step validation
@@ -32,26 +20,23 @@ The workflow layer is further split so each file stays narrow:
 
 From outside the package, the flow is:
 
-1. `commands.start(...)` resolves a workflow file path and either executes a Python workflow script or loads YAML.
-2. `workflow.parser.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation.parser_validation`.
-3. `workflow.engine.run_workflow(...)` executes steps in authored order.
-4. For each step, `workflow.steps.run_agent(...)`:
-   - receives the resolved step values from the engine
+1. `commands.start(...)` resolves a workflow path to a Python script and executes it in a
+   separate Python process.
+2. Python workflow code can call `workflow.steps.run_agent(...)` to launch an agent session.
+3. The child agent reports its structured result through `myteam workflow-result`.
+4. `workflow.steps.run_agent(...)`:
    - resolves the configured agent runtime config
    - builds the prompt
    - runs or resumes an interactive terminal session
    - waits for the agent to call `myteam workflow-result` over the private result channel
    - validates the returned payload against the authored output shape
-5. The engine stores completed step state for later `$step.path` references.
-6. The engine returns either:
-   - a completed workflow output mapping
-   - or a failed result naming the first failed step
 
 The terminal contract is:
 
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
-- the child reports its final result over a private Unix socket using `MYTEAM_RESULT_SOCKET` and `MYTEAM_RESULT_TOKEN`
+- the child reports its final result over a private Unix socket using `MYTEAM_RESULT_SOCKET` and
+  `MYTEAM_RESULT_TOKEN`
 - Python workflow authors can pass `session_id` to `run_agent(...)` to resume, set `fork=True`
   to fork that session, and read `StepResult.session_id` from completed steps that return one
 - `run_agent(...)` launches agents from the detected project root by default; Python workflow
@@ -62,25 +47,15 @@ The terminal contract is:
 ### Package Root
 
 - [__init__.py](__init__.py)
-  Exposes the main public workflow entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
-
-- [parser.py](parser.py)
-  Owns workflow-file loading and top-level orchestration around workflow schema validation.
-
-- [validation/parser_validation.py](validation/parser_validation.py)
-  Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, and step-definition validation.
+  Exposes the main public workflow entrypoint: `run_agent`.
 
 - [models.py](models.py)
-  Owns shared workflow types: authored step definitions, completed-step state, and run results.
-
-- [reference_resolver.py](reference_resolver.py)
-  Owns `$step.path` reference resolution against prior completed steps.
-
-- [engine.py](engine.py)
-  Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
+  Owns shared runtime types such as `StepResult` and `UsageInfo`.
 
 - [steps.py](steps.py)
-  Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run, resume, or fork a session, validate result, discover session id, and return `StepResult`.
+  Owns single-step execution: accept resolved step values, resolve agent runtime config, build
+  prompt, run, resume, or fork a session, validate result, discover session id, and return
+  `StepResult`.
 
 - [usage.py](usage.py)
   Owns usage-tracking helpers and usage-summary formatting.
@@ -100,10 +75,12 @@ The terminal contract is:
   Owns the default agent name and compatibility lookup.
 
 - [agents/runtime.py](agents/runtime.py)
-  Owns resolution of optional project-local runtime config modules with fallback to packaged defaults.
+  Owns resolution of optional project-local runtime config modules with fallback to packaged
+  defaults.
 
 - [agents/codex.py](agents/codex.py) and [agents/pi.py](agents/pi.py)
-  Own packaged default runtime config modules for supported agents, including each agent's terminal input encoding, launch arguments, exit sequence, and session discovery.
+  Own packaged default runtime config modules for supported agents, including each agent's terminal
+  input encoding, launch arguments, exit sequence, and session discovery.
 
 ### Terminal
 
@@ -111,16 +88,19 @@ The terminal contract is:
   Re-exports the terminal-layer building blocks.
 
 - [terminal/pty_session.py](terminal/pty_session.py)
-  Owns the low-level PTY transport. It launches the child, yields raw output bytes through the `events()` generator, mirrors terminal IO, and accepts injected input through `enqueue_input(...)`.
+  Owns the low-level PTY transport. It launches the child, yields raw output bytes through the
+  `events()` generator, mirrors terminal IO, and accepts injected input through `enqueue_input(...)`.
 
 - [terminal/recording.py](terminal/recording.py)
   Owns transcript recording from raw PTY byte chunks.
 
 - [terminal/result_channel.py](terminal/result_channel.py)
-  Owns the out-of-band result socket, token validation, acknowledgement handling, and payload submission helper.
+  Owns the out-of-band result socket, token validation, acknowledgement handling, and payload
+  submission helper.
 
 - [terminal/session.py](terminal/session.py)
-  Owns orchestration of `PtySession`, `TerminalRecording`, and `ResultChannel` into one terminal session result for a workflow step.
+  Owns orchestration of `PtySession`, `TerminalRecording`, and `ResultChannel` into one terminal
+  session result for a workflow step.
 
 ## Design Constraints
 

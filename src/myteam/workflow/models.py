@@ -9,31 +9,6 @@ class AgentConfig(TypedDict):
     argv: list[str]
 
 
-class StepDefinition(TypedDict, total=False):
-    prompt: str
-    output: dict[str, Any]
-    input: Any
-    agent: str
-    model: str
-    extra_args: list[str]
-    interactive: bool
-    session_id: str
-    fork: bool
-
-
-WorkflowDefinition = dict[str, StepDefinition]
-
-
-class CompletedStepState(TypedDict, total=False):
-    prompt: str
-    input: Any
-    agent: str
-    output: Any
-
-
-WorkflowOutput = dict[str, CompletedStepState]
-
-
 @dataclass(frozen=True)
 class UsageInfo:
     model: str
@@ -84,11 +59,3 @@ class StepResult:
     usage: UsageInfo | None = None
     usage_state: str = "not_attempted"
     usage_error_message: str | None = None
-
-
-@dataclass
-class WorkflowRunResult:
-    status: str
-    output: WorkflowOutput | None = None
-    failed_step_name: str | None = None
-    error_message: str | None = None

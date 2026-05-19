@@ -22,8 +22,6 @@ from .paths import (
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
-from .workflow.engine import run_workflow
-from .workflow.parser import load_workflow
 from .workflow.result_tool import workflow_result as submit_workflow_result
 
 
@@ -206,27 +204,8 @@ def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False
         logger(f"Workflow '{workflow}' completed successfully.")
         return
 
-    try:
-        workflow_definition = load_workflow(path)
-    except (OSError, ValueError) as exc:
-        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Loaded workflow with {len(workflow_definition)} step(s)")
-
-    result = run_workflow(workflow_definition, logger=logger)
-    if result.status != "completed":
-        failed_step = result.failed_step_name or "<unknown>"
-        if result.error_message:
-            print(
-                f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
-                file=sys.stderr,
-            )
-        else:
-            print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Workflow '{workflow}' completed successfully.")
+    print(f"Workflow '{workflow}' not found.", file=sys.stderr)
+    raise SystemExit(1)
 
 
 def workflow_result(json: str | None = None, text: str | None = None) -> None:

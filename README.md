@@ -277,13 +277,12 @@ myteam get skill python/testing --prefix .agents
 
 ### `myteam start <path> [--prefix <path>] [--verbose]`
 
-Executes a workflow definition from the selected local root.
+Executes a Python workflow script from the selected local root.
 
 - use slash-delimited workflow paths such as `dev/frontend`
 - workflow paths are resolved starting from the selected local root, which acts as the reference point for lookup
 - relative segments in workflow paths are allowed
-- workflow files are resolved with standard YAML extensions or `.py`
-- later workflow steps may reference completed state from earlier steps
+- workflow files are resolved as `.py` files
 - Python workflow files may resume or fork related agent sessions by passing a prior
   `StepResult.session_id` into `run_agent(...)` as `session_id`, with `fork=True` to fork
 - Python workflow files may pass `cwd` to `run_agent(...)` to override the default agent launch
@@ -371,9 +370,7 @@ For upgrade work:
 
 ## Workflows
 
-*Note: workflows are an experimental feature and are likely to evolve and change*
-
-`myteam` can also run authored workflows from the project-local tree.
+`myteam` can run Python workflow scripts from the project-local tree.
 
 Store workflow files under the selected local root. For example, this command:
 
@@ -384,54 +381,22 @@ myteam start dev/frontend
 looks for a workflow file such as:
 
 ```text
-.myteam/dev/frontend.yaml
+.myteam/dev/frontend.py
 ```
 
 If you use `--prefix .agents`, the same workflow path is resolved under `.agents/` instead.
 The selected local root is the reference point for resolution, not a containment boundary.
 
-YAML workflow files are mappings where each top-level key is a step name. Each step defines:
-
-- `prompt`: the objective for that step
-- `agent`: optional agent name; omit it to use the default agent
-- `input`: optional structured input data
-- `output`: the expected shape of the step's final structured result
-
-Example:
-
-```yaml
-gather_context:
-  prompt: Review the current implementation and summarize the relevant files.
-  output:
-    summary: Brief summary
-    files:
-      primary: Main file path
-      tests: Test file path
-
-draft_change:
-  prompt: Propose the implementation plan for the requested change.
-  input:
-    prior_summary: $gather_context.output.summary
-    primary_file: $gather_context.output.files.primary
-  output:
-    plan: Concise implementation plan
-    risks: Key risks or open questions
-```
-
 Notes:
 
-- step names should use identifier-style names such as `gather_context`
-- `$step_name.output...` references pull data from earlier completed steps
-- the step agent reports its final structured result by calling `myteam workflow-result`
-- `myteam start` stops at the first failing step and does not continue to later steps
-- `--verbose` writes workflow lifecycle logs to standard error
-- successful `myteam start` runs currently mirror workflow session terminal output; they do not yet
-  print a separate final structured payload on stdout
+- Python workflow scripts can call `myteam workflow-result` to report structured agent output.
+- `myteam start` runs the resolved `.py` file as a separate Python process and returns its exit
+  status.
+- `--verbose` writes workflow lifecycle logs to standard error.
 
 Python workflow files ending in `.py` are run as scripts in a separate Python process. The child
-process uses the directory containing the workflow file as its current working directory, receives
-the selected local root in `MYTEAM_PROJECT_ROOT`, and returns its exit status directly through
-`myteam start`.
+process uses the directory containing the workflow file as its current working directory and
+receives the selected local root in `MYTEAM_PROJECT_ROOT`.
 
 ## Why Use Myteam
 

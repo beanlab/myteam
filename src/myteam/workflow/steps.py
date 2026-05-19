@@ -60,9 +60,12 @@ class AgentContext:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        self.print_total_usage()
+        self.print_usage()
 
     def print_total_usage(self) -> None:
+        self.print_usage()
+
+    def print_usage(self) -> None:
         if not self._usage_totals_by_model:
             return
         print_aggregated_usage_summary(self._usage_totals_by_model)

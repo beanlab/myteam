@@ -14,7 +14,6 @@ from myteam.workflow.agents.pi import get_session_info as get_pi_session_info
 from myteam.workflow.agents.agent_utils import estimate_usage_cost
 from myteam.workflow.agents.runtime import AgentSessionContext
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
-from myteam.workflow.parser import load_workflow
 
 
 def agent_session_context(
@@ -236,36 +235,6 @@ def test_resolve_rejects_unknown_agent(tmp_path: Path, monkeypatch):
             project_root=tmp_path,
             session_context=agent_session_context(tmp_path),
         )
-
-
-def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    config_dir = tmp_path / ".myteam" / ".config"
-    config_dir.mkdir(parents=True)
-    (config_dir / "custom.py").write_text(
-        "EXEC = 'custom-agent'\n"
-        "EXIT_COMMAND = 'exit'\n"
-        "def get_session_info(nonce, context):\n"
-        "    return 'local-session'\n"
-        "def build_argv(prompt_text, interactive=True, session_id=None, fork=False, model=None, extra_args=None):\n"
-        "    return ['custom-agent', prompt_text]\n"
-        "def get_usage_info(session_path):\n"
-        "    return None\n",
-        encoding="utf-8",
-    )
-    workflow_file = tmp_path / "workflow.yaml"
-    workflow_file.write_text(
-        "step1:\n"
-        "  agent: custom\n"
-        "  prompt: hello\n"
-        "  output:\n"
-        "    message: hi\n",
-        encoding="utf-8",
-    )
-
-    workflow = load_workflow(workflow_file)
-
-    assert workflow["step1"]["agent"] == "custom"
 
 
 def test_codex_build_argv_supports_session_modes():
