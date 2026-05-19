@@ -17,12 +17,21 @@ This package is intentionally split into two layers:
 - `workflow/` owns workflow semantics
 - `workflow/terminal/` owns terminal transport and result delivery
 
+The workflow layer is further split so each file stays narrow:
+
+- `parser.py` loads authored YAML
+- `parser_validation.py` owns parser/schema validation for step definitions
+- `engine.py` handles multi-step orchestration
+- `steps.py` handles single-step execution and prompt/argv construction
+- `usage.py` owns usage tracking and reporting helpers
+- `validation.py` owns execution-time step validation
+
 ## Black-Box View
 
 From outside the package, the flow is:
 
 1. `commands.start(...)` resolves a workflow file path.
-2. `workflow.parser.load_workflow(...)` loads and validates the authored YAML.
+2. `workflow.parser.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.parser_validation`.
 3. `workflow.engine.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.steps.run_agent(...)`:
    - receives the resolved step values from the engine
@@ -54,7 +63,10 @@ The terminal contract is:
   Exposes the main public workflow entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
 
 - [parser.py](parser.py)
-  Owns workflow-file loading and validation of the authored YAML structure.
+  Owns workflow-file loading and top-level orchestration around workflow schema validation.
+
+- [parser_validation.py](parser_validation.py)
+  Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, and step-definition validation.
 
 - [models.py](models.py)
   Owns shared workflow types: authored step definitions, completed-step state, and run results.
@@ -67,6 +79,12 @@ The terminal contract is:
 
 - [steps.py](steps.py)
   Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run, resume, or fork a session, validate result, discover session id, and return `StepResult`.
+
+- [usage.py](usage.py)
+  Owns usage-tracking helpers and usage-summary formatting.
+
+- [validation.py](validation.py)
+  Owns runtime validation for step execution arguments and returned step output.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.

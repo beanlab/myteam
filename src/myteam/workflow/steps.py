@@ -10,6 +10,18 @@ from typing import Any
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult, UsageInfo
+from .usage import (
+    UsageTotals,
+    print_aggregated_usage_summary,
+    print_usage_summary,
+    resolve_usage_session_path,
+    resolve_usage_tracking,
+)
+from .step_validation import (
+    require_agent_name,
+    validate_step_execution_args,
+    validate_step_output,
+)
 from .terminal.session import run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
 
@@ -23,24 +35,6 @@ class _RunState:
     session_path: Path | None = None
     nonce: str | None = None
     agent_config: AgentRuntimeConfig | None = None
-
-
-@dataclass
-class _UsageTotals:
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_output_tokens: int = 0
-    total_tokens: int = 0
-    estimated_cost: float = 0.0
-
-    def add(self, usage: UsageInfo) -> None:
-        self.input_tokens += usage.input_tokens
-        self.cached_input_tokens += usage.cached_input_tokens
-        self.output_tokens += usage.output_tokens
-        self.reasoning_output_tokens += usage.reasoning_output_tokens
-        self.total_tokens += usage.total_tokens
-        self.estimated_cost += usage.estimated_cost
 
 
 class AgentContext:
@@ -60,7 +54,7 @@ class AgentContext:
             launch_cwd=self.launch_cwd,
         )
         self._agent_configs: dict[str, AgentRuntimeConfig] = {}
-        self._usage_totals_by_model: dict[str, _UsageTotals] = {}
+        self._usage_totals_by_model: dict[str, UsageTotals] = {}
 
     def __enter__(self) -> "AgentContext":
         return self
@@ -71,7 +65,7 @@ class AgentContext:
     def print_total_usage(self) -> None:
         if not self._usage_totals_by_model:
             return
-        _print_aggregated_usage_summary(self._usage_totals_by_model)
+        print_aggregated_usage_summary(self._usage_totals_by_model)
 
     def run_agent(
         self,
@@ -92,14 +86,20 @@ class AgentContext:
         state.nonce = nonce
 
         try:
-            _validate_step_execution_args(
-                interactive=interactive,
-                session_id=session_id,
-                fork=fork,
-                extra_args=extra_args,
-                model=model,
-            )
-            agent_name = _require_agent_name(agent)
+            try:
+                validate_step_execution_args(
+                    interactive=interactive,
+                    session_id=session_id,
+                    fork=fork,
+                    extra_args=extra_args,
+                    model=model,
+                )
+            except ValueError as exc:
+                raise StepExecutionError("argument_validation", str(exc)) from exc
+            try:
+                agent_name = require_agent_name(agent)
+            except ValueError as exc:
+                raise StepExecutionError("agent_resolution", str(exc)) from exc
             agent_config = self._resolve_agent_config(agent_name)
             state.agent_config = agent_config
 
@@ -133,7 +133,10 @@ class AgentContext:
                     "Workflow agent exited before reporting a structured result.",
                 )
 
-            _validate_step_output(output, session_result.payload)
+            try:
+                validate_step_output(output, session_result.payload)
+            except ValueError as exc:
+                raise StepExecutionError("output_validation", str(exc)) from exc
             discovered_session_id, session_path = _resolve_session_id(
                 payload=session_result.payload,
                 session_id=session_id,
@@ -142,7 +145,7 @@ class AgentContext:
                 agent_config=agent_config,
             )
             state.session_path = session_path
-            usage, usage_state, usage_error_message = _resolve_usage_tracking(
+            usage, usage_state, usage_error_message = resolve_usage_tracking(
                 agent_config=agent_config,
                 session_path=session_path,
             )
@@ -224,13 +227,13 @@ class AgentContext:
             return
         session_path = state.session_path
         if session_path is None:
-            session_path = _resolve_usage_session_path(
+            session_path = resolve_usage_session_path(
                 agent_config=state.agent_config,
                 nonce=state.nonce,
             )
         if session_path is None:
             return
-        usage, usage_state, usage_error_message = _resolve_usage_tracking(
+        usage, usage_state, usage_error_message = resolve_usage_tracking(
             agent_config=state.agent_config,
             session_path=session_path,
         )
@@ -259,14 +262,14 @@ class AgentContext:
             return
         totals = self._usage_totals_by_model.get(usage.model)
         if totals is None:
-            totals = _UsageTotals()
+            totals = UsageTotals()
             self._usage_totals_by_model[usage.model] = totals
         totals.add(usage)
 
     def _print_usage(self, state: _RunState) -> None:
         if state.usage is None:
             return
-        _print_usage_summary(state.usage)
+        print_usage_summary(state.usage)
 
 
 def run_agent(
@@ -311,15 +314,6 @@ def run_agent(
         )
 
 
-def _require_agent_name(agent_name: str | None) -> str:
-    if not agent_name:
-        raise StepExecutionError(
-            "agent_resolution",
-            "Step definition is missing required field 'agent'.",
-        )
-    return agent_name
-
-
 def _resolve_project_root(cwd: Path | None = None) -> Path:
     configured_agent_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
     if configured_agent_root:
@@ -333,53 +327,6 @@ def _resolve_project_root(cwd: Path | None = None) -> Path:
         if (candidate / ".myteam").is_dir():
             return candidate
     return cwd
-
-
-def _validate_step_execution_args(
-    *,
-    interactive: bool,
-    session_id: str | None,
-    fork: bool,
-    extra_args: list[str] | None,
-    model: str | None,
-) -> None:
-    if not isinstance(interactive, bool):
-        raise StepExecutionError(
-            "argument_validation",
-            "Step field 'interactive' must be a boolean when provided.",
-        )
-    if not isinstance(fork, bool):
-        raise StepExecutionError(
-            "argument_validation",
-            "Step field 'fork' must be a boolean when provided.",
-        )
-    if session_id is not None and (not isinstance(session_id, str) or not session_id):
-        raise StepExecutionError(
-            "argument_validation",
-            "Step field 'session_id' must be a non-empty string when provided.",
-        )
-    if fork and session_id is None:
-        raise StepExecutionError(
-            "argument_validation",
-            "Step field 'session_id' is required when 'fork' is true.",
-        )
-    if extra_args is not None:
-        if not isinstance(extra_args, list):
-            raise StepExecutionError(
-                "argument_validation",
-                "Step field 'extra_args' must be a list of strings when provided.",
-            )
-        for index, arg in enumerate(extra_args):
-            if not isinstance(arg, str):
-                raise StepExecutionError(
-                    "argument_validation",
-                    f"Step field 'extra_args[{index}]' must be a string.",
-                )
-    if model is not None and (not isinstance(model, str) or not model):
-        raise StepExecutionError(
-            "argument_validation",
-            "Step field 'model' must be a non-empty string when provided.",
-        )
 
 
 def _build_agent_argv(
@@ -484,41 +431,6 @@ def _resolve_session_id(
     return session_info
 
 
-def _resolve_usage_tracking(
-    *,
-    agent_config: AgentRuntimeConfig,
-    session_path: Path,
-) -> tuple[UsageInfo | None, str, str | None]:
-    if agent_config.get_usage_info is None:
-        return None, "no_get_usage_info_implemented", "workflow agent config does not implement get_usage_info"
-
-    try:
-        usage = agent_config.get_usage_info(session_path)
-    except Exception as exc:
-        return None, "unavailable", str(exc)
-
-    if usage is None:
-        return None, "unavailable", None
-
-    return usage, "collected", None
-
-
-def _resolve_usage_session_path(
-    *,
-    agent_config: AgentRuntimeConfig,
-    nonce: str | None,
-) -> Path | None:
-    if nonce is None:
-        return None
-
-    try:
-        _, session_path = agent_config.get_session_info(nonce)
-    except LookupError:
-        return None
-
-    return session_path
-
-
 def _extract_session_id(output_value: Any) -> str | None:
     if not isinstance(output_value, dict):
         return None
@@ -526,63 +438,6 @@ def _extract_session_id(output_value: Any) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
-
-
-def _validate_step_output(output_template: dict[str, Any], output_value: Any) -> None:
-    try:
-        _validate_output_node(output_template, output_value, path="output")
-    except ValueError as exc:
-        raise StepExecutionError("output_validation", str(exc)) from exc
-
-
-def _validate_output_node(template: Any, value: Any, *, path: str) -> None:
-    if not isinstance(template, dict):
-        return
-    if not isinstance(value, dict):
-        raise ValueError(f"{path} must be a mapping.")
-    for key, nested in template.items():
-        if key not in value:
-            raise ValueError(f"{path}.{key} is missing.")
-        _validate_output_node(nested, value[key], path=f"{path}.{key}")
-
-
-def _print_usage_summary(usage: UsageInfo) -> None:
-    print("Usage:")
-    print(f"  Model: {usage.model}")
-    print(f"  Input: {usage.input_tokens}")
-    print(f"  Cached Input: {usage.cached_input_tokens}")
-    print(f"  Output: {usage.output_tokens}")
-    print(f"  Reasoning: {usage.reasoning_output_tokens}")
-    print(f"  Total: {usage.total_tokens}")
-    print(f"  Cost: ${usage.estimated_cost:.4f}")
-
-
-def _print_aggregated_usage_summary(usage_totals_by_model: dict[str, _UsageTotals]) -> None:
-    print("Usage Summary:")
-    for model, totals in usage_totals_by_model.items():
-        print(f"  Model: {model}")
-        print(f"    Input: {totals.input_tokens}")
-        print(f"    Cached Input: {totals.cached_input_tokens}")
-        print(f"    Output: {totals.output_tokens}")
-        print(f"    Reasoning: {totals.reasoning_output_tokens}")
-        print(f"    Total: {totals.total_tokens}")
-        print(f"    Cost: ${totals.estimated_cost:.4f}")
-
-    grand_totals = _UsageTotals()
-    for totals in usage_totals_by_model.values():
-        grand_totals.input_tokens += totals.input_tokens
-        grand_totals.cached_input_tokens += totals.cached_input_tokens
-        grand_totals.output_tokens += totals.output_tokens
-        grand_totals.reasoning_output_tokens += totals.reasoning_output_tokens
-        grand_totals.total_tokens += totals.total_tokens
-        grand_totals.estimated_cost += totals.estimated_cost
-
-    print("Grand Totals:")
-    print(f"  Input: {grand_totals.input_tokens}")
-    print(f"  Cached Input: {grand_totals.cached_input_tokens}")
-    print(f"  Output: {grand_totals.output_tokens}")
-    print(f"  Total: {grand_totals.total_tokens}")
-    print(f"  Cost: ${grand_totals.estimated_cost:.4f}")
 
 
 class StepExecutionError(Exception):

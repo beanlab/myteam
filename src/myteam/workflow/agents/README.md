@@ -8,6 +8,9 @@ Each `<agent>.py` file describes how to operate one terminal-backed agent:
 
 Terminal input encoding is shared by the runtime through
 [`agent_utils.py`](agent_utils.py).
+Shared terminal-session helpers for agent adapters live in
+[`agent_utils.py`](agent_utils.py); keep adapter-specific session discovery
+and argv shaping in the adapter module itself.
 
 ## Resolution Order
 
