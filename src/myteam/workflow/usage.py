@@ -31,7 +31,11 @@ def resolve_usage_tracking(
     session_path: Path,
 ) -> tuple[UsageInfo | None, str, str | None]:
     if agent_config.get_usage_info is None:
-        return None, "no_get_usage_info_implemented", "workflow agent config does not implement get_usage_info"
+        return (
+            None,
+            "no_get_usage_info_implemented",
+            "workflow agent config does not implement get_usage_info",
+        )
 
     try:
         usage = agent_config.get_usage_info(session_path)
