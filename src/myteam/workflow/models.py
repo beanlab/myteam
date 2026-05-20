@@ -35,6 +35,30 @@ WorkflowOutput = dict[str, CompletedStepState]
 
 
 @dataclass
+class RunState:
+    transcript: str = ""
+    usage: UsageInfo | None = None
+    usage_state: str = "not_attempted"
+    usage_error_message: str | None = None
+    session_path: "Path | None" = None
+    nonce: str | None = None
+    agent_config: "AgentRuntimeConfig | None" = None
+
+
+@dataclass(frozen=True)
+class PreparedStep:
+    nonce: str
+    agent_config: "AgentRuntimeConfig"
+    prompt_text: str
+    argv: list[str]
+    resolved_input: Any
+    output_template: dict[str, Any]
+    agent_name: str | None
+    session_id: str | None
+    fork: bool
+
+
+@dataclass
 class UsageInfo:
     model: str = ""
     input_tokens: int = 0

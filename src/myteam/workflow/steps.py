@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +10,7 @@ from pyparsing import Literal
 
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from .models import StepResult, UsageInfo
+from .models import StepResult, UsageInfo, PreparedStep, RunState
 from .usage import (
     print_aggregated_usage_summary,
     print_usage_summary,
@@ -21,31 +20,6 @@ from .usage import (
 from .validation.step_validation import validate_step_execution_args, validate_step_output
 from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
-
-
-@dataclass
-class _RunState:
-    transcript: str = ""
-    usage: UsageInfo | None = None
-    usage_state: str = "not_attempted"
-    usage_error_message: str | None = None
-    session_path: Path | None = None
-    nonce: str | None = None
-    agent_config: AgentRuntimeConfig | None = None
-
-
-@dataclass(frozen=True)
-class _PreparedStep:
-    nonce: str
-    agent_config: AgentRuntimeConfig
-    prompt_text: str
-    argv: list[str]
-    resolved_input: Any
-    output_template: dict[str, Any]
-    agent_name: str | None
-    session_id: str | None
-    fork: bool
-
 
 class AgentContext:
     def __init__(
@@ -89,7 +63,7 @@ class AgentContext:
         fork: bool = False,
         extra_args: list[str] | None = None,
     ) -> StepResult:
-        state = _RunState()
+        state = RunState()
         try:
             prepared = self._prepare_step(
                 state=state,
@@ -115,7 +89,7 @@ class AgentContext:
     def _prepare_step(
         self,
         *,
-        state: _RunState,
+        state: RunState,
         prompt: str,
         output_template: dict[str, Any],
         input: Any,
@@ -125,7 +99,7 @@ class AgentContext:
         session_id: str | None,
         fork: bool,
         extra_args: list[str] | None,
-    ) -> _PreparedStep:
+    ) -> PreparedStep:
         nonce = str(uuid.uuid4())
         state.nonce = nonce
 
@@ -160,7 +134,7 @@ class AgentContext:
             extra_args=extra_args,
         )
 
-        return _PreparedStep(
+        return PreparedStep(
             nonce=nonce,
             agent_config=agent_config,
             prompt_text=prompt_text,
@@ -175,8 +149,8 @@ class AgentContext:
     def _run_prepared_step(
         self,
         *,
-        state: _RunState,
-        prepared: _PreparedStep,
+        state: RunState,
+        prepared: PreparedStep,
     ) -> TerminalSessionResult:
         session_result = run_terminal_session(
             prepared.argv,
@@ -190,8 +164,8 @@ class AgentContext:
     def _update_state(
         self,
         *,
-        state: _RunState,
-        prepared: _PreparedStep,
+        state: RunState,
+        prepared: PreparedStep,
         session_result: TerminalSessionResult,
     ) -> StepResult:
         """Validate output and update the state with session path and usage info"""
@@ -243,7 +217,7 @@ class AgentContext:
     def _handle_run_agent_error(
         self,
         *,
-        state: _RunState,
+        state: RunState,
         exc: Exception,
     ) -> StepResult:
         if isinstance(exc, StepExecutionError):
@@ -299,7 +273,7 @@ class AgentContext:
     def _collect_usage_after_failure(
         self,
         *,
-        state: _RunState,
+        state: RunState,
     ) -> None:
         if state.agent_config is None:
             return
@@ -326,7 +300,7 @@ class AgentContext:
     def _set_usage_state(
         self,
         *,
-        state: _RunState,
+        state: RunState,
         usage: UsageInfo | None,
         usage_state: str,
         usage_error_message: str | None,
@@ -344,7 +318,7 @@ class AgentContext:
             self._usage_totals_by_model[usage.model] = totals
         totals.add(usage)
 
-    def _print_usage(self, state: _RunState) -> None:
+    def _print_usage(self, state: RunState) -> None:
         if state.usage is None:
             return
         print_usage_summary("---", state.usage)
