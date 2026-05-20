@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from .agents.runtime import AgentRuntimeConfig
 from .models import UsageInfo
@@ -75,16 +76,22 @@ def print_usage_summary(usage: UsageInfo) -> None:
     print(f"  Cost: ${usage.estimated_cost:.4f}")
 
 
-def print_aggregated_usage_summary(usage_totals_by_model: dict[str, UsageTotals]) -> None:
+def print_aggregated_usage_summary(
+        usage_totals_by_model: dict[str, UsageTotals],
+        usage_logging: Literal["none", "summary", "detailed"] = "summary",
+) -> None:
+    if usage_logging == "none":
+        return
     print("Usage Summary:")
-    for model, totals in usage_totals_by_model.items():
-        print(f"  Model: {model}")
-        print(f"    Input: {totals.input_tokens}")
-        print(f"    Cached Input: {totals.cached_input_tokens}")
-        print(f"    Output: {totals.output_tokens}")
-        print(f"    Reasoning: {totals.reasoning_output_tokens}")
-        print(f"    Total: {totals.total_tokens}")
-        print(f"    Cost: ${totals.estimated_cost:.4f}")
+    if usage_logging == "detailed":
+        for model, totals in usage_totals_by_model.items():
+            print(f"  Model: {model}")
+            print(f"    Input: {totals.input_tokens}")
+            print(f"    Cached Input: {totals.cached_input_tokens}")
+            print(f"    Output: {totals.output_tokens}")
+            print(f"    Reasoning: {totals.reasoning_output_tokens}")
+            print(f"    Total: {totals.total_tokens}")
+            print(f"    Cost: ${totals.estimated_cost:.4f}")
 
     grand_totals = UsageTotals()
     for totals in usage_totals_by_model.values():

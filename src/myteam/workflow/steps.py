@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pyparsing import Literal
+
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult, UsageInfo
@@ -50,9 +52,11 @@ class AgentContext:
     def __init__(
         self,
         *,
+        usage_logging: Literal["none","summary","detailed"] = "summary",
         cwd: Path | str | None = None,
         inactivity_timeout_seconds: int = 300,
     ) -> None:
+        self.usage_logging = usage_logging
         self.cwd = None if cwd is None else Path(cwd).resolve()
         self.project_root = _resolve_project_root(cwd=self.cwd)
         self.timeout = inactivity_timeout_seconds
@@ -69,9 +73,9 @@ class AgentContext:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        if not self._usage_totals_by_model:
+        if not self._usage_totals_by_model or self.usage_logging == "none":
             return
-        print_aggregated_usage_summary(self._usage_totals_by_model)
+        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
 
     def run_agent(
         self,
@@ -222,7 +226,8 @@ class AgentContext:
             usage_error_message=usage_error_message,
         )
         self._record_usage(usage)
-        self._print_usage(state)
+        if self.usage_logging == "detailed":
+            self._print_usage(state)
         return StepResult(
             status="completed",
             output=session_result.payload,
