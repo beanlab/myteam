@@ -447,15 +447,18 @@ def _build_step_prompt(
     sections = [
         "Complete the objective below.",
         "",
-        "Return the final workflow result by calling this command:",
-        "Replace the placeholder values below with the real final result content.",
-        "",
-        "myteam workflow-result <<'JSON'",
-        json.dumps(output_template, indent=2),
-        "JSON",
-        "",
-        "Do not print result markers in the terminal.",
     ]
+    if output_template:
+        sections.extend([
+            "Return the final workflow result by calling this command:",
+            "Replace the placeholder values below with the real final result content.",
+            "",
+            "myteam workflow-result <<'JSON'",
+            json.dumps(output_template, indent=2),
+            "JSON",
+            "",
+            "Do not print result markers in the terminal.",
+        ])
     if session_nonce is not None:
         sections.append(f"Session nonce: {session_nonce}")
     if resolved_input is not None:
