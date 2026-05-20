@@ -34,15 +34,23 @@ class CompletedStepState(TypedDict, total=False):
 WorkflowOutput = dict[str, CompletedStepState]
 
 
-@dataclass(frozen=True)
+@dataclass
 class UsageInfo:
-    model: str
-    input_tokens: int
-    cached_input_tokens: int
-    output_tokens: int
-    reasoning_output_tokens: int
-    total_tokens: int
-    estimated_cost: float
+    model: str = ""
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_output_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost: float = 0.0
+
+    def add(self, usage: UsageInfo) -> None:
+        self.input_tokens += usage.input_tokens
+        self.cached_input_tokens += usage.cached_input_tokens
+        self.output_tokens += usage.output_tokens
+        self.reasoning_output_tokens += usage.reasoning_output_tokens
+        self.total_tokens += usage.total_tokens
+        self.estimated_cost += usage.estimated_cost
 
 
 @dataclass

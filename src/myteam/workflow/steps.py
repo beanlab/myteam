@@ -13,7 +13,6 @@ from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult, UsageInfo
 from .usage import (
-    UsageTotals,
     print_aggregated_usage_summary,
     print_usage_summary,
     resolve_usage_session_path,
@@ -67,7 +66,7 @@ class AgentContext:
             launch_cwd=self.launch_cwd,
         )
         self._agent_configs: dict[str, AgentRuntimeConfig] = {}
-        self._usage_totals_by_model: dict[str, UsageTotals] = {}
+        self._usage_totals_by_model: dict[str, UsageInfo] = {}
 
     def __enter__(self) -> "AgentContext":
         return self
@@ -341,14 +340,14 @@ class AgentContext:
             return
         totals = self._usage_totals_by_model.get(usage.model)
         if totals is None:
-            totals = UsageTotals()
+            totals = UsageInfo()
             self._usage_totals_by_model[usage.model] = totals
         totals.add(usage)
 
     def _print_usage(self, state: _RunState) -> None:
         if state.usage is None:
             return
-        print_usage_summary(state.usage)
+        print_usage_summary("---", state.usage)
 
 
 def run_agent(
