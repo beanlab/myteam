@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.22
+
+- Clarified the workflow definition template docstring to explain that it is a scaffold
+  for starting an agent with usage and cost tracking.
+
 ## 0.2.21
 
 - Added workflow usage tracking for agent runs, including step-level usage summaries and aggregated

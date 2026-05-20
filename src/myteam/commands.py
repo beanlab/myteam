@@ -102,6 +102,18 @@ def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     )
 
 
+def new_workflow(workflow: str = "agent", prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    workflow_root = _selected_root(prefix)
+    workflow_path = workflow_root.joinpath(*workflow.split("/")).with_suffix(".py")
+    if workflow_path.exists():
+        print(f"Workflow '{workflow}' already exists at {workflow_path}", file=sys.stderr)
+        raise SystemExit(1)
+
+    ensure_dir(workflow_path.parent)
+    template = get_template("workflow_definition_template.py").removesuffix("\n")
+    write_py_script(workflow_path, template)
+
+
 def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Delete the directory for a role or skill if it exists."""
     target_dir = role_dir(base_dir(), name, prefix)  # TODO fix for skills
@@ -249,6 +261,7 @@ __all__ = [
     "list_available_rosters",
     "new_role",
     "new_skill",
+    "new_workflow",
     "remove",
     "start",
     "workflow_result",
