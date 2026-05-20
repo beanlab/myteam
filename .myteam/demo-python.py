@@ -10,7 +10,7 @@ WORKFLOW_AGENT = "codex"
 
 
 def main() -> dict[str, Any]:
-    with AgentContext() as ctx:
+    with AgentContext(usage_logging="verbose") as ctx:
         poems = generate_poems(ctx)
         ranking = rank_poems(ctx, poems.output)
         print(ranking.output)

@@ -60,12 +60,12 @@ def print_usage_summary(title: str, usage: UsageInfo) -> None:
 
 def print_aggregated_usage_summary(
         usage_totals_by_model: dict[str, UsageInfo],
-        usage_logging: Literal["none", "summary", "detailed"] = "summary",
+        usage_logging: Literal["none", "summary", "per_model", "verbose"] = "summary",
 ) -> None:
     if usage_logging == "none":
         return
     print("  Usage Summary  ".center(25, "-"))
-    if usage_logging == "detailed":
+    if usage_logging in ("per_model", "verbose"):
         for model, totals in usage_totals_by_model.items():
             print_usage_summary(f"Model: {model}", totals)
 
@@ -73,4 +73,4 @@ def print_aggregated_usage_summary(
     for usage in usage_totals_by_model.values():
         grand_totals.add(usage)
 
-    print_usage_summary("Grand Totals:", grand_totals)
+    print_usage_summary("Total:", grand_totals)

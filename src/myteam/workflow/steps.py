@@ -25,7 +25,7 @@ class AgentContext:
     def __init__(
         self,
         *,
-        usage_logging: Literal["none","summary","detailed"] = "summary",
+        usage_logging: Literal["none","summary","per_model","verbose"] = "summary",
         cwd: Path | str | None = None,
         inactivity_timeout_seconds: int = 300,
     ) -> None:
@@ -199,7 +199,7 @@ class AgentContext:
             usage_error_message=usage_error_message,
         )
         self._record_usage(usage)
-        if self.usage_logging == "detailed":
+        if self.usage_logging == "verbose":
             self._print_usage(state)
         return StepResult(
             status="completed",
@@ -321,7 +321,7 @@ class AgentContext:
     def _print_usage(self, state: RunState) -> None:
         if state.usage is None:
             return
-        print_usage_summary("---", state.usage)
+        print_usage_summary("Step Usage".center(25, "-"), state.usage)
 
 
 def run_agent(
