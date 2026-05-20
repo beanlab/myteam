@@ -18,7 +18,7 @@ from .usage import (
     resolve_usage_tracking,
 )
 from .validation.step_validation import validate_step_execution_args, validate_step_output
-from .terminal.session import run_terminal_session
+from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
 
 
@@ -31,6 +31,19 @@ class _RunState:
     session_path: Path | None = None
     nonce: str | None = None
     agent_config: AgentRuntimeConfig | None = None
+
+
+@dataclass(frozen=True)
+class _PreparedStep:
+    nonce: str
+    agent_config: AgentRuntimeConfig
+    prompt_text: str
+    argv: list[str]
+    resolved_input: Any
+    output_template: dict[str, Any]
+    agent_name: str | None
+    session_id: str | None
+    fork: bool
 
 
 class AgentContext:
@@ -56,9 +69,6 @@ class AgentContext:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        self.print_total_usage()
-
-    def print_total_usage(self) -> None:
         if not self._usage_totals_by_model:
             return
         print_aggregated_usage_summary(self._usage_totals_by_model)
@@ -77,92 +87,162 @@ class AgentContext:
         extra_args: list[str] | None = None,
     ) -> StepResult:
         state = _RunState()
-        resolved_input = input
+        try:
+            prepared = self._prepare_step(
+                state=state,
+                prompt=prompt,
+                output_template=output,
+                input=input,
+                agent=agent,
+                model=model,
+                interactive=interactive,
+                session_id=session_id,
+                fork=fork,
+                extra_args=extra_args,
+            )
+            session_result = self._run_prepared_step(state=state, prepared=prepared)
+            return self._update_state(
+                state=state,
+                prepared=prepared,
+                session_result=session_result,
+            )
+        except Exception as exc:
+            return self._handle_run_agent_error(state=state, exc=exc)
+
+    def _prepare_step(
+        self,
+        *,
+        state: _RunState,
+        prompt: str,
+        output_template: dict[str, Any],
+        input: Any,
+        agent: str | None,
+        model: str | None,
+        interactive: bool,
+        session_id: str | None,
+        fork: bool,
+        extra_args: list[str] | None,
+    ) -> _PreparedStep:
         nonce = str(uuid.uuid4())
         state.nonce = nonce
 
         try:
-            try:
-                validate_step_execution_args(
-                    agent_name=agent,
-                    interactive=interactive,
-                    session_id=session_id,
-                    fork=fork,
-                    extra_args=extra_args,
-                    model=model,
-                )
-            except ValueError as exc:
-                raise StepExecutionError("argument_validation", str(exc)) from exc
-            agent_config = self._resolve_agent_config(agent)
-            state.agent_config = agent_config
-
-            prompt_text = _build_step_prompt(
-                resolved_input=resolved_input,
-                objective_text=prompt,
-                output_template=output,
-                session_nonce=nonce,
-            )
-            argv = _build_agent_argv(
-                agent_config=agent_config,
-                prompt_text=prompt_text,
+            validate_step_execution_args(
+                agent_name=agent,
                 interactive=interactive,
                 session_id=session_id,
                 fork=fork,
-                model=model,
                 extra_args=extra_args,
+                model=model,
+            )
+        except ValueError as exc:
+            raise StepExecutionError("argument_validation", str(exc)) from exc
+
+        agent_config = self._resolve_agent_config(agent)
+        state.agent_config = agent_config
+
+        prompt_text = _build_step_prompt(
+            resolved_input=input,
+            objective_text=prompt,
+            output_template=output_template,
+            session_nonce=nonce,
+        )
+        argv = _build_agent_argv(
+            agent_config=agent_config,
+            prompt_text=prompt_text,
+            interactive=interactive,
+            session_id=session_id,
+            fork=fork,
+            model=model,
+            extra_args=extra_args,
+        )
+
+        return _PreparedStep(
+            nonce=nonce,
+            agent_config=agent_config,
+            prompt_text=prompt_text,
+            argv=argv,
+            resolved_input=input,
+            output_template=output_template,
+            agent_name=agent,
+            session_id=session_id,
+            fork=fork,
+        )
+
+    def _run_prepared_step(
+        self,
+        *,
+        state: _RunState,
+        prepared: _PreparedStep,
+    ) -> TerminalSessionResult:
+        session_result = run_terminal_session(
+            prepared.argv,
+            exit_input=prepared.agent_config.exit_sequence,
+            cwd=self.launch_cwd,
+            inactivity_timeout_seconds=self.timeout,
+        )
+        state.transcript = session_result.transcript
+        return session_result
+
+    def _update_state(
+        self,
+        *,
+        state: _RunState,
+        prepared: _PreparedStep,
+        session_result: TerminalSessionResult,
+    ) -> StepResult:
+        """Update the state with session path and usage info"""
+        if session_result.payload is None:
+            raise StepExecutionError(
+                "completion_missing",
+                "Workflow agent exited before reporting a structured result.",
             )
 
-            session_result = run_terminal_session(
-                argv,
-                exit_input=agent_config.exit_sequence,
-                cwd=self.launch_cwd,
-                inactivity_timeout_seconds=self.timeout,
-            )
-            state.transcript = session_result.transcript
+        try:
+            validate_step_output(prepared.output_template, session_result.payload)
+        except ValueError as exc:
+            raise StepExecutionError("output_validation", str(exc)) from exc
 
-            if session_result.payload is None:
-                raise StepExecutionError(
-                    "completion_missing",
-                    "Workflow agent exited before reporting a structured result.",
-                )
+        discovered_session_id, session_path = _resolve_session_id(
+            payload=session_result.payload,
+            session_id=prepared.session_id,
+            fork=prepared.fork,
+            nonce=prepared.nonce,
+            agent_config=prepared.agent_config,
+        )
+        state.session_path = session_path
+        usage, usage_state, usage_error_message = resolve_usage_tracking(
+            agent_config=prepared.agent_config,
+            session_path=session_path,
+        )
+        self._set_usage_state(
+            state=state,
+            usage=usage,
+            usage_state=usage_state,
+            usage_error_message=usage_error_message,
+        )
+        self._record_usage(usage)
+        self._print_usage(state)
+        return StepResult(
+            status="completed",
+            output=session_result.payload,
+            resolved_input=prepared.resolved_input,
+            agent_name=prepared.agent_name,
+            transcript=state.transcript,
+            exit_code=session_result.exit_code,
+            session_id=discovered_session_id,
+            usage=state.usage,
+            usage_state=state.usage_state,
+            usage_error_message=state.usage_error_message,
+        )
 
-            try:
-                validate_step_output(output, session_result.payload)
-            except ValueError as exc:
-                raise StepExecutionError("output_validation", str(exc)) from exc
-            discovered_session_id, session_path = _resolve_session_id(
-                payload=session_result.payload,
-                session_id=session_id,
-                fork=fork,
-                nonce=nonce,
-                agent_config=agent_config,
-            )
-            state.session_path = session_path
-            usage, usage_state, usage_error_message = resolve_usage_tracking(
-                agent_config=agent_config,
-                session_path=session_path,
-            )
-            self._set_usage_state(
-                state=state,
-                usage=usage,
-                usage_state=usage_state,
-                usage_error_message=usage_error_message,
-            )
-            self._record_usage(usage)
-            self._print_usage(state)
-            return StepResult(
-                status="completed",
-                output=session_result.payload,
-                resolved_input=resolved_input,
-                agent_name=agent,
-                transcript=state.transcript,
-                exit_code=session_result.exit_code,
-                session_id=discovered_session_id,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
-        except StepExecutionError as exc:
+    def _handle_run_agent_error(
+        self,
+        *,
+        state: _RunState,
+        exc: Exception,
+    ) -> StepResult:
+        if isinstance(exc, StepExecutionError):
             if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
                 self._collect_usage_after_failure(state=state)
                 self._print_usage(state)
@@ -175,7 +255,7 @@ class AgentContext:
                 usage_state=state.usage_state,
                 usage_error_message=state.usage_error_message,
             )
-        except TimeoutError as exc:
+        if isinstance(exc, TimeoutError):
             self._collect_usage_after_failure(state=state)
             self._print_usage(state)
             return StepResult(
@@ -187,7 +267,7 @@ class AgentContext:
                 usage_state=state.usage_state,
                 usage_error_message=state.usage_error_message,
             )
-        except OSError as exc:
+        if isinstance(exc, OSError):
             return StepResult(
                 status="failed",
                 error_type="agent_launch",
@@ -195,6 +275,7 @@ class AgentContext:
                 transcript=state.transcript,
                 usage_state="not_attempted",
             )
+        raise exc
 
     def _resolve_agent_config(self, agent_name: str) -> AgentRuntimeConfig:
         cached_config = self._agent_configs.get(agent_name)

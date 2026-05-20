@@ -91,9 +91,9 @@ def print_aggregated_usage_summary(usage_totals_by_model: dict[str, UsageTotals]
         grand_totals.total_tokens += totals.total_tokens
         grand_totals.estimated_cost += totals.estimated_cost
 
-    print("Grand Totals:")
-    print(f"  Input: {grand_totals.input_tokens}")
-    print(f"  Cached Input: {grand_totals.cached_input_tokens}")
-    print(f"  Output: {grand_totals.output_tokens}")
-    print(f"  Total: {grand_totals.total_tokens}")
-    print(f"  Cost: ${grand_totals.estimated_cost:.4f}")
+    print("  Grand Total:")
+    print(f"    Input: {grand_totals.input_tokens}")
+    print(f"    Cached Input: {grand_totals.cached_input_tokens}")
+    print(f"    Output: {grand_totals.output_tokens}")
+    print(f"    Total: {grand_totals.total_tokens}")
+    print(f"    Cost: ${grand_totals.estimated_cost:.4f}")
