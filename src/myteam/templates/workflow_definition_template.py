@@ -1,11 +1,10 @@
 from myteam.workflow.steps import AgentContext
 
-AGENT = "undecided"
-MODEL = "undecided"
+AGENT = ""
+MODEL = ""
 
 def main():
-    if AGENT == "undecided" or MODEL == "undecided":
-        raise NotImplementedError(f"Workflow '{__name__}' has not been implemented yet.")
+    raise NotImplementedError(f"Workflow '{__name__}' has not been implemented yet.")
     with AgentContext(usage_logging="summary") as ctx:
         result = ctx.run_agent(
             agent=AGENT,
