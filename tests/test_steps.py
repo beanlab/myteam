@@ -311,6 +311,51 @@ def test_run_agent_reports_missing_result(monkeypatch):
     assert result.usage_state == "collected"
 
 
+def test_run_agent_does_not_print_step_usage_for_summary_logging_on_failure(monkeypatch, capsys):
+    usage = UsageInfo(
+        model="gpt-5-codex",
+        input_tokens=10,
+        cached_input_tokens=1,
+        output_tokens=2,
+        reasoning_output_tokens=3,
+        total_tokens=13,
+        estimated_cost=0.05,
+    )
+
+    def fake_run_terminal_session(*_args, **_kwargs) -> TerminalSessionResult:
+        return TerminalSessionResult(exit_code=0, transcript="runner transcript", payload=None)
+
+    def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
+        return usage
+
+    config = fake_agent_config()
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_info=config.get_session_info,
+        build_argv=config.build_argv,
+        get_usage_info=fake_get_usage_info,
+        source=config.source,
+    )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+
+    with AgentContext(usage_logging="summary") as ctx:
+        result = ctx.run_agent(
+            agent="codex",
+            prompt="Write a summary.",
+            output={"summary": "short summary"},
+        )
+
+    captured = capsys.readouterr().out
+    assert result.status == "failed"
+    assert "Step Usage" not in captured
+    assert "Usage Summary" in captured
+    assert "Total:" in captured
+
+
 def test_run_agent_requires_explicit_agent():
     result = run_agent(
         prompt="Write a summary.",

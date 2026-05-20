@@ -4,7 +4,7 @@ AGENT = "codex"
 MODEL = "gpt-5.4-mini"
 
 def main():
-    with AgentContext() as ctx:
+    with AgentContext(usage_logging="summary") as ctx:
         result = ctx.run_agent(
             agent=AGENT,
             model=MODEL,
