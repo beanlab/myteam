@@ -199,8 +199,7 @@ class AgentContext:
             usage_error_message=usage_error_message,
         )
         self._record_usage(usage)
-        if self.usage_logging != "verbose":
-            self._print_usage(state)
+        self._print_usage(state)
         return StepResult(
             status="completed",
             output=session_result.payload,
@@ -319,7 +318,7 @@ class AgentContext:
         totals.add(usage)
 
     def _print_usage(self, state: RunState) -> None:
-        if state.usage is None or self.usage_logging == "verbose":
+        if state.usage is None or self.usage_logging != "verbose":
             return
         print_usage_summary(" Step Usage ".center(25, "-"), state.usage)
 
