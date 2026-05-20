@@ -242,6 +242,22 @@ myteam new skill research/literature-review
 myteam new skill python/testing --prefix .agents
 ```
 
+### `myteam new workflow [path] [--prefix <path>]`
+
+Creates a new Python workflow file under the selected local root.
+
+- omit `path` to create the default `agent.py` at the selected local root
+- use slash-delimited paths for nested workflows such as `automation/daily`
+- the scaffolded file contents match the repository's default `.myteam/agent.py`
+
+Examples:
+
+```bash
+myteam new workflow
+myteam new workflow automation/daily
+myteam new workflow --prefix .agents
+```
+
 ### `myteam get role [path] [--prefix <path>]`
 
 Loads a role's instructions.

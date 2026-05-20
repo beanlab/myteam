@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def test_new_role_creates_definition_and_loader(run_myteam, initialized_project: Path):
     result = run_myteam(initialized_project, "new", "role", "developer")
@@ -39,6 +41,38 @@ def test_new_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
     assert result.exit_code == 0
     assert (tmp_path / ".agents" / "python" / "testing" / "skill.md").exists()
     assert (tmp_path / ".agents" / "python" / "testing" / "load.py").exists()
+
+
+def test_new_workflow_creates_default_agent_script(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "workflow")
+
+    assert result.exit_code == 0
+    assert (initialized_project / ".myteam" / "agent.py").exists()
+
+
+def test_new_workflow_matches_repo_default_template(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "workflow")
+
+    assert result.exit_code == 0
+    created = (initialized_project / ".myteam" / "agent.py").read_text(encoding="utf-8")
+    expected = (ROOT / ".myteam" / "agent.py").read_text(encoding="utf-8")
+    assert created == expected
+
+
+def test_new_workflow_accepts_nested_paths(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "workflow", "automation/daily")
+
+    assert result.exit_code == 0
+    assert (initialized_project / ".myteam" / "automation" / "daily.py").exists()
+
+
+def test_creating_existing_workflow_fails_clearly(run_myteam, initialized_project: Path):
+    first = run_myteam(initialized_project, "new", "workflow")
+    second = run_myteam(initialized_project, "new", "workflow")
+
+    assert first.exit_code == 0
+    assert second.exit_code == 1
+    assert "already exists" in second.stderr
 
 
 def test_creating_existing_role_fails_clearly(run_myteam, initialized_project: Path):
