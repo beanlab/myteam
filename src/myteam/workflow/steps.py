@@ -17,11 +17,7 @@ from .usage import (
     resolve_usage_session_path,
     resolve_usage_tracking,
 )
-from .validation.step_validation import (
-    require_agent_name,
-    validate_step_execution_args,
-    validate_step_output,
-)
+from .validation.step_validation import validate_step_execution_args, validate_step_output
 from .terminal.session import run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
 
@@ -88,6 +84,7 @@ class AgentContext:
         try:
             try:
                 validate_step_execution_args(
+                    agent_name=agent,
                     interactive=interactive,
                     session_id=session_id,
                     fork=fork,
@@ -96,11 +93,7 @@ class AgentContext:
                 )
             except ValueError as exc:
                 raise StepExecutionError("argument_validation", str(exc)) from exc
-            try:
-                agent_name = require_agent_name(agent)
-            except ValueError as exc:
-                raise StepExecutionError("agent_resolution", str(exc)) from exc
-            agent_config = self._resolve_agent_config(agent_name)
+            agent_config = self._resolve_agent_config(agent)
             state.agent_config = agent_config
 
             prompt_text = _build_step_prompt(
@@ -161,7 +154,7 @@ class AgentContext:
                 status="completed",
                 output=session_result.payload,
                 resolved_input=resolved_input,
-                agent_name=agent_name,
+                agent_name=agent,
                 transcript=state.transcript,
                 exit_code=session_result.exit_code,
                 session_id=discovered_session_id,

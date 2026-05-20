@@ -3,20 +3,17 @@ from __future__ import annotations
 from typing import Any
 
 
-def require_agent_name(agent_name: str | None) -> str:
-    if not agent_name:
-        raise ValueError("Step definition is missing required field 'agent'.")
-    return agent_name
-
-
 def validate_step_execution_args(
     *,
+    agent_name: str,
     interactive: bool,
     session_id: str | None,
     fork: bool,
     extra_args: list[str] | None,
     model: str | None,
 ) -> None:
+    if not agent_name or not isinstance(agent_name, str):
+        raise ValueError("Step definition is missing required string 'agent'.")
     if not isinstance(interactive, bool):
         raise ValueError("Step field 'interactive' must be a boolean when provided.")
     if not isinstance(fork, bool):
