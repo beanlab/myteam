@@ -12,7 +12,6 @@ def main():
             output={}
         )
         if result.status != "completed" and result.error_type != 'completion_missing':
-            print(result)
             raise RuntimeError(result.error_message)
 
 if __name__ == "__main__":
