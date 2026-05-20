@@ -12,16 +12,23 @@ EXIT_COMMAND = "/quit"
 SESSION_ID_RE = re.compile(
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
 )
-# model: [input, cached, output]
-PRICING_INFO = {
-    "gpt-5.5": [5.0, 0.5, 30.0],
-    "gpt-5.4": [2.5, 0.25, 15.0],
-    "gpt-5.4-mini": [0.75, 0.075, 4.5],
-    "gpt-5.4-nano": [0.2, 0.02, 1.25],
-    "gpt-5.2": [1.75, 0.175, 14.00],
-    "gpt-5": [1.25, 0.125, 10.00],
-    "gpt-5-mini": [0.25, 0.025, 2.00],
-    "gpt-5-nano": [0.05, 0.005, 0.40],
+# model: (input, cached input, output) rate per 1M tokens
+PRICING_INFO: dict[str, tuple[float, float | None, float]] = {
+    "gpt-5.5": (5.0, 0.5, 30.0),
+    "gpt-5.5-pro": (30.0, None, 180.0),
+    "gpt-5.4": (2.5, 0.25, 15.0),
+    "gpt-5.4-mini": (0.75, 0.075, 4.5),
+    "gpt-5.4-nano": (0.2, 0.02, 1.25),
+    "gpt-5.4-pro": (30.0, None, 180.0),
+    "gpt-5.3-codex": (1.75, 0.175, 14.0),
+    "gpt-5.2": (1.75, 0.175, 14.0),
+    "gpt-5.2-codex": (1.75, 0.175, 14.0),
+    "gpt-5.2-pro": (21.0, None, 168.0),
+    "gpt-5": (1.25, 0.125, 10.0),
+    "gpt-5-codex": (1.25, 0.125, 10.0),
+    "gpt-5-pro": (15.0, None, 120.0),
+    "gpt-5-mini": (0.25, 0.025, 2.0),
+    "gpt-5-nano": (0.05, 0.005, 0.4),
 }
 
 

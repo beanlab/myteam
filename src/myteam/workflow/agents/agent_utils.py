@@ -11,7 +11,7 @@ def encode_input(text: str) -> bytes:
 
 
 def estimate_usage_cost(
-    pricing: dict[str, list[int]],
+    pricing: dict[str, tuple[float, float | None, float]],
     model: str,
     input_tokens: int,
     cached_input_tokens: int,
@@ -22,9 +22,10 @@ def estimate_usage_cost(
         return 0.0
 
     non_cached_input_tokens = max(input_tokens - cached_input_tokens, 0)
+    cached_input_rate = model_pricing[1] if model_pricing[1] is not None else model_pricing[0]
     return (
         non_cached_input_tokens * model_pricing[0]
-        + cached_input_tokens * model_pricing[1]
+        + cached_input_tokens * cached_input_rate
         + output_tokens * model_pricing[2]
     ) / 1_000_000
 

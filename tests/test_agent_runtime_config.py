@@ -486,11 +486,19 @@ def test_codex_get_usage_info_returns_none_without_model(tmp_path: Path):
 
 
 def test_estimate_usage_cost_uses_passed_pricing_mapping():
-    pricing = {"gpt-test": [2.5, 0.25, 15.0]}
+    pricing = {"gpt-test": (2.5, 0.25, 15.0)}
 
     cost = estimate_usage_cost(pricing, "gpt-test", 100, 20, 10)
 
     assert cost == pytest.approx(0.000355)
+
+
+def test_estimate_usage_cost_uses_input_rate_when_cached_rate_is_missing():
+    pricing = {"gpt-test-pro": (30.0, None, 180.0)}
+
+    cost = estimate_usage_cost(pricing, "gpt-test-pro", 100, 20, 10)
+
+    assert cost == pytest.approx(0.0048)
 
 
 def test_estimate_usage_cost_returns_zero_for_unknown_model():
