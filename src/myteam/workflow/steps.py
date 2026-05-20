@@ -191,7 +191,7 @@ class AgentContext:
         prepared: _PreparedStep,
         session_result: TerminalSessionResult,
     ) -> StepResult:
-        """Update the state with session path and usage info"""
+        """Validate output and update the state with session path and usage info"""
         if session_result.payload is None:
             raise StepExecutionError(
                 "completion_missing",
