@@ -8,6 +8,9 @@ Each `<agent>.py` file describes how to operate one terminal-backed agent:
 
 Terminal input encoding is shared by the runtime through
 [`agent_utils.py`](agent_utils.py).
+Shared terminal-session helpers for agent adapters live in
+[`agent_utils.py`](agent_utils.py); keep adapter-specific session discovery
+and argv shaping in the adapter module itself.
 
 ## Resolution Order
 
@@ -30,18 +33,22 @@ Every `<agent>.py` module must define:
 EXEC = "agent-executable"
 EXIT_COMMAND = "/quit"
 
-def get_session_id(nonce: str, context: AgentSessionContext) -> str:
+def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Path]:
     ...
 
 def build_argv(
-    prompt_text: str,
-    interactive: bool = True,
-    session_id: str | None = None,
-    fork: bool = False,
-    extra_args: list[str] | None = None,
+        prompt_text: str,
+        interactive: bool = True,
+        session_id: str | None = None,
+        fork: bool = False,
+        extra_args: list[str] | None = None,
 ) -> list[str]:
     ...
 ```
+
+`get_usage_info` is optional. When it is omitted, `run_agent(...)` records the
+step usage state as `no_get_usage_info_implemented` instead of failing config
+resolution.
 
 Instead of `EXIT_COMMAND` as a string that uses `encode_input` from `agent_utils.py`, you
 may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
@@ -96,11 +103,12 @@ Existing local configs can still provide already-encoded bytes:
 EXIT_SEQUENCE = b"exit\r"
 ```
 
-### `get_session_id(nonce, context)`
+### `get_session_info(nonce, context)`
 
-`get_session_id` returns the session id for a completed step. `myteam` embeds
-a nonce in the prompt, then calls this function after completion so Python
-workflows can resume or fork previous sessions.
+`get_session_info` returns the session id for a completed step and the 
+session filepath. `myteam` embeds a nonce in the prompt, then calls this
+function after completion so Python workflows can resume or fork previous
+sessions.
 
 The `context` argument is an `AgentSessionContext` with explicit dependencies
 for session lookup:
@@ -135,7 +143,7 @@ passing `agent="codex_mini"` into `run_agent`.
 ```python
 from __future__ import annotations
 
-from myteam.workflow.agents.codex import EXEC, EXIT_COMMAND, get_session_id
+from myteam.workflow.agents.codex import EXEC, EXIT_COMMAND, get_session_info
 from myteam.workflow.agents.codex import build_argv as build_codex_argv
 
 

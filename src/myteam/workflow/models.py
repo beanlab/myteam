@@ -35,6 +35,49 @@ WorkflowOutput = dict[str, CompletedStepState]
 
 
 @dataclass
+class RunState:
+    transcript: str = ""
+    usage: UsageInfo | None = None
+    usage_state: str = "not_attempted"
+    usage_error_message: str | None = None
+    session_path: "Path | None" = None
+    nonce: str | None = None
+    agent_config: "AgentRuntimeConfig | None" = None
+
+
+@dataclass(frozen=True)
+class PreparedStep:
+    nonce: str
+    agent_config: "AgentRuntimeConfig"
+    prompt_text: str
+    argv: list[str]
+    resolved_input: Any
+    output_template: dict[str, Any]
+    agent_name: str | None
+    session_id: str | None
+    fork: bool
+
+
+@dataclass
+class UsageInfo:
+    model: str = ""
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_output_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost: float = 0.0
+
+    def add(self, usage: UsageInfo) -> None:
+        self.input_tokens += usage.input_tokens
+        self.cached_input_tokens += usage.cached_input_tokens
+        self.output_tokens += usage.output_tokens
+        self.reasoning_output_tokens += usage.reasoning_output_tokens
+        self.total_tokens += usage.total_tokens
+        self.estimated_cost += usage.estimated_cost
+
+
+@dataclass
 class StepResult:
     """
     Result of executing one workflow step.
@@ -54,6 +97,12 @@ class StepResult:
     - ``completion_missing``: the agent session ended without producing a structured result.
     - ``output_validation``: the completion payload content did not satisfy the authored output template.
     - ``session_discovery``: the step completed but the runtime could not discover the new agent session id.
+
+    Usage tracking values:
+    - ``not_attempted``: usage lookup was skipped because the step failed before launch.
+    - ``collected``: usage lookup succeeded and ``usage`` is populated.
+    - ``unavailable``: usage lookup was attempted, but the runtime could not provide usage data.
+    - ``no_get_usage_info_implemented``: the agent config does not define ``get_usage_info``.
     """
     status: str
     output: Any | None = None
@@ -64,6 +113,9 @@ class StepResult:
     transcript: str = ""
     exit_code: int | None = None
     session_id: str | None = None
+    usage: UsageInfo | None = None
+    usage_state: str = "not_attempted"
+    usage_error_message: str | None = None
 
 
 @dataclass

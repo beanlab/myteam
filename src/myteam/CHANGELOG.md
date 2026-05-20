@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.2.21
+
+- Added workflow usage tracking for agent runs, including step-level usage summaries and aggregated
+  estimated cost reporting.
+- Added optional usage lookup support to workflow agent runtimes so completed steps can report
+  usage metadata when available.
+- Expanded workflow session lookup to return both the session id and the backing session file path, 
+  which lets completed runs recover usage data more reliably.
+
 ## 0.2.20
 
 - Refactored workflow agent adapter input handling into shared built-in adapter behavior.
