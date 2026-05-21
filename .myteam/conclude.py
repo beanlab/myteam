@@ -11,53 +11,6 @@ AGENT = "codex"
 MODEL = "gpt-5.4-mini"
 
 
-def review_docs(ctx: AgentContext) -> StepResult:
-    git_diff = get_branch_diff()
-    return ctx.run_agent(
-        agent=AGENT,
-        model=MODEL,
-        prompt=(
-            "Review the current repository changes with emphasis on documentation.",
-            "`application_interface.md, `CHANGELOG.md` (where applicable) and other",
-            "documentation should accurately reflect the current project state",
-            "",
-            "The changelog should only contain significant user-facing changes. When"
-            "the changelog is updated, also update the .toml file as needed",
-            "",
-            "Also draft a PR body for the overall changes on this branch and return",
-            "it as output. Do not run tests",
-        ),
-        input={
-            "git_diff": git_diff,
-        },
-        output={
-            "commit_message": "brief, informative commit message for the documentation changes",
-            "pr_body": "PR body message containing sections: Overview, Black-box level changes, File-level changes",
-        },
-    )
-
-
-def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
-    i = list_github_issues()
-    i["pr_body"] = pr_body
-    return ctx.run_agent(
-        agent=AGENT,
-        model=MODEL,
-        input=i,
-        prompt=(
-            "Open a pull request for the current branch and write the PR body.",
-            "Then update the issue body's Pull Request section with the PR URL and "
-            "final status."
-        ),
-        output={
-            "pr_url": "pull request URL",
-            "pr_body": "pull request body text",
-            "issue_update": "summary of the issue body update",
-            "ready_to_push": False,
-        },
-    )
-
-
 def list_github_issues() -> dict:
     repo_root = Path(__file__).resolve().parents[1]
     project_items_raw = subprocess.check_output(
@@ -106,25 +59,6 @@ def list_github_issues() -> dict:
             },
             "issues": issues,
         }
-
-
-def commit_changes(msg: str) -> str:
-    """Commit the unstaged changes on the branch with the given message."""
-    repo_root = Path(__file__).resolve().parents[1]
-    subprocess.check_call(["git", "-C", str(repo_root), "add", "-A"])
-
-    staged = subprocess.run(
-        ["git", "-C", str(repo_root), "diff", "--cached", "--quiet"],
-        check=False,
-    )
-    if staged.returncode == 0:
-        return ""
-
-    subprocess.check_call(["git", "-C", str(repo_root), "commit", "-m", msg])
-    return subprocess.check_output(
-        ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
-        text=True,
-    ).strip()
 
 
 def get_branch_diff() -> str:
@@ -182,10 +116,78 @@ def get_branch_diff() -> str:
     return "\n".join(sections).rstrip()
 
 
+def commit_changes(msg: str) -> str:
+    """Commit the unstaged changes on the branch with the given message."""
+    repo_root = Path(__file__).resolve().parents[1]
+    subprocess.check_call(["git", "-C", str(repo_root), "add", "-A"])
+
+    staged = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--cached", "--quiet"],
+        check=False,
+    )
+    if staged.returncode == 0:
+        return ""
+
+    subprocess.check_call(["git", "-C", str(repo_root), "commit", "-m", msg])
+    return subprocess.check_output(
+        ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
+        text=True,
+    ).strip()
+
+
 def require_completion(result):
     if result.status != "completed" and result.error_type != 'completion_missing':
         raise RuntimeError(result.error_message)
     return result
+
+
+def review_docs(ctx: AgentContext) -> StepResult:
+    git_diff = get_branch_diff()
+    return ctx.run_agent(
+        agent=AGENT,
+        model=MODEL,
+        prompt=(
+            "Review the current repository changes with emphasis on documentation.",
+            "`application_interface.md, `CHANGELOG.md` (where applicable) and other",
+            "documentation should accurately reflect the current project state",
+            "",
+            "The changelog should only contain significant user-facing changes. When"
+            "the changelog is updated, also update the .toml file as needed",
+            "",
+            "Also draft a PR body for the overall changes on this branch and return",
+            "it as output. Do not run tests",
+        ),
+        input={
+            "git_diff": git_diff,
+        },
+        output={
+            "commit_message": "brief, informative commit message for the documentation changes",
+            "pr_body": "PR body message containing sections: Overview, Black-box level changes, File-level changes",
+        },
+    )
+
+
+def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
+    i = list_github_issues()
+    i["pr_body"] = pr_body
+    return ctx.run_agent(
+        agent=AGENT,
+        model=MODEL,
+        input=i,
+        prompt=(
+            "Open a pull request for the current branch and write the PR body.",
+            "If an issue in the project is closed or related to the changes on",
+            "this branch, mention it in the pr body as well.",
+            "Then update the issue body's Pull Request section with the PR URL and",
+            "final status.",
+        ),
+        output={
+            "pr_url": "pull request URL",
+            "pr_body": "pull request body text",
+            "issue_update": "summary of the issue body update",
+            "ready_to_push": False,
+        },
+    )
 
 
 def main():
