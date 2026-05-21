@@ -5,8 +5,8 @@ import subprocess
 from pathlib import Path
 from textwrap import dedent
 
-from src.myteam.workflow.steps import AgentContext
-from src.myteam.workflow.models import StepResult
+from myteam.workflow.steps import AgentContext
+from myteam.workflow.models import StepResult
 
 AGENT = "codex"
 MODEL = "gpt-5.4-mini"

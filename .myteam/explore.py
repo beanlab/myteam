@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 from textwrap import dedent
 
-from src.myteam.workflow.models import StepResult
-from src.myteam.workflow.steps import AgentContext
+from myteam.workflow.models import StepResult
+from myteam.workflow.steps import AgentContext
 
 AGENT = "codex"
 MODEL = "gpt-5.4-mini"
