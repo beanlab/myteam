@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.23
+
+- Fixed child PTY session handling so Codex menus are handled correctly during interactive
+  workflow runs.
+
 ## 0.2.22
 
 - Clarified the workflow definition template docstring to explain that it is a scaffold
