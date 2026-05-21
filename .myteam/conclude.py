@@ -146,6 +146,9 @@ def review_docs(ctx: AgentContext) -> StepResult:
     return ctx.run_agent(
         agent=AGENT,
         model=MODEL,
+        input={
+            "git_diff": git_diff,
+        },
         prompt=(
             "Review the current repository changes with emphasis on documentation.",
             "`application_interface.md, `CHANGELOG.md` (where applicable) and other",
@@ -157,9 +160,6 @@ def review_docs(ctx: AgentContext) -> StepResult:
             "Also draft a PR body for the overall changes on this branch and return",
             "it as output. Do not run tests",
         ),
-        input={
-            "git_diff": git_diff,
-        },
         output={
             "commit_message": "brief, informative commit message for the documentation changes",
             "pr_body": "PR body message containing sections: Overview, Black-box level changes, File-level changes",
@@ -184,9 +184,8 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
         ),
         output={
             "pr_url": "pull request URL",
-            "pr_body": "pull request body text",
+            "pr_body": "summary of the pr body changes",
             "issue_update": "summary of the issue body update",
-            "ready_to_push": False,
         },
     )
 
