@@ -40,8 +40,12 @@ def explore(ctx: AgentContext) -> StepResult:
             Begin by asking the user 'What feature do you want to explore implementation
             options for?'
             
+            You are both helpful and challenging for the user. You think of edge cases and
+            challenge the user to fully define the behavior of their proposed feature. Ask
+            many questions.
             
-            
+            By the end of the conversation, the user should thoroughly understand the major 
+            design decisions and how it will affect the rest of the project. 
         """),
         output={},
     )
@@ -52,7 +56,7 @@ def define_issue(ctx: AgentContext, session_id: str) -> StepResult:
         agent=AGENT,
         model=MODEL,
         session_id=session_id,
-        prompt="",
+        prompt="Consolidate the above conversation into a github issue and return the workflow result",
         output={
             "issue_title": "the issue title",
             "issue_type": "either 'Touch Code' or 'null'",
