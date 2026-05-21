@@ -5,7 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from myteam.workflow.tty_wrapper import run_pty_session
+from myteam.workflow.terminal.session import run_terminal_session
+from myteam.workflow.agents.backends import PTY_RIGHT_ARROW
 
 
 def _dog_monitor():
@@ -31,5 +32,7 @@ if __name__ == "__main__":
         print("Usage: python scripts/prototypes/monitored_tty.py <command> [args...]", file=sys.stderr)
         raise SystemExit(2)
 
-    result = run_pty_session(sys.argv[1:], None, _dog_monitor())
+    result = run_terminal_session(sys.argv[1:],
+                                  initial_input=b'ask permission to edit a local file',
+                                  exit_input=b'/quit')
     raise SystemExit(result.exit_code)
