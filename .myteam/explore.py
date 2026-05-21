@@ -30,7 +30,7 @@ def require_completion(result):
 
 def explore(ctx: AgentContext) -> StepResult:
     return ctx.run_agent(
-        AGENT=AGENT,
+        agent=AGENT,
         model=MODEL,
         prompt="",
         output={},
@@ -39,7 +39,7 @@ def explore(ctx: AgentContext) -> StepResult:
 
 def summarize_issue(ctx: AgentContext, transcript) -> StepResult:
     return ctx.run_agent(
-        AGENT=AGENT,
+        agent=AGENT,
         model=MODEL,
         input={"transcript": transcript},
         prompt="",
