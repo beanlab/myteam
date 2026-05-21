@@ -137,16 +137,49 @@ def get_branch_diff() -> str:
         ["git", "-C", str(repo_root), "diff", "--no-ext-diff", "--no-color"],
         text=True,
     ).strip()
-
-    return "\n".join(
+    untracked_files = subprocess.check_output(
         [
-            "## git status --short",
-            status or "(clean)",
-            "",
-            "## git diff",
-            diff or "(no tracked changes)",
-        ]
-    )
+            "git",
+            "-C",
+            str(repo_root),
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+        ],
+        text=True,
+    ).splitlines()
+    untracked_sections = []
+    for rel_path in sorted(path for path in untracked_files if path.strip()):
+        file_path = repo_root / rel_path
+        try:
+            file_contents = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            file_contents = file_path.read_text(encoding="utf-8", errors="replace")
+        untracked_sections.extend(
+            [
+                f"### {rel_path}",
+                file_contents.rstrip(),
+                "",
+            ]
+        )
+
+    sections = [
+        "## git status --short",
+        status or "(clean)",
+        "",
+        "## git diff",
+        diff or "(no tracked changes)",
+    ]
+    if untracked_sections:
+        sections.extend(
+            [
+                "",
+                "## untracked files",
+                "",
+                *untracked_sections,
+            ]
+        )
+    return "\n".join(sections).rstrip()
 
 
 def require_completion(result):
