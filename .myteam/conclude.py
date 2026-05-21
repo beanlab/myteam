@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from textwrap import dedent
 
-from myteam.workflow.steps import AgentContext
-from myteam.workflow.models import StepResult
+from src.myteam.workflow.steps import AgentContext
+from src.myteam.workflow.models import StepResult
 
 AGENT = "codex"
 MODEL = "gpt-5.4-mini"
@@ -239,17 +240,17 @@ def review_docs(ctx: AgentContext) -> StepResult:
         input={
             "git_diff": git_diff,
         },
-        prompt=(
-            "Review the current repository changes with emphasis on documentation.",
-            "`application_interface.md, `CHANGELOG.md` (where applicable) and other",
-            "documentation should accurately reflect the current project state",
-            "",
-            "The changelog should only contain significant user-facing changes. When"
-            "the changelog is updated, also update the .toml file as needed",
-            "",
-            "Also draft a PR body for the overall changes on this branch and return",
-            "it as output. Do not run tests",
-        ),
+        prompt=dedent(f"""
+            Review the current repository changes with emphasis on documentation.
+            `application_interface.md, `CHANGELOG.md` (where applicable) and other
+            documentation should accurately reflect the current project state
+            
+            The changelog should only contain significant user-facing changes. When
+            the changelog is updated, also update the .toml file as needed
+            
+            Also draft a PR body for the overall changes on this branch and return
+            it as output. Do not run tests
+        """),
         output={
             "commit_message": "brief, informative commit message for the documentation changes",
             "pr_body": "PR body message containing sections: Overview, Black-box level changes, File-level changes",
@@ -267,33 +268,33 @@ def review_myteam(ctx: AgentContext, pr_body: str) -> StepResult:
         agent=AGENT,
         model=MODEL,
         input={"pr_body": pr_body},
-        prompt=(
-            "Ensure that the existing `.myteam` tree stays up-to-date.",
-            "",
-            "- Review the pr_body and `CHANGELOG.md`. Were any templates modified?",
-            "- Do any of the changes affect `.myteam` organization or structure?",
-            "",
-            "If so, create a document in `src/myteam/migrations/<version>.md` to",
-            "document changes and provide careful instructions for how to migrate",
-            "an existing `.myteam` folder and files to reflect the changes.",
-            "The document will be used by our users to update their `.myteam` folders",
-            "to the latest features / format.",
-            "",
-            "These instructions should be generic:",
-            "they should NOT assume specific role or skill folders.",
-            "They should simply describe the general changes needed to `load.py` or",
-            "other files to match the new templates or assumptions.",
-            "",
-            "For example, if new content has been added to the AGENTS.md template,",
-            "then that new content should be integrated into existing AGENTS.md files.",
-            "",
-            "Or, if a new function is available in `utils` and was included in the",
-            "default role `load.py` template, then existing role `load.py` files",
-            "should be updated to use this new utility.",
-            "",
-            "The migration instructions should clearly explain what the changes are",
-            "and how those changes might be applied to existing structure.",
-        ),
+        prompt=dedent(f"""
+            Ensure that the existing `.myteam` tree stays up-to-date.
+            
+            - Review the pr_body and `CHANGELOG.md`. Were any templates modified?
+            - Do any of the changes affect `.myteam` organization or structure?
+            
+            If so, create a document in `src/myteam/migrations/<version>.md` to
+            document changes and provide careful instructions for how to migrate
+            an existing `.myteam` folder and files to reflect the changes.
+            The document will be used by our users to update their `.myteam` folders
+            to the latest features / format.
+            
+            These instructions should be generic:
+            they should NOT assume specific role or skill folders.
+            They should simply describe the general changes needed to `load.py` or
+            other files to match the new templates or assumptions.
+            
+            For example, if new content has been added to the AGENTS.md template,
+            then that new content should be integrated into existing AGENTS.md files.
+            
+            Or, if a new function is available in `utils` and was included in the
+            default role `load.py` template, then existing role `load.py` files
+            should be updated to use this new utility.
+            
+            The migration instructions should clearly explain what the changes are
+            and how those changes might be applied to existing structure.
+        """),
         output={
             "commit_message": "brief, informative commit message for the migration changes",
         }
@@ -307,14 +308,14 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
         agent=AGENT,
         model=MODEL,
         input=i,
-        prompt=(
-            "Open a pull request if a PR hasn't already been opened for the current",
-            "branch and write/update the PR body.",
-            "If an issue in the project is closed or related to the changes on",
-            "this branch, mention it in the pr body as well.",
-            "Then update the issue body's Pull Request section with the PR URL and",
-            "final status.",
-        ),
+        prompt=dedent(f"""
+            Open a pull request if a PR hasn't already been opened for the current
+            branch and write/update the PR body.
+            If an issue in the project is closed or related to the changes on
+            this branch, mention it in the pr body as well.
+            Then update the issue body's Pull Request section with the PR URL and
+            final status.
+        """),
         output={
             "pr_url": "pull request URL",
             "pr_body": "summary of the pr body changes",
@@ -329,7 +330,7 @@ def main():
             usage_logging="summary",
             inactivity_timeout_seconds=900,
     ) as ctx:
-        # review documetation
+        # review documentation
         review_result = require_completion(review_docs(ctx))
         commit_changes(review_result.output["commit_message"])
 

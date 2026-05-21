@@ -4,8 +4,10 @@ import json
 import subprocess
 import tempfile
 from pathlib import Path
-from myteam.workflow.models import StepResult
-from myteam.workflow.steps import AgentContext
+from textwrap import dedent
+
+from src.myteam.workflow.models import StepResult
+from src.myteam.workflow.steps import AgentContext
 
 AGENT = "codex"
 MODEL = "gpt-5.4-mini"
@@ -32,18 +34,18 @@ def explore(ctx: AgentContext) -> StepResult:
     return ctx.run_agent(
         agent=AGENT,
         model=MODEL,
-        prompt=(
+        prompt=dedent("""
             "Ask the user 'What feature do you want to explore implementation options for?'",
-        ),
+        """),
         output={},
     )
 
 
-def summarize_issue(ctx: AgentContext, transcript) -> StepResult:
+def define_issue(ctx: AgentContext, session_id: str) -> StepResult:
     return ctx.run_agent(
         agent=AGENT,
         model=MODEL,
-        input={"transcript": transcript},
+        session_id=session_id,
         prompt="",
         output={
             "issue_title": "the issue title",
@@ -164,14 +166,12 @@ def main():
     ) as ctx:
         # this should be altered to run the explore process to clearly define the
         explore_result = require_completion(explore(ctx))
-        summary_result = require_completion(summarize_issue(ctx, explore_result.transcript)).output
+        summary_result = require_completion(define_issue(ctx, explore_result.session_id)).output
         create_issue(
             summary_result["issue_title"],
             summary_result["issue_type"],
             summary_result["issue_body"],
         )
-        # summarize the decisions and add to github project and return and output to conclude the workflow automatically
-        pass
 
 
 if __name__ == "__main__":
