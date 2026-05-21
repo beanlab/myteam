@@ -35,7 +35,13 @@ def explore(ctx: AgentContext) -> StepResult:
         agent=AGENT,
         model=MODEL,
         prompt=dedent("""
-            "Ask the user 'What feature do you want to explore implementation options for?'",
+            This step is to enable the user to further define a desired feature and narrow
+            in on a implementation direction. Do **NOT** change code during this step.
+            Begin by asking the user 'What feature do you want to explore implementation
+            options for?'
+            
+            
+            
         """),
         output={},
     )

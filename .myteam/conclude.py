@@ -240,7 +240,7 @@ def review_docs(ctx: AgentContext) -> StepResult:
         input={
             "git_diff": git_diff,
         },
-        prompt=dedent(f"""
+        prompt=dedent("""
             Review the current repository changes with emphasis on documentation.
             `application_interface.md, `CHANGELOG.md` (where applicable) and other
             documentation should accurately reflect the current project state
@@ -268,7 +268,7 @@ def review_myteam(ctx: AgentContext, pr_body: str) -> StepResult:
         agent=AGENT,
         model=MODEL,
         input={"pr_body": pr_body},
-        prompt=dedent(f"""
+        prompt=dedent("""
             Ensure that the existing `.myteam` tree stays up-to-date.
             
             - Review the pr_body and `CHANGELOG.md`. Were any templates modified?
@@ -308,7 +308,7 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
         agent=AGENT,
         model=MODEL,
         input=i,
-        prompt=dedent(f"""
+        prompt=dedent("""
             Open a pull request if a PR hasn't already been opened for the current
             branch and write/update the PR body.
             If an issue in the project is closed or related to the changes on
