@@ -28,7 +28,7 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
         "    explain_skills()\n"
         "    list_skills(base, myteam, [])\n"
         "    explain_tools()\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -55,7 +55,7 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
     assert "name: Developer" not in result.stdout
     assert "developer/frontend" in result.stdout
     assert "developer/testing" in result.stdout
-    assert "helper.py" in result.stdout
+    assert ".myteam/developer/helper.py" in result.stdout
 
 
 def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized_project: Path):
@@ -76,7 +76,7 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
         "    myteam = get_myteam_root(base)\n"
         "    list_roles(base, myteam, [])\n"
         "    list_skills(base, myteam, [])\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -96,7 +96,7 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
     assert "Use Python." in result.stdout
     assert "name: Python" not in result.stdout
     assert "python/testing" in result.stdout
-    assert "lint.py" in result.stdout
+    assert ".myteam/python/lint.py" in result.stdout
 
 
 def test_get_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
@@ -190,7 +190,7 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "    explain_skills()\n"
         "    list_skills(base, myteam, [])\n"
         "    explain_tools()\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -211,7 +211,7 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "    myteam = get_myteam_root(base)\n"
         "    list_roles(base, myteam, [])\n"
         "    list_skills(base, myteam, [])\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
