@@ -4,8 +4,6 @@ import json
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Literal
-
 from myteam.workflow.models import StepResult
 from myteam.workflow.steps import AgentContext
 
@@ -53,7 +51,7 @@ def summarize_issue(ctx: AgentContext, transcript) -> StepResult:
     )
 
 
-def create_issue(title: str, type: Literal["Touch Code", "Task"], body: str) -> str:
+def create_issue(title: str, issue_type: str | None, body: str) -> str:
     repo_root = Path(__file__).resolve().parents[1]
 
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
@@ -75,7 +73,8 @@ def create_issue(title: str, type: Literal["Touch Code", "Task"], body: str) -> 
             cwd=repo_root,
         ).strip()
 
-        _set_issue_type(repo_root, issue_url, type)
+        if issue_type == "Touch Code":
+            _set_issue_type(repo_root, issue_url, issue_type)
 
         try:
             subprocess.check_call(
@@ -163,8 +162,12 @@ def main():
     ) as ctx:
         # this should be altered to run the explore process to clearly define the
         explore_result = require_completion(explore(ctx))
-        summary_result = require_completion(summarize_issue(ctx, explore_result.transcript))
-        create_issue(summary_result.output["issue_body"])
+        summary_result = require_completion(summarize_issue(ctx, explore_result.transcript)).output
+        create_issue(
+            summary_result["issue_title"],
+            summary_result["issue_type"],
+            summary_result["issue_body"],
+        )
         # summarize the decisions and add to github project and return and output to conclude the workflow automatically
         pass
 
