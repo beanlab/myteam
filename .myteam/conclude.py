@@ -166,6 +166,49 @@ def review_docs(ctx: AgentContext) -> StepResult:
         },
     )
 
+def review_myteam(ctx: AgentContext, pr_body: str) -> StepResult:
+    """
+    This reviews changes to the myteam src code and writes migration
+    instructions if needed.
+    For other projects, this step should evaluate the current `.myteam`
+    roster for path references, etc. that may need to be updated.
+    """
+    return ctx.run_agent(
+        agent=AGENT,
+        model=MODEL,
+        input={"pr_body": pr_body},
+        prompt=(
+            "Ensure that the existing `.myteam` tree stays up-to-date.",
+            "",
+            "- Review the pr_body and `CHANGELOG.md`. Were any templates modified?",
+            "- Do any of the changes affect `.myteam` organization or structure?",
+            "",
+            "If so, create a document in `src/myteam/migrations/<version>.md` to",
+            "document changes and provide careful instructions for how to migrate",
+            "an existing `.myteam` folder and files to reflect the changes.",
+            "The document will be used by our users to update their `.myteam` folders",
+            "to the latest features / format.",
+            "",
+            "These instructions should be generic:",
+            "they should NOT assume specific role or skill folders.",
+            "They should simply describe the general changes needed to `load.py` or",
+            "other files to match the new templates or assumptions.",
+            "",
+            "For example, if new content has been added to the AGENTS.md template,",
+            "then that new content should be integrated into existing AGENTS.md files.",
+            "",
+            "Or, if a new function is available in `utils` and was included in the",
+            "default role `load.py` template, then existing role `load.py` files",
+            "should be updated to use this new utility.",
+            "",
+            "The migration instructions should clearly explain what the changes are",
+            "and how those changes might be applied to existing structure.",
+        ),
+        output={
+            "commit_message": "brief, informative commit message for the migration changes",
+        }
+    )
+
 
 def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
     i = list_github_issues()
@@ -192,8 +235,15 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
 
 def main():
     with AgentContext(usage_logging="summary") as ctx:
+        # review documetation
         review_result = require_completion(review_docs(ctx))
         commit_changes(review_result.output["commit_message"])
+
+        # review myteam changes
+        myteam_result = review_myteam(ctx, review_result.output["pr_body"])
+        commit_changes(myteam_result.output["commit_message"])
+
+        # open pr
         require_completion(conclude(ctx, review_result.output["pr_body"]))
 
 
