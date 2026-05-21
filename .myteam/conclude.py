@@ -175,7 +175,8 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
         model=MODEL,
         input=i,
         prompt=(
-            "Open a pull request for the current branch and write the PR body.",
+            "Open a pull request if a PR hasn't already been opened for the current",
+            "branch and write/update the PR body.",
             "If an issue in the project is closed or related to the changes on",
             "this branch, mention it in the pr body as well.",
             "Then update the issue body's Pull Request section with the PR URL and",
