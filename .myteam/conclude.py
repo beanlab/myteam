@@ -11,6 +11,96 @@ AGENT = "codex"
 MODEL = "gpt-5.4-mini"
 
 
+def get_base_branch(repo_root: Path) -> str:
+    origin_head = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if origin_head.returncode == 0:
+        remote_ref = origin_head.stdout.strip()
+        if remote_ref:
+            return remote_ref.rsplit("/", 1)[-1]
+
+    for branch in ("main", "master"):
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "show-ref",
+                "--verify",
+                "--quiet",
+                f"refs/heads/{branch}",
+            ],
+            check=False,
+        )
+        if result.returncode == 0:
+            return branch
+
+    raise SystemExit(
+        "Unable to determine a root branch. Set `origin/HEAD` or create a local "
+        "`main` or `master` branch before running the conclusion workflow."
+    )
+
+
+def require_concludable_branch() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    base_branch = get_base_branch(repo_root)
+    branch = subprocess.check_output(
+        ["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"],
+        text=True,
+    ).strip()
+    if branch == base_branch:
+        raise SystemExit(
+            f"Cannot conclude a workflow on `{base_branch}`. Switch to a feature "
+            "branch with changes first."
+        )
+
+    branch_is_based_on_base_branch = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "merge-base",
+            "--is-ancestor",
+            base_branch,
+            "HEAD",
+        ],
+        check=False,
+    ).returncode == 0
+    if not branch_is_based_on_base_branch:
+        raise SystemExit(
+            f"Branch '{branch}' is not based on `{base_branch}`. Rebase or "
+            f"branch from `{base_branch}` before concluding."
+        )
+
+    status = subprocess.check_output(
+        ["git", "-C", str(repo_root), "status", "--short"],
+        text=True,
+    ).strip()
+    diff = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--quiet", f"{base_branch}...HEAD"],
+        check=False,
+    ).returncode
+    if not status and diff == 0:
+        raise SystemExit(
+            f"Branch '{branch}' has no changes relative to `{base_branch}`. Make a change "
+            "before running the conclusion workflow."
+        )
+
+    return branch
+
+
 def list_github_issues() -> dict:
     repo_root = Path(__file__).resolve().parents[1]
     project_items_raw = subprocess.check_output(
@@ -234,6 +324,7 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
 
 
 def main():
+    require_concludable_branch()
     with AgentContext(usage_logging="summary") as ctx:
         # review documetation
         review_result = require_completion(review_docs(ctx))
