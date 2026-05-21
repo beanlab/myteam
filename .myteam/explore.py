@@ -32,7 +32,9 @@ def explore(ctx: AgentContext) -> StepResult:
     return ctx.run_agent(
         agent=AGENT,
         model=MODEL,
-        prompt="",
+        prompt=(
+            "Ask the user 'What feature do you want to explore implementation options for?'",
+        ),
         output={},
     )
 
