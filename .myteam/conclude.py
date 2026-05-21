@@ -21,28 +21,56 @@ def review_docs(ctx: AgentContext) -> StepResult:
             "documentation should accurately reflect the current project state",
             "",
             "The changelog should only contain significant user-facing changes. When"
-            "the changelog is updated, also update the .toml file as needed.",
+            "the changelog is updated, also update the .toml file as needed",
+            "",
+            "Also draft a PR body for the overall changes on this branch and return",
+            "it as output",
         ),
         input={
             "git_diff": git_diff,
         },
         output={
-            "commit_message": "brief, informative commit message for the documentation changes"
+            "commit_message": "brief, informative commit message for the documentation changes",
+            "pr_body": "PR body message containing Overview, Black-box level changes, and File-level changes",
         },
     )
 
 
-def conclude(ctx: AgentContext) -> StepResult:
+def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
     return ctx.run_agent(
         agent=AGENT,
         model=MODEL,
-        prompt="Insert instructions for opening a PR with sections: overview, black-box level changes, and file-level changes",
-        output={},
+        input={"pr_body": pr_body},
+        prompt=(
+            "Open a pull request for the current branch and write the PR body.",
+            "Then update the issue body's Pull Request section with the PR URL and "
+            "final status."
+        ),
+        output={
+            "pr_url": "pull request URL",
+            "pr_body": "pull request body text",
+            "issue_update": "summary of the issue body update",
+            "ready_to_push": False,
+        },
     )
 
 def commit_changes(msg: str) -> str:
     """Commit the unstaged changes on the branch with the given message."""
-    pass
+    repo_root = Path(__file__).resolve().parents[1]
+    subprocess.check_call(["git", "-C", str(repo_root), "add", "-A"])
+
+    staged = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--cached", "--quiet"],
+        check=False,
+    )
+    if staged.returncode == 0:
+        return ""
+
+    subprocess.check_call(["git", "-C", str(repo_root), "commit", "-m", msg])
+    return subprocess.check_output(
+        ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
+        text=True,
+    ).strip()
 
 
 def get_branch_diff() -> str:
@@ -77,7 +105,7 @@ def main():
     with AgentContext(usage_logging="summary") as ctx:
         review_result = require_completion(review_docs(ctx))
         commit_changes(review_result.output["commit_message"])
-        require_completion(conclude(ctx))
+        require_completion(conclude(ctx, review_result.output["pr_body"]))
 
 
 if __name__ == "__main__":
