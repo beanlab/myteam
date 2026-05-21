@@ -1,5 +1,30 @@
 # Change Log
 
+## 0.2.22
+
+- Clarified the workflow definition template docstring to explain that it is a scaffold
+  for starting an agent with usage and cost tracking.
+
+## 0.2.21
+
+- Added workflow usage tracking for agent runs, including step-level usage summaries and aggregated
+  estimated cost reporting.
+- Added optional usage lookup support to workflow agent runtimes so completed steps can report
+  usage metadata when available.
+- Expanded workflow session lookup to return both the session id and the backing session file path, 
+  which lets completed runs recover usage data more reliably.
+
+## 0.2.20
+
+- Refactored workflow agent adapter input handling into shared built-in adapter behavior.
+- Added nonce injection for workflow session start, resume, view, and fork operations.
+- Added support for resuming and forking workflow agent sessions, including working-directory-aware
+  session ID lookup.
+- Extended adapter command construction with `interactive`, `model`, and `extra_args` support,
+  including Codex `exec` resume behavior.
+- Added workflow adapter documentation covering built-in adapter functions and lightweight alias
+  adapters such as custom Codex variants.
+
 ## 0.2.19
 
 - Added session-aware workflow agent execution so `run_agent(...)` can resume a prior agent session

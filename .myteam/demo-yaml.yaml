@@ -1,5 +1,5 @@
 generate_poems:
-  prompt: Generate 3 poems on topics provided by the user.
+  prompt: Generate 3 poems on topics provided by the user. Ask them for the topics.
   output:
     poem1: a haiku
     poem2: a limerick

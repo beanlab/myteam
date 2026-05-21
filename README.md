@@ -242,6 +242,22 @@ myteam new skill research/literature-review
 myteam new skill python/testing --prefix .agents
 ```
 
+### `myteam new workflow [path] [--prefix <path>]`
+
+Creates a new Python workflow file under the selected local root.
+
+- omit `path` to create the default `agent.py` at the selected local root
+- use slash-delimited paths for nested workflows such as `automation/daily`
+- the scaffolded file contents match the repository's default `.myteam/agent.py`
+
+Examples:
+
+```bash
+myteam new workflow
+myteam new workflow automation/daily
+myteam new workflow --prefix .agents
+```
+
 ### `myteam get role [path] [--prefix <path>]`
 
 Loads a role's instructions.
@@ -284,8 +300,8 @@ Executes a workflow definition from the selected local root.
 - relative segments in workflow paths are allowed
 - workflow files are resolved with standard YAML extensions or `.py`
 - later workflow steps may reference completed state from earlier steps
-- Python workflow files may resume related agent sessions by passing a prior `StepResult.session_id`
-  into `run_agent(...)`
+- Python workflow files may resume or fork related agent sessions by passing a prior
+  `StepResult.session_id` into `run_agent(...)` as `session_id`, with `fork=True` to fork
 - Python workflow files may pass `cwd` to `run_agent(...)` to override the default agent launch
   directory
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.agents.codex import EXIT_SEQUENCE
+from myteam.workflow.agents.agent_utils import encode_input
 from myteam.workflow.terminal.pty_session import PtySession
 from myteam.workflow.terminal.recording import TerminalRecording
 
@@ -51,7 +51,7 @@ def test_pty_session_exit_input_preserves_backend_submit_sequence(capfd: pytest.
                 break
             recording.feed(chunk)
             if "READY" in recording.snapshot() and "RIGHT_ARROW_SUBMIT" not in recording.snapshot():
-                session.enqueue_input(EXIT_SEQUENCE)
+                session.enqueue_input(encode_input("/quit"))
 
     capfd.readouterr()
     assert exit_code == 0
