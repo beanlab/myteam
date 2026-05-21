@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Mapping
+from collections.abc import Callable, Generator, Mapping
 from pathlib import Path
 from queue import Empty, Queue
 import errno
+import fcntl
 import os
 import pty
 import select
@@ -56,7 +57,7 @@ class PtySession:
             stderr=self._slave_fd,
             env=None if self.env is None else {**os.environ, **self.env},
             cwd=self.cwd,
-            start_new_session=True,
+            preexec_fn=_make_controlling_terminal_preexec(self._slave_fd),
             close_fds=True,
         )
         os.close(self._slave_fd)
@@ -184,3 +185,11 @@ class PtySession:
             self._copy_terminal_size()
         except OSError:
             pass
+
+
+def _make_controlling_terminal_preexec(slave_fd: int) -> Callable[[], None]:
+    def preexec() -> None:
+        os.setsid()
+        fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
+
+    return preexec
