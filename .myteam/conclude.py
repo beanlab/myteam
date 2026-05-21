@@ -325,7 +325,10 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
 
 def main():
     require_concludable_branch()
-    with AgentContext(usage_logging="summary") as ctx:
+    with AgentContext(
+            usage_logging="summary",
+            inactivity_timeout_seconds=900,
+    ) as ctx:
         # review documetation
         review_result = require_completion(review_docs(ctx))
         commit_changes(review_result.output["commit_message"])
