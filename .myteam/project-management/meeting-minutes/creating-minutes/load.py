@@ -11,7 +11,7 @@ def main() -> int:
     print_instructions(base)
     myteam = get_active_myteam_root(base)
     list_skills(base, myteam, [])
-    list_tools(base, myteam, [])
+    list_tools(base, myteam.parent, [])
     list_roles(base, myteam, [])
 
     return 0
