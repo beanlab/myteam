@@ -4,6 +4,7 @@
 
 - Fixed role and skill loaders so listed tool paths stay rooted at the project tree, which keeps
   tool paths executable from the repo root without dropping the `.myteam/` prefix.
+- Added migration instructions for older teams to be automatically updated.
 
 ## 0.2.23
 
