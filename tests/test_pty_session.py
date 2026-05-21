@@ -60,6 +60,25 @@ def test_pty_session_exit_input_preserves_backend_submit_sequence(capfd: pytest.
     assert "MISSING_RIGHT_ARROW" not in recording.snapshot()
 
 
+def test_pty_session_gives_child_a_controlling_terminal(capfd: pytest.CaptureFixture[str]):
+    recording = TerminalRecording()
+
+    with PtySession(_helper_argv("controlling_tty"), inactivity_timeout_seconds=1) as session:
+        events = session.events()
+        while True:
+            try:
+                chunk = next(events)
+            except StopIteration as exc:
+                exit_code = exc.value
+                break
+            recording.feed(chunk)
+
+    capfd.readouterr()
+    assert exit_code == 0
+    assert "STDIN_ISATTY:True" in recording.snapshot()
+    assert "DEV_TTY_OK" in recording.snapshot()
+
+
 def test_pty_session_times_out_after_inactivity():
     with PtySession(_helper_argv("silent"), inactivity_timeout_seconds=1) as session:
         with pytest.raises(TimeoutError, match="became inactive for 1 seconds"):
