@@ -289,6 +289,17 @@ def test_builtin_migration_skill_reports_pending_migration_notes(run_myteam, ini
     assert "## 0.2.6 migration" in result.stdout
 
 
+def test_builtin_migration_skill_includes_latest_packaged_migration(run_myteam, initialized_project: Path):
+    (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.23\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "skill", "builtins/migration")
+
+    assert result.exit_code == 0
+    assert "Pending migrations for `.myteam` tracked at 0.2.23" in result.stdout
+    assert "## 0.2.24 migration" in result.stdout
+    assert "tool paths stay rooted at the project tree" in result.stdout
+
+
 def test_builtin_parent_skill_lists_packaged_children(run_myteam, initialized_project: Path):
     result = run_myteam(initialized_project, "get", "skill", "builtins")
 
