@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -31,16 +32,18 @@ def review_docs(ctx: AgentContext) -> StepResult:
         },
         output={
             "commit_message": "brief, informative commit message for the documentation changes",
-            "pr_body": "PR body message containing Overview, Black-box level changes, and File-level changes",
+            "pr_body": "PR body message containing sections: Overview, Black-box level changes, File-level changes",
         },
     )
 
 
 def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
+    i = list_github_issues()
+    i["pr_body"] = pr_body
     return ctx.run_agent(
         agent=AGENT,
         model=MODEL,
-        input={"pr_body": pr_body},
+        input=i,
         prompt=(
             "Open a pull request for the current branch and write the PR body.",
             "Then update the issue body's Pull Request section with the PR URL and "
@@ -53,6 +56,57 @@ def conclude(ctx: AgentContext, pr_body: str) -> StepResult:
             "ready_to_push": False,
         },
     )
+
+
+def list_github_issues() -> dict:
+    repo_root = Path(__file__).resolve().parents[1]
+    project_items_raw = subprocess.check_output(
+        [
+            "gh",
+            "project",
+            "item-list",
+            "13",
+            "--owner",
+            "beanlab",
+            "--format",
+            "json",
+        ],
+        text=True,
+        cwd=repo_root,
+    ).strip()
+    issues_raw = subprocess.check_output(
+        [
+            "gh",
+            "issue",
+            "list",
+            "--state",
+            "all",
+            "--limit",
+            "100",
+            "--json",
+            "number,title,state,labels,url,updatedAt",
+        ],
+        text=True,
+        cwd=repo_root,
+    ).strip()
+
+    project_items_data = json.loads(project_items_raw) if project_items_raw else {}
+    project_items = (
+        project_items_data.get("items", project_items_data)
+        if isinstance(project_items_data, dict)
+        else project_items_data
+    )
+    issues = json.loads(issues_raw) if issues_raw else []
+
+    return {
+            "project": {
+                "owner": "beanlab",
+                "number": 13,
+                "items": project_items,
+            },
+            "issues": issues,
+        }
+
 
 def commit_changes(msg: str) -> str:
     """Commit the unstaged changes on the branch with the given message."""
