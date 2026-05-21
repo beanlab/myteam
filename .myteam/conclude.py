@@ -25,7 +25,7 @@ def review_docs(ctx: AgentContext) -> StepResult:
             "the changelog is updated, also update the .toml file as needed",
             "",
             "Also draft a PR body for the overall changes on this branch and return",
-            "it as output",
+            "it as output. Do not run tests",
         ),
         input={
             "git_diff": git_diff,
