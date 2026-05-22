@@ -54,7 +54,7 @@ class AgentContext:
         self,
         *,
         prompt: str,
-        output: dict[str, Any],
+        output: dict[str, Any] | None = None,
         input: Any = None,
         agent: str | None = None,
         model: str | None = None,
@@ -64,6 +64,8 @@ class AgentContext:
         extra_args: list[str] | None = None,
     ) -> StepResult:
         state = RunState()
+        if output is None:
+            output = {}
         try:
             prepared = self._prepare_step(
                 state=state,
