@@ -22,7 +22,7 @@ from .paths import (
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
-from src.myteam.workflow.default_workflow import run_default_workflow
+from .workflow.default_workflow import run_default_workflow
 from .workflow.engine import run_workflow
 from .workflow.parser import load_workflow
 from .workflow.result_tool import workflow_result as submit_workflow_result
