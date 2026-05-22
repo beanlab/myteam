@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
+from myteam.workflow.models import StepResult
 from myteam.workflow.models import WorkflowRunResult
 
 
@@ -99,6 +101,125 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
 
     assert result.exit_code == 0
     assert seen["path"] == workflow_file
+
+
+def test_start_no_args_uses_root_load_py_prompt(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    root_load = initialized_project / ".myteam" / "load.py"
+    root_load.write_text("print('ROOT PROMPT')\n", encoding="utf-8")
+
+    seen: dict[str, object] = {}
+
+    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+        seen["prompt"] = prompt
+        seen["cwd"] = cwd
+        seen["kwargs"] = kwargs
+        return StepResult(status="completed")
+
+    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+
+    result = run_myteam_inprocess(initialized_project, "start")
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert seen["prompt"] == "ROOT PROMPT\n"
+    assert seen["cwd"] == initialized_project / ".myteam"
+
+
+def test_start_and_get_role_share_loader_capture_helper(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    seen: dict[str, object] = {"calls": 0}
+
+    def fake_run_load_py(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path):
+        seen["calls"] = int(seen["calls"]) + 1
+        seen.setdefault("args", []).append((dir_type, name_dir, name, project_root))
+        return subprocess.CompletedProcess(args=["python"], returncode=0, stdout="SHARED PROMPT\n", stderr="")
+
+    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+        seen["prompt"] = prompt
+        seen["cwd"] = cwd
+        return StepResult(status="completed")
+
+    monkeypatch.setattr("myteam.commands._run_load_py", fake_run_load_py)
+    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+
+    get_result = run_myteam_inprocess(initialized_project, "get", "role")
+    assert get_result.exit_code == 0
+    assert get_result.stdout == "SHARED PROMPT\n"
+
+    start_result = run_myteam_inprocess(initialized_project, "start")
+    assert start_result.exit_code == 0
+
+    assert seen["calls"] == 2
+    assert seen["prompt"] == "SHARED PROMPT\n"
+    assert seen["cwd"] == initialized_project / ".myteam"
+
+
+def test_start_uses_role_load_py_output_as_prompt(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    role_dir = initialized_project / ".myteam" / "developer"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text("Developer role\n", encoding="utf-8")
+    (role_dir / "load.py").write_text("print('ROLE PROMPT')\n", encoding="utf-8")
+
+    seen: dict[str, object] = {}
+
+    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+        seen["prompt"] = prompt
+        seen["cwd"] = cwd
+        return StepResult(status="completed")
+
+    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+
+    result = run_myteam_inprocess(initialized_project, "start", "developer")
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert seen["prompt"] == "ROLE PROMPT\n"
+    assert seen["cwd"] == role_dir
+
+
+def test_start_uses_skill_load_py_output_as_prompt(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    skill_dir = initialized_project / ".myteam" / "python"
+    skill_dir.mkdir()
+    (skill_dir / "skill.md").write_text("Python skill\n", encoding="utf-8")
+    (skill_dir / "load.py").write_text("print('SKILL PROMPT')\n", encoding="utf-8")
+
+    seen: dict[str, object] = {}
+
+    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+        seen["prompt"] = prompt
+        seen["cwd"] = cwd
+        return StepResult(status="completed")
+
+    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+
+    result = run_myteam_inprocess(initialized_project, "start", "python")
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert seen["prompt"] == "SKILL PROMPT\n"
+    assert seen["cwd"] == skill_dir
+
+
+def test_start_fails_when_role_load_py_is_missing(run_myteam_inprocess, initialized_project: Path):
+    role_dir = initialized_project / ".myteam" / "developer"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text("Developer role\n", encoding="utf-8")
+
+    result = run_myteam_inprocess(initialized_project, "start", "developer")
+
+    assert result.exit_code == 1
+    assert "No load.py found for role 'developer'." in result.stderr
+
+
+def test_start_reports_loader_failures(run_myteam, initialized_project: Path):
+    role_dir = initialized_project / ".myteam" / "broken"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text("Broken role\n", encoding="utf-8")
+    (role_dir / "load.py").write_text("raise RuntimeError('load failed')\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "start", "broken")
+
+    assert result.exit_code == 1
+    assert "RuntimeError: load failed" in result.stderr
 
 
 def test_start_runs_python_workflow_file(run_myteam, initialized_project: Path):

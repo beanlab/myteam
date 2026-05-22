@@ -17,11 +17,12 @@ from .paths import (
     agents_root,
     base_dir,
     role_dir,
-    workflow_path,
+    workflow_candidates,
 )
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
+from src.myteam.workflow.default_workflow import run_default_workflow
 from .workflow.engine import run_workflow
 from .workflow.parser import load_workflow
 from .workflow.result_tool import workflow_result as submit_workflow_result
@@ -133,6 +134,24 @@ def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
 
 
 def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path) -> None:
+    try:
+        result = _run_load_py(dir_type, name_dir, name, project_root=project_root)
+    except OSError as exc:
+        print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+    if result.stdout:
+        sys.stdout.write(result.stdout)
+    raise SystemExit(result.returncode)
+
+
+def _run_load_py(
+        dir_type: str,
+        name_dir: Path,
+        name: str | None,
+        *,
+        project_root: Path,
+) -> subprocess.CompletedProcess[str]:
     if not name_dir.exists():
         print(
             f"{dir_type.title()} '{name}' not found. Run 'myteam new {dir_type} {name}' to create it.",
@@ -145,14 +164,16 @@ def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: P
         print(f"No load.py found for {dir_type} '{name}'.", file=sys.stderr)
         raise SystemExit(1)
 
-    try:
-        env = dict(os.environ)
-        env[PROJECT_ROOT_ENV_VAR] = str(project_root)
-        result = subprocess.run([sys.executable, str(load_py)], cwd=name_dir, env=env, check=False)
-        raise SystemExit(result.returncode)
-    except OSError as exc:
-        print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
+    env = dict(os.environ)
+    env[PROJECT_ROOT_ENV_VAR] = str(project_root)
+    return subprocess.run(
+        [sys.executable, str(load_py)],
+        cwd=name_dir,
+        env=env,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+    )
 
 
 def get_role(role: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
@@ -196,49 +217,100 @@ def _run_python_workflow(path: Path, *, project_root: Path) -> int:
     return result.returncode
 
 
-def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
+def _run_start_fallback(prompt: str, *, cwd: Path) -> None:
+    result = run_default_workflow(prompt, cwd=cwd)
+    if result.status == "completed" or result.error_type == "completion_missing":
+        return
+    if result.error_message:
+        print(result.error_message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def _workflow_target(workflow: str, prefix: str) -> Path | None:
+    candidates = workflow_candidates(base_dir(), workflow, prefix)
+    if len(candidates) > 1:
+        matches = ", ".join(str(path) for path in candidates)
+        print(f"Workflow '{workflow}' is ambiguous. Matching files: {matches}", file=sys.stderr)
+        raise SystemExit(1)
+    if candidates:
+        return candidates[0]
+    return None
+
+
+def _load_start_prompt(name_dir: Path, name: str | None, *, dir_type: str, project_root: Path) -> str:
+    result = _run_load_py(dir_type, name_dir, name, project_root=project_root)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    return result.stdout or ""
+
+
+def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
     logger = _log if verbose else (lambda msg: None)
 
-    try:
-        path = workflow_path(base_dir(), workflow, prefix)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Resolved workflow '{workflow}' to {path}")
-
-    if path.suffix == ".py":
-        try:
-            returncode = _run_python_workflow(path, project_root=agents_root(base_dir(), prefix))
-        except OSError as exc:
-            print(f"Failed to execute Python workflow '{workflow}': {exc}", file=sys.stderr)
+    if workflow is None:
+        project_root = agents_root(base_dir(), prefix)
+        load_dir = project_root
+        if not is_role_dir(load_dir):
+            print("Not a role: None", file=sys.stderr)
             raise SystemExit(1)
-        if returncode != 0:
-            raise SystemExit(returncode)
+        prompt = _load_start_prompt(load_dir, None, dir_type="role", project_root=project_root)
+        _run_start_fallback(prompt, cwd=load_dir)
+        logger("Workflow start fallback completed successfully.")
+        return
+
+    path = _workflow_target(workflow, prefix)
+    if path is not None:
+        logger(f"Resolved workflow '{workflow}' to {path}")
+
+        if path.suffix == ".py":
+            try:
+                returncode = _run_python_workflow(path, project_root=agents_root(base_dir(), prefix))
+            except OSError as exc:
+                print(f"Failed to execute Python workflow '{workflow}': {exc}", file=sys.stderr)
+                raise SystemExit(1)
+            if returncode != 0:
+                raise SystemExit(returncode)
+            logger(f"Workflow '{workflow}' completed successfully.")
+            return
+
+        try:
+            workflow_definition = load_workflow(path)
+        except (OSError, ValueError) as exc:
+            print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
+            raise SystemExit(1)
+
+        logger(f"Loaded workflow with {len(workflow_definition)} step(s)")
+
+        result = run_workflow(workflow_definition, logger=logger)
+        if result.status != "completed":
+            failed_step = result.failed_step_name or "<unknown>"
+            if result.error_message:
+                print(
+                    f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
+            raise SystemExit(1)
+
         logger(f"Workflow '{workflow}' completed successfully.")
         return
 
-    try:
-        workflow_definition = load_workflow(path)
-    except (OSError, ValueError) as exc:
-        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
+    project_root = agents_root(base_dir(), prefix)
+    folder = project_root.joinpath(*workflow.split("/"))
+    if is_role_dir(folder):
+        prompt = _load_start_prompt(folder, workflow, dir_type="role", project_root=project_root)
+        _run_start_fallback(prompt, cwd=folder)
+        logger(f"Started role '{workflow}' using fallback agent runner.")
+        return
+    if is_skill_dir(folder):
+        prompt = _load_start_prompt(folder, workflow, dir_type="skill", project_root=project_root)
+        _run_start_fallback(prompt, cwd=folder)
+        logger(f"Started skill '{workflow}' using fallback agent runner.")
+        return
 
-    logger(f"Loaded workflow with {len(workflow_definition)} step(s)")
-
-    result = run_workflow(workflow_definition, logger=logger)
-    if result.status != "completed":
-        failed_step = result.failed_step_name or "<unknown>"
-        if result.error_message:
-            print(
-                f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
-                file=sys.stderr,
-            )
-        else:
-            print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Workflow '{workflow}' completed successfully.")
+    print(f"Workflow '{workflow}' not found.", file=sys.stderr)
+    raise SystemExit(1)
 
 
 def workflow_result(json: str | None = None, text: str | None = None) -> None:
