@@ -109,13 +109,12 @@ def test_start_no_args_uses_root_load_py_prompt(run_myteam_inprocess, initialize
 
     seen: dict[str, object] = {}
 
-    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
-        seen["kwargs"] = kwargs
         return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+    monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
 
     result = run_myteam_inprocess(initialized_project, "start")
 
@@ -133,13 +132,13 @@ def test_start_and_get_role_share_loader_capture_helper(run_myteam_inprocess, in
         seen.setdefault("args", []).append((dir_type, name_dir, name, project_root))
         return subprocess.CompletedProcess(args=["python"], returncode=0, stdout="SHARED PROMPT\n", stderr="")
 
-    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
         return StepResult(status="completed")
 
     monkeypatch.setattr("myteam.commands._run_load_py", fake_run_load_py)
-    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+    monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
 
     get_result = run_myteam_inprocess(initialized_project, "get", "role")
     assert get_result.exit_code == 0
@@ -161,12 +160,12 @@ def test_start_uses_role_load_py_output_as_prompt(run_myteam_inprocess, initiali
 
     seen: dict[str, object] = {}
 
-    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
         return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+    monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
 
     result = run_myteam_inprocess(initialized_project, "start", "developer")
 
@@ -184,12 +183,12 @@ def test_start_uses_skill_load_py_output_as_prompt(run_myteam_inprocess, initial
 
     seen: dict[str, object] = {}
 
-    def fake_run_loaded_prompt(prompt: str, *, cwd: Path, **kwargs):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
         return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.commands.run_loaded_prompt", fake_run_loaded_prompt)
+    monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
 
     result = run_myteam_inprocess(initialized_project, "start", "python")
 
