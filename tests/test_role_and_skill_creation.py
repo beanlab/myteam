@@ -55,7 +55,9 @@ def test_new_workflow_matches_repo_default_template(run_myteam, initialized_proj
 
     assert result.exit_code == 0
     created = (initialized_project / ".myteam" / "agent.py").read_text(encoding="utf-8")
-    expected = (ROOT / ".myteam" / "agent.py").read_text(encoding="utf-8")
+    expected = (ROOT / "src" / "myteam" / "templates" / "workflow_definition_template.py").read_text(
+        encoding="utf-8"
+    ).removesuffix("\n")
     assert created == expected
 
 
