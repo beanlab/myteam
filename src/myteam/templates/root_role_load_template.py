@@ -20,7 +20,7 @@ def main() -> int:
     list_skills(base, myteam, [])
 
     explain_tools()
-    list_tools(base, myteam, [])
+    list_tools(base, myteam.parent, [])
 
     explain_roles()
     list_roles(base, myteam, [])

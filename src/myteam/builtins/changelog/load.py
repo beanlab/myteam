@@ -10,12 +10,13 @@ from myteam.utils import builtin_skill_dir, get_active_myteam_root, list_roles, 
 def main() -> int:
     base = Path(__file__).resolve().parent
     builtin_root = builtin_skill_dir("builtins")
+    display_root = builtin_root.parent
     myteam = get_active_myteam_root(base)
 
     print_instructions(base)
     print_release_notes(myteam)
     list_skills(base, builtin_root, [])
-    list_tools(base, builtin_root, [])
+    list_tools(base, display_root, [])
     list_roles(base, builtin_root, [])
 
     return 0

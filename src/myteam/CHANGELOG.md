@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.2.24
+
+- Fixed role and skill loaders so listed tool paths stay rooted at the project tree, which keeps
+  tool paths executable from the repo root without dropping the `.myteam/` prefix.
+- Added migration instructions for older teams to be automatically updated.
+
 ## 0.2.23
 
 - Fixed child PTY session handling so Codex menus are handled correctly during interactive
@@ -7,8 +13,8 @@
 
 ## 0.2.22
 
-- Clarified the workflow definition template docstring to explain that it is a scaffold
-  for starting an agent with usage and cost tracking.
+- Added new command: `myteam new workflow` creates a generic python workflow file in `.myteam/`
+  from a template that raises `NotImplementedError`.
 
 ## 0.2.21
 

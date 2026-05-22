@@ -28,7 +28,7 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
         "    explain_skills()\n"
         "    list_skills(base, myteam, [])\n"
         "    explain_tools()\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -55,7 +55,7 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
     assert "name: Developer" not in result.stdout
     assert "developer/frontend" in result.stdout
     assert "developer/testing" in result.stdout
-    assert "helper.py" in result.stdout
+    assert ".myteam/developer/helper.py" in result.stdout
 
 
 def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized_project: Path):
@@ -76,7 +76,7 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
         "    myteam = get_myteam_root(base)\n"
         "    list_roles(base, myteam, [])\n"
         "    list_skills(base, myteam, [])\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -96,7 +96,7 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
     assert "Use Python." in result.stdout
     assert "name: Python" not in result.stdout
     assert "python/testing" in result.stdout
-    assert "lint.py" in result.stdout
+    assert ".myteam/python/lint.py" in result.stdout
 
 
 def test_get_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
@@ -190,7 +190,7 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "    explain_skills()\n"
         "    list_skills(base, myteam, [])\n"
         "    explain_tools()\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -211,7 +211,7 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "    myteam = get_myteam_root(base)\n"
         "    list_roles(base, myteam, [])\n"
         "    list_skills(base, myteam, [])\n"
-        "    list_tools(base, myteam, [])\n"
+        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -287,6 +287,17 @@ def test_builtin_migration_skill_reports_pending_migration_notes(run_myteam, ini
     assert "Use the printed migration notes to update older `.myteam` folders" in result.stdout
     assert "Pending migrations for `.myteam` tracked at 0.2.5" in result.stdout
     assert "## 0.2.6 migration" in result.stdout
+
+
+def test_builtin_migration_skill_includes_latest_packaged_migration(run_myteam, initialized_project: Path):
+    (initialized_project / ".myteam" / ".myteam-version").write_text("0.2.23\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "skill", "builtins/migration")
+
+    assert result.exit_code == 0
+    assert "Pending migrations for `.myteam` tracked at 0.2.23" in result.stdout
+    assert "## 0.2.24 migration" in result.stdout
+    assert "tool paths stay rooted at the project tree" in result.stdout
 
 
 def test_builtin_parent_skill_lists_packaged_children(run_myteam, initialized_project: Path):
