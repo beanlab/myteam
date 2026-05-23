@@ -84,6 +84,18 @@ def _mode_silent() -> int:
     return 0
 
 
+def _mode_controlling_tty() -> int:
+    print(f"STDIN_ISATTY:{sys.stdin.isatty()}", flush=True)
+    try:
+        fd = os.open("/dev/tty", os.O_RDWR)
+    except OSError as exc:
+        print(f"DEV_TTY_ERROR:{exc.errno}:{exc.strerror}", flush=True)
+        return 1
+    os.close(fd)
+    print("DEV_TTY_OK", flush=True)
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print("usage: tty_child.py <mode> [args...]", file=sys.stderr)
@@ -100,6 +112,8 @@ def main(argv: list[str]) -> int:
         return _mode_exit_code(argv[2])
     if mode == "silent":
         return _mode_silent()
+    if mode == "controlling_tty":
+        return _mode_controlling_tty()
 
     print(f"unknown mode: {mode}", file=sys.stderr)
     return 2
