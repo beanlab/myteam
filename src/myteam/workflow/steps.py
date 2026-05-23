@@ -22,7 +22,7 @@ from .validation.step_validation import validate_step_execution_args, validate_s
 from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
 
-_UNSET = object()
+_MISSING = object()
 
 class AgentContext:
     def __init__(
@@ -59,16 +59,21 @@ class AgentContext:
         *,
         prompt: str,
         output: dict[str, Any],
-        input: Any = _UNSET,
-        agent: str | None = _UNSET,
-        model: str | None = _UNSET,
-        interactive: Any = _UNSET,
-        session_id: str | None = _UNSET,
-        fork: Any = _UNSET,
-        extra_args: Any = _UNSET,
+        input: Any = None,
+        agent: str | None = None,
+        model: str | None = None,
+        interactive: Any = _MISSING,
+        session_id: str | None = None,
+        fork: Any = _MISSING,
+        extra_args: Any = None,
     ) -> StepResult:
         state = RunState()
         try:
+            if not isinstance(output, dict):
+                raise StepExecutionError(
+                    "argument_validation",
+                    "Step definition is missing required mapping 'output'.",
+                )
             prepared = self._prepare_step(
                 state=state,
                 prompt=prompt,
@@ -318,19 +323,19 @@ class AgentContext:
             if defaults.extra_args is not None:
                 resolved["extra_args"] = list(defaults.extra_args)
 
-        if input is not _UNSET:
+        if input is not None:
             resolved["input"] = input
-        if agent is not _UNSET:
+        if agent is not None:
             resolved["agent"] = agent
-        if model is not _UNSET:
+        if model is not None:
             resolved["model"] = model
-        if interactive is not _UNSET:
+        if interactive is not _MISSING and interactive is not None:
             resolved["interactive"] = interactive
-        if session_id is not _UNSET:
+        if session_id is not None:
             resolved["session_id"] = session_id
-        if fork is not _UNSET:
+        if fork is not _MISSING and fork is not None:
             resolved["fork"] = fork
-        if extra_args is not _UNSET:
+        if extra_args is not None:
             resolved["extra_args"] = extra_args
         return resolved
 
@@ -395,13 +400,13 @@ def run_agent(
     *,
     prompt: str,
     output: dict[str, Any],
-    input: Any = _UNSET,
-    agent: str | None = _UNSET,
-    model: str | None = _UNSET,
-    interactive: Any = _UNSET,
-    session_id: str | None = _UNSET,
-    fork: Any = _UNSET,
-    extra_args: Any = _UNSET,
+    input: Any = None,
+    agent: str | None = None,
+    model: str | None = None,
+    interactive: Any = _MISSING,
+    session_id: str | None = None,
+    fork: Any = _MISSING,
+    extra_args: Any = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
     """
@@ -486,7 +491,7 @@ def _build_step_prompt(
     *,
     resolved_input: Any,
     objective_text: str,
-    output_template: dict[str, Any],
+    output_template: dict[str, Any] | None,
     session_nonce: str | None,
 ) -> str:
     sections = [

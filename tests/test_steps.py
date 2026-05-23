@@ -228,7 +228,7 @@ def test_run_agent_uses_project_defaults(monkeypatch, tmp_path):
     assert seen["cwd"] == tmp_path
 
 
-def test_run_agent_explicit_arguments_override_project_defaults(monkeypatch, tmp_path):
+def test_run_agent_explicit_none_falls_back_to_project_defaults(monkeypatch, tmp_path):
     monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
     config_dir = tmp_path / ".myteam"
     config_dir.mkdir()
@@ -284,14 +284,26 @@ def test_run_agent_explicit_arguments_override_project_defaults(monkeypatch, tmp
     assert seen["build_argv"] == {
         "prompt_text": seen["argv"][-1],
         "interactive": True,
-        "session_id": None,
+        "session_id": "thread-123",
         "fork": False,
         "model": "gpt-4.1",
         "extra_args": ["--dry-run"],
     }
-    assert seen["argv"][0] == "codex"
+    assert seen["argv"][0:3] == ["codex", "resume", "thread-123"]
     assert "--model" in seen["argv"]
     assert "--dry-run" in seen["argv"]
+
+
+def test_run_agent_rejects_none_output(monkeypatch):
+    result = run_agent(
+        agent="codex",
+        prompt="Write a summary.",
+        output=None,  # type: ignore[arg-type]
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step definition is missing required mapping 'output'."
 
 
 def test_agent_context_exit_calls_print_usage(monkeypatch):
