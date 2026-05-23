@@ -8,6 +8,7 @@ from typing import Any
 
 from pyparsing import Literal
 
+from .config import ProjectWorkflowDefaults, load_project_workflow_defaults
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .models import StepResult, UsageInfo, PreparedStep, RunState
@@ -20,6 +21,8 @@ from .usage import (
 from .validation.step_validation import validate_step_execution_args, validate_step_output
 from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
+
+_UNSET = object()
 
 class AgentContext:
     def __init__(
@@ -34,6 +37,7 @@ class AgentContext:
         self.project_root = _resolve_project_root(cwd=self.cwd)
         self.timeout = inactivity_timeout_seconds
         self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
+        self.project_defaults: ProjectWorkflowDefaults | None = load_project_workflow_defaults(self.project_root)
         self.session_context = AgentSessionContext(
             home=Path.home().resolve(),
             project_root=self.project_root,
@@ -48,20 +52,20 @@ class AgentContext:
     def __exit__(self, exc_type, exc, tb) -> None:
         if not self._usage_totals_by_model or self.usage_logging == "none":
             return
-        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
+        self.print_usage()
 
     def run_agent(
         self,
         *,
         prompt: str,
         output: dict[str, Any],
-        input: Any = None,
-        agent: str | None = None,
-        model: str | None = None,
-        interactive: bool = True,
-        session_id: str | None = None,
-        fork: bool = False,
-        extra_args: list[str] | None = None,
+        input: Any = _UNSET,
+        agent: str | None = _UNSET,
+        model: str | None = _UNSET,
+        interactive: Any = _UNSET,
+        session_id: str | None = _UNSET,
+        fork: Any = _UNSET,
+        extra_args: Any = _UNSET,
     ) -> StepResult:
         state = RunState()
         try:
@@ -95,31 +99,41 @@ class AgentContext:
         input: Any,
         agent: str | None,
         model: str | None,
-        interactive: bool,
+        interactive: Any,
         session_id: str | None,
-        fork: bool,
-        extra_args: list[str] | None,
+        fork: Any,
+        extra_args: Any,
     ) -> PreparedStep:
         nonce = str(uuid.uuid4())
         state.nonce = nonce
 
+        resolved_args = self._resolve_run_agent_args(
+            input=input,
+            agent=agent,
+            model=model,
+            interactive=interactive,
+            session_id=session_id,
+            fork=fork,
+            extra_args=extra_args,
+        )
+
         try:
             validate_step_execution_args(
-                agent_name=agent,
-                interactive=interactive,
-                session_id=session_id,
-                fork=fork,
-                extra_args=extra_args,
-                model=model,
+                agent_name=resolved_args["agent"],
+                interactive=resolved_args["interactive"],
+                session_id=resolved_args["session_id"],
+                fork=resolved_args["fork"],
+                extra_args=resolved_args["extra_args"],
+                model=resolved_args["model"],
             )
         except ValueError as exc:
             raise StepExecutionError("argument_validation", str(exc)) from exc
 
-        agent_config = self._resolve_agent_config(agent)
+        agent_config = self._resolve_agent_config(resolved_args["agent"])
         state.agent_config = agent_config
 
         prompt_text = _build_step_prompt(
-            resolved_input=input,
+            resolved_input=resolved_args["input"],
             objective_text=prompt,
             output_template=output_template,
             session_nonce=nonce,
@@ -127,11 +141,11 @@ class AgentContext:
         argv = _build_agent_argv(
             agent_config=agent_config,
             prompt_text=prompt_text,
-            interactive=interactive,
-            session_id=session_id,
-            fork=fork,
-            model=model,
-            extra_args=extra_args,
+            interactive=resolved_args["interactive"],
+            session_id=resolved_args["session_id"],
+            fork=resolved_args["fork"],
+            model=resolved_args["model"],
+            extra_args=resolved_args["extra_args"],
         )
 
         return PreparedStep(
@@ -139,11 +153,11 @@ class AgentContext:
             agent_config=agent_config,
             prompt_text=prompt_text,
             argv=argv,
-            resolved_input=input,
+            resolved_input=resolved_args["input"],
             output_template=output_template,
-            agent_name=agent,
-            session_id=session_id,
-            fork=fork,
+            agent_name=resolved_args["agent"],
+            session_id=resolved_args["session_id"],
+            fork=resolved_args["fork"],
         )
 
     def _run_prepared_step(
@@ -269,6 +283,57 @@ class AgentContext:
         self._agent_configs[agent_name] = config
         return config
 
+    def _resolve_run_agent_args(
+        self,
+        *,
+        input: Any,
+        agent: str | None,
+        model: str | None,
+        interactive: Any,
+        session_id: str | None,
+        fork: Any,
+        extra_args: Any,
+    ) -> dict[str, Any]:
+        resolved: dict[str, Any] = {
+            "input": None,
+            "agent": None,
+            "model": None,
+            "interactive": True,
+            "session_id": None,
+            "fork": False,
+            "extra_args": None,
+        }
+        defaults = self.project_defaults
+        if defaults is not None:
+            if defaults.agent is not None:
+                resolved["agent"] = defaults.agent
+            if defaults.model is not None:
+                resolved["model"] = defaults.model
+            if defaults.interactive is not None:
+                resolved["interactive"] = defaults.interactive
+            if defaults.session_id is not None:
+                resolved["session_id"] = defaults.session_id
+            if defaults.fork is not None:
+                resolved["fork"] = defaults.fork
+            if defaults.extra_args is not None:
+                resolved["extra_args"] = list(defaults.extra_args)
+
+        if input is not _UNSET:
+            resolved["input"] = input
+        if agent is not _UNSET:
+            resolved["agent"] = agent
+        if model is not _UNSET:
+            resolved["model"] = model
+        if interactive is not _UNSET:
+            resolved["interactive"] = interactive
+        if session_id is not _UNSET:
+            resolved["session_id"] = session_id
+        if fork is not _UNSET:
+            resolved["fork"] = fork
+        if extra_args is not _UNSET:
+            resolved["extra_args"] = extra_args
+        return resolved
+
     def _collect_usage_after_failure(
         self,
         *,
@@ -322,18 +387,21 @@ class AgentContext:
             return
         print_usage_summary(" Step Usage ".center(25, "-"), state.usage)
 
+    def print_usage(self) -> None:
+        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
+
 
 def run_agent(
     *,
     prompt: str,
     output: dict[str, Any],
-    input: Any = None,
-    agent: str | None = None,
-    model: str | None = None,
-    interactive: bool = True,
-    session_id: str | None = None,
-    fork: bool = False,
-    extra_args: list[str] | None = None,
+    input: Any = _UNSET,
+    agent: str | None = _UNSET,
+    model: str | None = _UNSET,
+    interactive: Any = _UNSET,
+    session_id: str | None = _UNSET,
+    fork: Any = _UNSET,
+    extra_args: Any = _UNSET,
     cwd: Path | str | None = None,
 ) -> StepResult:
     """
