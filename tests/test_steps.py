@@ -5,8 +5,7 @@ from typing import Any
 
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from myteam.workflow.config import ProjectWorkflowDefaults
-from myteam.workflow.models import StepResult, UsageInfo
+from myteam.workflow.models import ProjectWorkflowDefaults, StepResult, UsageInfo
 from myteam.workflow.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 

@@ -34,6 +34,18 @@ class CompletedStepState(TypedDict, total=False):
 WorkflowOutput = dict[str, CompletedStepState]
 
 
+@dataclass(frozen=True)
+class ProjectWorkflowDefaults:
+    agent: str | None = None
+    model: str | None = None
+    interactive: bool | None = None
+    session_id: str | None = None
+    fork: bool | None = None
+    extra_args: tuple[str, ...] | None = None
+    usage_logging: str | None = None
+    inactivity_timeout_seconds: int | None = None
+
+
 @dataclass
 class RunState:
     transcript: str = ""
