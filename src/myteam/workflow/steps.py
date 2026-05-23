@@ -58,7 +58,7 @@ class AgentContext:
         self,
         *,
         prompt: str,
-        output: dict[str, Any],
+        output: dict[str, Any] | None = None,
         input: Any = None,
         agent: str | None = None,
         model: str | None = None,
@@ -69,15 +69,19 @@ class AgentContext:
     ) -> StepResult:
         state = RunState()
         try:
-            if not isinstance(output, dict):
+            if output is None:
+                output_template: dict[str, Any] = {}
+            elif isinstance(output, dict):
+                output_template = output
+            else:
                 raise StepExecutionError(
                     "argument_validation",
-                    "Step definition is missing required mapping 'output'.",
+                    "Step definition field 'output' must be a mapping when provided.",
                 )
             prepared = self._prepare_step(
                 state=state,
                 prompt=prompt,
-                output_template=output,
+                output_template=output_template,
                 input=input,
                 agent=agent,
                 model=model,
@@ -399,7 +403,7 @@ class AgentContext:
 def run_agent(
     *,
     prompt: str,
-    output: dict[str, Any],
+    output: dict[str, Any] | None = None,
     input: Any = None,
     agent: str | None = None,
     model: str | None = None,
@@ -424,7 +428,7 @@ def run_agent(
         extra_args: Optional additional argv items passed to the agent adapter.
         cwd: Optional working directory for launching the agent process.
     """
-    with AgentContext(cwd=cwd, inactivity_timeout_seconds=300) as ctx:
+    with AgentContext(cwd=cwd) as ctx:
         return ctx.run_agent(
             prompt=prompt,
             output=output,

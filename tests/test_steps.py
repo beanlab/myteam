@@ -294,16 +294,34 @@ def test_run_agent_explicit_none_falls_back_to_project_defaults(monkeypatch, tmp
     assert "--dry-run" in seen["argv"]
 
 
-def test_run_agent_rejects_none_output(monkeypatch):
+def test_run_agent_defaults_missing_output_to_empty_mapping(monkeypatch, tmp_path):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={},
+        )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
     result = run_agent(
+        cwd=tmp_path,
         agent="codex",
         prompt="Write a summary.",
-        output=None,  # type: ignore[arg-type]
+        output=None,
     )
 
-    assert result.status == "failed"
-    assert result.error_type == "argument_validation"
-    assert result.error_message == "Step definition is missing required mapping 'output'."
+    assert result.status == "completed"
+    assert result.output == {}
 
 
 def test_agent_context_exit_calls_print_usage(monkeypatch):
