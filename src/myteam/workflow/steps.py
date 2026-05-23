@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -155,6 +156,7 @@ class AgentContext:
         session_result = run_terminal_session(
             prepared.argv,
             exit_input=prepared.agent_config.exit_sequence,
+            payload_validator=_build_payload_validator(prepared.output_template),
             cwd=self.launch_cwd,
             inactivity_timeout_seconds=self.timeout,
         )
@@ -429,6 +431,7 @@ def _build_step_prompt(
         sections.extend([
             "Return the final workflow result by calling this command:",
             "Replace the placeholder values below with the real final result content.",
+            "If the command reports an output format mismatch, correct the payload and try again.",
             "",
             "myteam workflow-result <<'JSON'",
             json.dumps(output_template, indent=2),
@@ -492,6 +495,19 @@ def _extract_session_id(output_value: Any) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
+
+
+def _build_payload_validator(output_template: dict[str, Any]) -> Callable[[Any], str | None]:
+    expected_output = json.dumps(output_template, indent=2)
+
+    def validate(payload: Any) -> str | None:
+        try:
+            validate_step_output(output_template, payload)
+        except ValueError:
+            return "output format mismatch\nRequired output format:\n" + expected_output
+        return None
+
+    return validate
 
 
 class StepExecutionError(Exception):
