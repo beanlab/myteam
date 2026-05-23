@@ -5,6 +5,7 @@
 - `run_agent(...)` now defaults to arguments configured in `.myteam/.config.yaml` if they aren't
   provided.
 - The `output` argument is also made optional, but doesn't allow for a configured default value.
+  In this case, the agent relies on the user to conclude the step manually.
 
 ## 0.2.24
 
