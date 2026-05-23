@@ -6,9 +6,16 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from . import __version__
-from .disclosure import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
+from .disclosure import (
+    PROJECT_ROOT_ENV_VAR,
+    builtin_skill_dir,
+    is_role_dir,
+    is_skill_dir,
+    load_definition_workflow_settings,
+)
 from .paths import (
     APP_NAME,
     BUILTIN_ROOT_NAME,
@@ -216,8 +223,27 @@ def _run_python_workflow(path: Path, *, project_root: Path) -> int:
     return result.returncode
 
 
-def _run_start_fallback(prompt: str, *, cwd: Path) -> None:
-    result = run_default_workflow(prompt, cwd=cwd)
+def _run_start_fallback(
+        prompt: str,
+        *,
+        cwd: Path,
+        workflow_settings: Any | None = None,
+) -> None:
+    workflow_kwargs: dict[str, Any] = {}
+    if workflow_settings is not None:
+        workflow_kwargs = {
+            "agent": workflow_settings.agent,
+            "model": workflow_settings.model,
+            "input": workflow_settings.input,
+            "output": workflow_settings.output,
+            "interactive": workflow_settings.interactive,
+            "session_id": workflow_settings.session_id,
+            "fork": workflow_settings.fork,
+            "extra_args": list(workflow_settings.extra_args) if workflow_settings.extra_args is not None else None,
+            "usage_logging": workflow_settings.usage_logging,
+            "inactivity_timeout_seconds": workflow_settings.inactivity_timeout_seconds,
+        }
+    result = run_default_workflow(prompt, cwd=cwd, **workflow_kwargs)
     if result.status == "completed" or result.error_type == "completion_missing":
         return
     if result.error_message:
@@ -256,6 +282,47 @@ def _load_start_prompt(name_dir: Path, name: str | None, *, dir_type: str, proje
     return result.stdout or ""
 
 
+def _format_start_prompt(prompt: str, input_value: Any, *, workflow: str, dir_type: str) -> str:
+    if input_value is None:
+        return prompt
+    if not isinstance(input_value, dict):
+        print(
+            f"Workflow settings for {dir_type} '{workflow}' field 'input' must be a mapping to format the prompt.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    try:
+        return prompt.format(**input_value)
+    except (AttributeError, KeyError, IndexError, ValueError) as exc:
+        print(
+            f"Failed to format prompt for {dir_type} '{workflow}' using frontmatter input: {exc}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+
+def _run_named_start_fallback(
+        *,
+        workflow: str,
+        folder: Path,
+        dir_type: str,
+        project_root: Path,
+        logger,
+) -> None:
+    try:
+        workflow_settings = load_definition_workflow_settings(folder, dir_type)
+    except ValueError as exc:
+        print(f"Failed to load workflow settings for {dir_type} '{workflow}': {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+    prompt = _load_start_prompt(folder, workflow, dir_type=dir_type, project_root=project_root)
+    if workflow_settings is not None:
+        prompt = _format_start_prompt(prompt, workflow_settings.input, workflow=workflow, dir_type=dir_type)
+
+    _run_start_fallback(prompt, cwd=folder, workflow_settings=workflow_settings)
+    logger(f"Started {dir_type} '{workflow}' using fallback agent runner.")
+
+
 def _run_python_start_workflow(path: Path, *, workflow: str, project_root: Path) -> None:
     try:
         returncode = _run_python_workflow(path, project_root=project_root)
@@ -287,19 +354,6 @@ def _run_yaml_start_workflow(path: Path, *, workflow: str, logger) -> None:
         raise SystemExit(1)
 
 
-def _run_named_start_fallback(
-        *,
-        workflow: str,
-        folder: Path,
-        dir_type: str,
-        project_root: Path,
-        logger,
-) -> None:
-    prompt = _load_start_prompt(folder, workflow, dir_type=dir_type, project_root=project_root)
-    _run_start_fallback(prompt, cwd=folder)
-    logger(f"Started {dir_type} '{workflow}' using fallback agent runner.")
-
-
 def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
     logger = _log if verbose else (lambda msg: None)
     project_root = agents_root(base_dir(), prefix)
@@ -308,8 +362,16 @@ def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose
         if not is_role_dir(project_root):
             print("Not a role: None", file=sys.stderr)
             raise SystemExit(1)
+        workflow_label = "<root role>"
+        try:
+            workflow_settings = load_definition_workflow_settings(project_root, "role")
+        except ValueError as exc:
+            print(f"Failed to load workflow settings for role '{workflow_label}': {exc}", file=sys.stderr)
+            raise SystemExit(1)
         prompt = _load_start_prompt(project_root, None, dir_type="role", project_root=project_root)
-        _run_start_fallback(prompt, cwd=project_root)
+        if workflow_settings is not None:
+            prompt = _format_start_prompt(prompt, workflow_settings.input, workflow=workflow_label, dir_type="role")
+        _run_start_fallback(prompt, cwd=project_root, workflow_settings=workflow_settings)
         logger("Workflow start fallback completed successfully.")
         return
 

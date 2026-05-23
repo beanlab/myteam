@@ -129,14 +129,11 @@ def test_run_default_workflow_uses_config_file_values(tmp_path: Path, monkeypatc
 
     assert result.status == "completed"
     assert seen["context_kwargs"] == {
-        "usage_logging": "none",
         "cwd": tmp_path,
-        "inactivity_timeout_seconds": 321,
+        "usage_logging": None,
+        "inactivity_timeout_seconds": None,
     }
-    assert seen["run_agent_kwargs"]["agent"] == "pi"
-    assert seen["run_agent_kwargs"]["model"] == "gpt-5.5"
-    assert seen["run_agent_kwargs"]["prompt"] == "Say 'Ready'"
-    assert seen["run_agent_kwargs"]["output"] == {}
+    assert seen["run_agent_kwargs"] == {"prompt": "Say 'Ready'"}
 
 
 def test_run_default_workflow_explicit_arguments_override_config(tmp_path: Path, monkeypatch):
@@ -170,8 +167,15 @@ def test_run_default_workflow_explicit_arguments_override_config(tmp_path: Path,
         cwd=tmp_path,
         agent="codex",
         model="gpt-5.4-mini",
+        usage_logging="verbose",
+        inactivity_timeout_seconds=77,
     )
 
     assert result.status == "completed"
+    assert seen["context_kwargs"] == {
+        "cwd": tmp_path,
+        "usage_logging": "verbose",
+        "inactivity_timeout_seconds": 77,
+    }
     assert seen["run_agent_kwargs"]["agent"] == "codex"
     assert seen["run_agent_kwargs"]["model"] == "gpt-5.4-mini"

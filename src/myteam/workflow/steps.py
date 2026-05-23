@@ -28,16 +28,28 @@ class AgentContext:
     def __init__(
         self,
         *,
-        usage_logging: Literal["none","summary","per_model","verbose"] = "summary",
+        usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None,
         cwd: Path | str | None = None,
-        inactivity_timeout_seconds: int = 300,
+        inactivity_timeout_seconds: int | None = None,
     ) -> None:
-        self.usage_logging = usage_logging
         self.cwd = None if cwd is None else Path(cwd).resolve()
         self.project_root = _resolve_project_root(cwd=self.cwd)
-        self.timeout = inactivity_timeout_seconds
-        self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
         self.project_defaults: ProjectWorkflowDefaults | None = load_project_workflow_defaults(self.project_root)
+        self.usage_logging = (
+            usage_logging
+            if usage_logging is not None
+            else (self.project_defaults.usage_logging if self.project_defaults and self.project_defaults.usage_logging is not None else "summary")
+        )
+        self.timeout = (
+            inactivity_timeout_seconds
+            if inactivity_timeout_seconds is not None
+            else (
+                self.project_defaults.inactivity_timeout_seconds
+                if self.project_defaults and self.project_defaults.inactivity_timeout_seconds is not None
+                else 300
+            )
+        )
+        self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
         self.session_context = AgentSessionContext(
             home=Path.home().resolve(),
             project_root=self.project_root,

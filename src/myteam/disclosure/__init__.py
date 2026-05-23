@@ -2,14 +2,29 @@ from __future__ import annotations
 
 import os
 import subprocess
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import yaml
 
 from ..paths import BUILTIN_ROOT_NAME, builtin_agents_root
 from ..templates import get_template
+
+
+@dataclass(frozen=True)
+class WorkflowStepSettings:
+    agent: str | None = None
+    model: str | None = None
+    input: Any | None = None
+    output: dict[str, Any] | None = None
+    interactive: bool | None = None
+    session_id: str | None = None
+    fork: bool | None = None
+    extra_args: tuple[str, ...] | None = None
+    usage_logging: str | None = None
+    inactivity_timeout_seconds: int | None = None
 
 PROJECT_ROOT_ENV_VAR = "MYTEAM_PROJECT_ROOT"
 
@@ -113,6 +128,169 @@ def _parse_yaml_frontmatter_text(text: str) -> dict[str, str]:
             continue
         data[str(key).lower()] = str(value)
     return data
+
+
+def _parse_yaml_frontmatter_text_raw(text: str, *, source_path: Path) -> dict[str, Any] | None:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    if end is None:
+        raise ValueError(f"Workflow definition file {source_path} has malformed YAML frontmatter.")
+
+    frontmatter = "\n".join(lines[1:end])
+    try:
+        loaded = yaml.safe_load(frontmatter)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Workflow definition file {source_path} has malformed YAML frontmatter: {exc}") from exc
+
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, dict):
+        raise ValueError(f"Workflow definition file {source_path} frontmatter must be a mapping.")
+    return loaded
+
+
+def _load_optional_string(loaded: dict[str, Any], key: str, *, source_path: Path) -> str | None:
+    value = loaded.get(key)
+    if value is None:
+        return None
+    if isinstance(value, str) and value:
+        return value
+    raise ValueError(
+        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a non-empty string."
+    )
+
+
+def _load_optional_bool(loaded: dict[str, Any], key: str, *, source_path: Path) -> bool | None:
+    value = loaded.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    raise ValueError(
+        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a boolean."
+    )
+
+
+def _load_optional_string_list(loaded: dict[str, Any], key: str, *, source_path: Path) -> tuple[str, ...] | None:
+    value = loaded.get(key)
+    if value is None:
+        return None
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return tuple(value)
+    raise ValueError(
+        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a list of strings."
+    )
+
+
+def _load_optional_usage_logging(loaded: dict[str, Any], *, source_path: Path) -> str | None:
+    value = loaded.get("usage_logging")
+    if value is None:
+        return None
+    if value in {"none", "summary", "per_model", "verbose"}:
+        return value
+    raise ValueError(
+        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.usage_logging' must be one of: "
+        "none, summary, per_model, verbose."
+    )
+
+
+def _load_optional_positive_int(loaded: dict[str, Any], key: str, *, source_path: Path) -> int | None:
+    value = loaded.get(key)
+    if value is None:
+        return None
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    raise ValueError(
+        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a positive integer."
+    )
+
+
+def _validate_workflow_settings(
+    loaded: dict[str, Any],
+    *,
+    source_path: Path,
+) -> WorkflowStepSettings:
+    allowed_keys = {
+        "agent",
+        "model",
+        "input",
+        "output",
+        "interactive",
+        "session_id",
+        "fork",
+        "extra_args",
+        "usage_logging",
+        "inactivity_timeout_seconds",
+    }
+    unknown_keys = sorted(set(loaded) - allowed_keys)
+    if unknown_keys:
+        joined = ", ".join(unknown_keys)
+        raise ValueError(
+            f"Workflow definition file {source_path} frontmatter contains unknown workflow-settings keys: {joined}"
+        )
+
+    input_value = loaded.get("input")
+    output_value = loaded.get("output")
+    if output_value is not None and not isinstance(output_value, dict):
+        raise ValueError(
+            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.output' must be a mapping."
+        )
+
+    if input_value is not None and not isinstance(input_value, dict):
+        raise ValueError(
+            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.input' must be a mapping."
+        )
+
+    fork = _load_optional_bool(loaded, "fork", source_path=source_path)
+    session_id = _load_optional_string(loaded, "session_id", source_path=source_path)
+    if fork and session_id is None:
+        raise ValueError(
+            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.session_id' is required when 'fork' is true."
+        )
+
+    return WorkflowStepSettings(
+        agent=_load_optional_string(loaded, "agent", source_path=source_path),
+        model=_load_optional_string(loaded, "model", source_path=source_path),
+        input=input_value,
+        output=output_value,
+        interactive=_load_optional_bool(loaded, "interactive", source_path=source_path),
+        session_id=session_id,
+        fork=fork,
+        extra_args=_load_optional_string_list(loaded, "extra_args", source_path=source_path),
+        usage_logging=_load_optional_usage_logging(loaded, source_path=source_path),
+        inactivity_timeout_seconds=_load_optional_positive_int(
+            loaded,
+            "inactivity_timeout_seconds",
+            source_path=source_path,
+        ),
+    )
+
+
+def load_definition_workflow_settings(folder: Path, definition_stem: str) -> WorkflowStepSettings | None:
+    definition_file = _get_definition_file(folder, definition_stem)
+    if definition_file is None:
+        return None
+
+    frontmatter = _parse_yaml_frontmatter_text_raw(definition_file.read_text(encoding="utf-8"), source_path=definition_file)
+    if not frontmatter:
+        return None
+
+    workflow_settings = frontmatter.get("workflow-settings")
+    if workflow_settings is None:
+        return None
+    if not isinstance(workflow_settings, dict):
+        raise ValueError(
+            f"Workflow definition file {definition_file} frontmatter field 'workflow-settings' must be a mapping."
+        )
+
+    return _validate_workflow_settings(workflow_settings, source_path=definition_file)
 
 
 def _format_frontmatter_info(frontmatter: dict[str, str]) -> str:

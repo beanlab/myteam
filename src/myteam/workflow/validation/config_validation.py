@@ -31,7 +31,7 @@ def validate_project_workflow_defaults(
     defaults = loaded.get("workflow_agent_defaults")
     if not isinstance(defaults, dict):
         raise ValueError(
-            f"Workflow project config at {config_path} field 'workflow_agent_defaults' must be a mapping."
+            f"Workflow project config at {config_path} must define workflow defaults under 'workflow_agent_defaults'."
         )
 
     unknown_keys = sorted(set(defaults) - _ALLOWED_KEYS)

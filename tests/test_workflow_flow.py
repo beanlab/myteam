@@ -109,9 +109,10 @@ def test_start_no_args_uses_root_load_py_prompt(run_myteam_inprocess, initialize
 
     seen: dict[str, object] = {}
 
-    def fake_run_start_fallback(prompt: str, *, cwd: Path):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path, workflow_settings):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
+        seen["workflow_settings"] = workflow_settings
         return StepResult(status="completed")
 
     monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
@@ -122,6 +123,7 @@ def test_start_no_args_uses_root_load_py_prompt(run_myteam_inprocess, initialize
     assert result.stdout == ""
     assert seen["prompt"] == "ROOT PROMPT\n"
     assert seen["cwd"] == initialized_project / ".myteam"
+    assert seen["workflow_settings"] is None
 
 
 def test_start_and_get_role_share_loader_capture_helper(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -132,9 +134,10 @@ def test_start_and_get_role_share_loader_capture_helper(run_myteam_inprocess, in
         seen.setdefault("args", []).append((dir_type, name_dir, name, project_root))
         return subprocess.CompletedProcess(args=["python"], returncode=0, stdout="SHARED PROMPT\n", stderr="")
 
-    def fake_run_start_fallback(prompt: str, *, cwd: Path):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path, workflow_settings):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
+        seen["workflow_settings"] = workflow_settings
         return StepResult(status="completed")
 
     monkeypatch.setattr("myteam.commands._run_load_py", fake_run_load_py)
@@ -160,9 +163,10 @@ def test_start_uses_role_load_py_output_as_prompt(run_myteam_inprocess, initiali
 
     seen: dict[str, object] = {}
 
-    def fake_run_start_fallback(prompt: str, *, cwd: Path):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path, workflow_settings):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
+        seen["workflow_settings"] = workflow_settings
         return StepResult(status="completed")
 
     monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
@@ -173,6 +177,7 @@ def test_start_uses_role_load_py_output_as_prompt(run_myteam_inprocess, initiali
     assert result.stdout == ""
     assert seen["prompt"] == "ROLE PROMPT\n"
     assert seen["cwd"] == role_dir
+    assert seen["workflow_settings"] is None
 
 
 def test_start_uses_skill_load_py_output_as_prompt(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -183,9 +188,10 @@ def test_start_uses_skill_load_py_output_as_prompt(run_myteam_inprocess, initial
 
     seen: dict[str, object] = {}
 
-    def fake_run_start_fallback(prompt: str, *, cwd: Path):
+    def fake_run_start_fallback(prompt: str, *, cwd: Path, workflow_settings):
         seen["prompt"] = prompt
         seen["cwd"] = cwd
+        seen["workflow_settings"] = workflow_settings
         return StepResult(status="completed")
 
     monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
@@ -196,6 +202,83 @@ def test_start_uses_skill_load_py_output_as_prompt(run_myteam_inprocess, initial
     assert result.stdout == ""
     assert seen["prompt"] == "SKILL PROMPT\n"
     assert seen["cwd"] == skill_dir
+    assert seen["workflow_settings"] is None
+
+
+def test_start_uses_role_frontmatter_workflow_settings(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    role_dir = initialized_project / ".myteam" / "review"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
+        "---\n"
+        "name: Review role\n"
+        "workflow-settings:\n"
+        "  agent: pi\n"
+        "  input:\n"
+        "    file: the file to review\n"
+        "  output:\n"
+        "    findings: list of findings\n"
+        "  interactive: false\n"
+        "  fork: false\n"
+        "  usage_logging: verbose\n"
+        "  inactivity_timeout_seconds: 900\n"
+        "---\n\n"
+        "Review {file}.\n",
+        encoding="utf-8",
+    )
+    (role_dir / "load.py").write_text("print('PROMPT BODY')\n", encoding="utf-8")
+
+    seen: dict[str, object] = {}
+
+    def fake_run_start_fallback(prompt: str, *, cwd: Path, workflow_settings):
+        seen["prompt"] = prompt
+        seen["cwd"] = cwd
+        seen["workflow_settings"] = workflow_settings
+        return StepResult(status="completed")
+
+    monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
+
+    result = run_myteam_inprocess(initialized_project, "start", "review")
+
+    assert result.exit_code == 0
+    assert seen["prompt"] == "PROMPT BODY\n"
+    assert seen["cwd"] == role_dir
+    assert seen["workflow_settings"].agent == "pi"
+    assert seen["workflow_settings"].input == {"file": "the file to review"}
+    assert seen["workflow_settings"].output == {"findings": "list of findings"}
+    assert seen["workflow_settings"].interactive is False
+    assert seen["workflow_settings"].fork is False
+    assert seen["workflow_settings"].usage_logging == "verbose"
+    assert seen["workflow_settings"].inactivity_timeout_seconds == 900
+
+
+def test_start_formats_prompt_from_frontmatter_input(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    role_dir = initialized_project / ".myteam" / "formatter"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
+        "---\n"
+        "workflow-settings:\n"
+        "  input:\n"
+        "    file: review-notes.md\n"
+        "---\n\n"
+        "Please review {file}.\n",
+        encoding="utf-8",
+    )
+    (role_dir / "load.py").write_text("print('Review {file}.')\n", encoding="utf-8")
+
+    seen: dict[str, object] = {}
+
+    def fake_run_start_fallback(prompt: str, *, cwd: Path, workflow_settings):
+        seen["prompt"] = prompt
+        seen["workflow_settings"] = workflow_settings
+        return StepResult(status="completed")
+
+    monkeypatch.setattr("myteam.commands._run_start_fallback", fake_run_start_fallback)
+
+    result = run_myteam_inprocess(initialized_project, "start", "formatter")
+
+    assert result.exit_code == 0
+    assert seen["prompt"] == "Review review-notes.md.\n"
+    assert seen["workflow_settings"].input == {"file": "review-notes.md"}
 
 
 def test_start_fails_when_role_load_py_is_missing(run_myteam_inprocess, initialized_project: Path):
@@ -219,6 +302,25 @@ def test_start_reports_loader_failures(run_myteam, initialized_project: Path):
 
     assert result.exit_code == 1
     assert "RuntimeError: load failed" in result.stderr
+
+
+def test_start_fails_on_malformed_frontmatter(run_myteam_inprocess, initialized_project: Path):
+    role_dir = initialized_project / ".myteam" / "malformed"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
+        "---\n"
+        "workflow-settings:\n"
+        "  input: [unterminated\n"
+        "---\n\n"
+        "Prompt body.\n",
+        encoding="utf-8",
+    )
+    (role_dir / "load.py").write_text("print('PROMPT BODY')\n", encoding="utf-8")
+
+    result = run_myteam_inprocess(initialized_project, "start", "malformed")
+
+    assert result.exit_code == 1
+    assert "Failed to load workflow settings for role 'malformed'" in result.stderr
 
 
 def test_start_runs_python_workflow_file(run_myteam, initialized_project: Path):
