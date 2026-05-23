@@ -228,6 +228,7 @@ def _run_start_fallback(
         *,
         cwd: Path,
         workflow_settings: Any | None = None,
+        input: Any = None,
 ) -> None:
     workflow_kwargs: dict[str, Any] = {}
     if workflow_settings is not None:
@@ -243,6 +244,8 @@ def _run_start_fallback(
             "usage_logging": workflow_settings.usage_logging,
             "inactivity_timeout_seconds": workflow_settings.inactivity_timeout_seconds,
         }
+    if input is not None:
+        workflow_kwargs["input"] = input
     result = run_default_workflow(prompt, cwd=cwd, **workflow_kwargs)
     if result.status == "completed" or result.error_type == "completion_missing":
         return
@@ -287,7 +290,7 @@ def _format_start_prompt(prompt: str, input_value: Any, *, workflow: str, dir_ty
         return prompt
     if not isinstance(input_value, dict):
         print(
-            f"Workflow settings for {dir_type} '{workflow}' field 'input' must be a mapping to format the prompt.",
+            f"Input for {dir_type} '{workflow}' must be a mapping to format the prompt.",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -295,10 +298,50 @@ def _format_start_prompt(prompt: str, input_value: Any, *, workflow: str, dir_ty
         return prompt.format(**input_value)
     except (AttributeError, KeyError, IndexError, ValueError) as exc:
         print(
-            f"Failed to format prompt for {dir_type} '{workflow}' using frontmatter input: {exc}",
+            f"Failed to format prompt for {dir_type} '{workflow}' using input values: {exc}",
             file=sys.stderr,
         )
         raise SystemExit(1)
+
+
+def _format_required_input(required_input: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for key, description in required_input.items():
+        if isinstance(description, str) and description.strip():
+            parts.append(f"{key} ({description.strip()})")
+        else:
+            parts.append(str(key))
+    return ", ".join(parts)
+
+
+def _validate_start_input(
+        required_input: dict[str, Any] | None,
+        input_value: Any,
+        *,
+        workflow: str,
+        dir_type: str,
+) -> Any:
+    if required_input is None:
+        return input_value
+
+    if not isinstance(input_value, dict):
+        required = _format_required_input(required_input)
+        print(
+            f"Workflow settings for {dir_type} '{workflow}' missing required input values: {required}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    missing = [key for key in required_input if key not in input_value]
+    if missing:
+        missing_formatted = _format_required_input({key: required_input[key] for key in missing})
+        print(
+            f"Workflow settings for {dir_type} '{workflow}' missing required input values: {missing_formatted}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    return input_value
 
 
 def _run_named_start_fallback(
@@ -307,6 +350,7 @@ def _run_named_start_fallback(
         folder: Path,
         dir_type: str,
         project_root: Path,
+        input: Any = None,
         logger,
 ) -> None:
     try:
@@ -316,10 +360,16 @@ def _run_named_start_fallback(
         raise SystemExit(1)
 
     prompt = _load_start_prompt(folder, workflow, dir_type=dir_type, project_root=project_root)
-    if workflow_settings is not None:
-        prompt = _format_start_prompt(prompt, workflow_settings.input, workflow=workflow, dir_type=dir_type)
+    start_input = _validate_start_input(
+        workflow_settings.input if workflow_settings is not None else None,
+        input,
+        workflow=workflow,
+        dir_type=dir_type,
+    )
+    if isinstance(start_input, dict):
+        prompt = _format_start_prompt(prompt, start_input, workflow=workflow, dir_type=dir_type)
 
-    _run_start_fallback(prompt, cwd=folder, workflow_settings=workflow_settings)
+    _run_start_fallback(prompt, cwd=folder, workflow_settings=workflow_settings, input=start_input)
     logger(f"Started {dir_type} '{workflow}' using fallback agent runner.")
 
 
@@ -354,7 +404,12 @@ def _run_yaml_start_workflow(path: Path, *, workflow: str, logger) -> None:
         raise SystemExit(1)
 
 
-def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
+def start(
+        workflow: str | None = None,
+        prefix: str = DEFAULT_LOCAL_ROOT,
+        verbose: bool = False,
+        input: Any = None,
+) -> None:
     logger = _log if verbose else (lambda msg: None)
     project_root = agents_root(base_dir(), prefix)
 
@@ -369,9 +424,15 @@ def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose
             print(f"Failed to load workflow settings for role '{workflow_label}': {exc}", file=sys.stderr)
             raise SystemExit(1)
         prompt = _load_start_prompt(project_root, None, dir_type="role", project_root=project_root)
-        if workflow_settings is not None:
-            prompt = _format_start_prompt(prompt, workflow_settings.input, workflow=workflow_label, dir_type="role")
-        _run_start_fallback(prompt, cwd=project_root, workflow_settings=workflow_settings)
+        start_input = _validate_start_input(
+            workflow_settings.input if workflow_settings is not None else None,
+            input,
+            workflow=workflow_label,
+            dir_type="role",
+        )
+        if isinstance(start_input, dict):
+            prompt = _format_start_prompt(prompt, start_input, workflow=workflow_label, dir_type="role")
+        _run_start_fallback(prompt, cwd=project_root, workflow_settings=workflow_settings, input=start_input)
         logger("Workflow start fallback completed successfully.")
         return
 
@@ -394,6 +455,7 @@ def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose
                 folder=folder,
                 dir_type="role",
                 project_root=project_root,
+                input=input,
                 logger=logger,
         )
         return
@@ -403,6 +465,7 @@ def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose
                 folder=folder,
                 dir_type="skill",
                 project_root=project_root,
+                input=input,
                 logger=logger,
         )
         return

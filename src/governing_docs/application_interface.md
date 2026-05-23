@@ -222,7 +222,7 @@ Failure conditions that matter at the interface:
 - If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
 - If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
 
-### `myteam start <path> [--prefix <path>] [--verbose]`
+### `myteam start <path> [--prefix <path>] [--verbose] [--input <mapping>]`
 
 Executes a workflow definition from the selected local tree.
 
@@ -233,6 +233,8 @@ Inputs:
 - The command accepts any standard YAML workflow file extension for the resolved file, including
   `.yaml` and `.yml`, plus Python workflow files ending in `.py`.
 - `--verbose` enables workflow lifecycle logging on standard error.
+- `--input` supplies structured caller input for role/skill fallback execution when the selected
+  role or skill declares required frontmatter input keys.
 
 Expected outcome on success:
 
@@ -240,6 +242,8 @@ Expected outcome on success:
 - For YAML workflows, loads and validates the authored workflow definition and executes the
   workflow's steps in order.
 - For Python workflows, executes the workflow file as a separate Python process.
+- For role and skill fallback execution, loads the target `load.py` as the prompt source and
+  validates any required frontmatter input keys before formatting the prompt body.
 - Supplies each configured workflow agent with the authored step prompt when the step session starts.
 - Allows later steps to reference completed state from earlier steps.
 - Returns success only after all workflow steps complete in order.
