@@ -173,14 +173,15 @@ def test_run_agent_uses_project_defaults(monkeypatch, tmp_path):
     config_dir = tmp_path / ".myteam"
     config_dir.mkdir()
     (config_dir / ".config.yaml").write_text(
-        "agent: codex\n"
-        "model: gpt-5.4\n"
-        "interactive: false\n"
-        "session_id: thread-123\n"
-        "fork: false\n"
-        "extra_args:\n"
-        "  - --exec\n"
-        "  - pytest -q\n",
+        "workflow_agent_defaults:\n"
+        "  agent: codex\n"
+        "  model: gpt-5.4\n"
+        "  interactive: false\n"
+        "  session_id: thread-123\n"
+        "  fork: false\n"
+        "  extra_args:\n"
+        "    - --exec\n"
+        "    - pytest -q\n",
         encoding="utf-8",
     )
 
@@ -233,14 +234,15 @@ def test_run_agent_explicit_none_falls_back_to_project_defaults(monkeypatch, tmp
     config_dir = tmp_path / ".myteam"
     config_dir.mkdir()
     (config_dir / ".config.yaml").write_text(
-        "agent: codex\n"
-        "model: gpt-5.4\n"
-        "interactive: false\n"
-        "session_id: thread-123\n"
-        "fork: true\n"
-        "extra_args:\n"
-        "  - --exec\n"
-        "  - pytest -q\n",
+        "workflow_agent_defaults:\n"
+        "  agent: codex\n"
+        "  model: gpt-5.4\n"
+        "  interactive: false\n"
+        "  session_id: thread-123\n"
+        "  fork: true\n"
+        "  extra_args:\n"
+        "    - --exec\n"
+        "    - pytest -q\n",
         encoding="utf-8",
     )
 

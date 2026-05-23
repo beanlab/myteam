@@ -18,14 +18,15 @@ def test_load_project_workflow_defaults_parses_valid_yaml(tmp_path: Path):
     config_dir = tmp_path / ".myteam"
     config_dir.mkdir()
     (config_dir / ".config.yaml").write_text(
-        "agent: codex\n"
-        "model: gpt-5.4\n"
-        "interactive: false\n"
-        "session_id: thread-123\n"
-        "fork: true\n"
-        "extra_args:\n"
-        "  - --exec\n"
-        "  - pytest -q\n",
+        "workflow_agent_defaults:\n"
+        "  agent: codex\n"
+        "  model: gpt-5.4\n"
+        "  interactive: false\n"
+        "  session_id: thread-123\n"
+        "  fork: true\n"
+        "  extra_args:\n"
+        "    - --exec\n"
+        "    - pytest -q\n",
         encoding="utf-8",
     )
 
@@ -39,6 +40,34 @@ def test_load_project_workflow_defaults_parses_valid_yaml(tmp_path: Path):
         fork=True,
         extra_args=("--exec", "pytest -q"),
     )
+
+
+def test_load_project_workflow_defaults_rejects_bare_defaults_at_root(tmp_path: Path):
+    config_dir = tmp_path / ".myteam"
+    config_dir.mkdir()
+    (config_dir / ".config.yaml").write_text(
+        "agent: codex\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="workflow defaults under 'workflow_agent_defaults'"):
+        load_project_workflow_defaults(tmp_path)
+
+
+def test_load_project_workflow_defaults_allows_future_top_level_sections(tmp_path: Path):
+    config_dir = tmp_path / ".myteam"
+    config_dir.mkdir()
+    (config_dir / ".config.yaml").write_text(
+        "future_section:\n"
+        "  enabled: true\n"
+        "workflow_agent_defaults:\n"
+        "  agent: codex\n",
+        encoding="utf-8",
+    )
+
+    defaults = load_project_workflow_defaults(tmp_path)
+
+    assert defaults == ProjectWorkflowDefaults(agent="codex")
 
 
 def test_load_project_workflow_defaults_rejects_malformed_yaml(tmp_path: Path):

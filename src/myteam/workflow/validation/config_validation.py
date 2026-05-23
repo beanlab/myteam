@@ -28,34 +28,27 @@ def validate_project_workflow_defaults(
     if not isinstance(loaded, dict):
         raise ValueError(f"Workflow project config at {config_path} must be a mapping.")
 
-    if "workflow_agent_defaults" in loaded:
-        unknown_keys = sorted(set(loaded) - {"workflow_agent_defaults"})
-        if unknown_keys:
-            joined = ", ".join(unknown_keys)
-            raise ValueError(f"Workflow project config at {config_path} contains unknown keys: {joined}")
-        loaded = loaded["workflow_agent_defaults"]
-        if loaded is None:
-            return ProjectWorkflowDefaults()
-        if not isinstance(loaded, dict):
-            raise ValueError(
-                f"Workflow project config at {config_path} field 'workflow_agent_defaults' must be a mapping."
-            )
+    defaults = loaded.get("workflow_agent_defaults")
+    if not isinstance(defaults, dict):
+        raise ValueError(
+            f"Workflow project config at {config_path} field 'workflow_agent_defaults' must be a mapping."
+        )
 
-    unknown_keys = sorted(set(loaded) - _ALLOWED_KEYS)
+    unknown_keys = sorted(set(defaults) - _ALLOWED_KEYS)
     if unknown_keys:
         joined = ", ".join(unknown_keys)
         raise ValueError(f"Workflow project config at {config_path} contains unknown keys: {joined}")
 
     return ProjectWorkflowDefaults(
-        agent=_load_optional_string(loaded, "agent", config_path),
-        model=_load_optional_string(loaded, "model", config_path),
-        interactive=_load_optional_bool(loaded, "interactive", config_path),
-        session_id=_load_optional_string(loaded, "session_id", config_path),
-        fork=_load_optional_bool(loaded, "fork", config_path),
-        extra_args=_load_optional_string_list(loaded, "extra_args", config_path),
-        usage_logging=_load_optional_usage_logging(loaded, config_path),
+        agent=_load_optional_string(defaults, "agent", config_path),
+        model=_load_optional_string(defaults, "model", config_path),
+        interactive=_load_optional_bool(defaults, "interactive", config_path),
+        session_id=_load_optional_string(defaults, "session_id", config_path),
+        fork=_load_optional_bool(defaults, "fork", config_path),
+        extra_args=_load_optional_string_list(defaults, "extra_args", config_path),
+        usage_logging=_load_optional_usage_logging(defaults, config_path),
         inactivity_timeout_seconds=_load_optional_positive_int(
-            loaded,
+            defaults,
             "inactivity_timeout_seconds",
             config_path,
         ),
