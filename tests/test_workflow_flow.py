@@ -284,7 +284,12 @@ def test_start_fails_when_required_frontmatter_input_is_missing(run_myteam_inpro
     result = run_myteam_inprocess(initialized_project, "start", "formatter")
 
     assert result.exit_code == 1
-    assert "missing required input values: file (absolute path to the file to review)." in result.stderr
+    assert "input contract mismatch" in result.stderr
+    assert "Required input shape:" in result.stderr
+    assert "file: absolute path to the file to review" in result.stderr
+    assert "Received: <none>." in result.stderr
+    assert "Missing keys: file (absolute path to the file to review)." in result.stderr
+    assert "Unexpected keys: <none>." in result.stderr
 
 
 def test_start_formats_prompt_from_call_input(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -323,6 +328,35 @@ def test_start_formats_prompt_from_call_input(run_myteam_inprocess, initialized_
     assert seen["prompt"] == "Review review-notes.md.\n"
     assert seen["workflow_settings"].input == {"file": "absolute path to the file to review"}
     assert seen["input"] == {"file": "review-notes.md"}
+
+
+def test_start_reports_input_shape_when_prompt_formatting_fails(run_myteam_inprocess, initialized_project: Path):
+    role_dir = initialized_project / ".myteam" / "formatter"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
+        "---\n"
+        "workflow-settings:\n"
+        "  input:\n"
+        "    file: absolute path to the file to review\n"
+        "---\n\n"
+        "Please review {filepath}.\n",
+        encoding="utf-8",
+    )
+    (role_dir / "load.py").write_text("print('Review {filepath}.')\n", encoding="utf-8")
+
+    result = run_myteam_inprocess(
+        initialized_project,
+        "start",
+        "formatter",
+        "--input",
+        '{"file": "review-notes.md"}',
+    )
+
+    assert result.exit_code == 1
+    assert "provided input does not match the required input shape" in result.stderr
+    assert "Required input shape:" in result.stderr
+    assert "file: absolute path to the file to review" in result.stderr
+    assert "Formatting error: 'filepath'" in result.stderr
 
 
 def test_start_fails_when_role_load_py_is_missing(run_myteam_inprocess, initialized_project: Path):

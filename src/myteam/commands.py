@@ -285,7 +285,14 @@ def _load_start_prompt(name_dir: Path, name: str | None, *, dir_type: str, proje
     return result.stdout or ""
 
 
-def _format_start_prompt(prompt: str, input_value: Any, *, workflow: str, dir_type: str) -> str:
+def _format_start_prompt(
+        prompt: str,
+        input_value: Any,
+        *,
+        workflow: str,
+        dir_type: str,
+        required_input: dict[str, Any] | None = None,
+) -> str:
     if input_value is None:
         return prompt
     if not isinstance(input_value, dict):
@@ -297,8 +304,12 @@ def _format_start_prompt(prompt: str, input_value: Any, *, workflow: str, dir_ty
     try:
         return prompt.format(**input_value)
     except (AttributeError, KeyError, IndexError, ValueError) as exc:
+        required_shape = _format_required_input_shape(required_input if required_input is not None else input_value)
         print(
-            f"Failed to format prompt for {dir_type} '{workflow}' using input values: {exc}",
+            f"Failed to format prompt for {dir_type} '{workflow}' because the provided input does not match "
+            f"the required input shape.\n"
+            f"{required_shape}\n"
+            f"Formatting error: {exc}",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -314,6 +325,16 @@ def _format_required_input(required_input: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
+def _format_required_input_shape(required_input: dict[str, Any]) -> str:
+    lines = ["Required input shape:"]
+    for key, description in required_input.items():
+        if isinstance(description, str) and description.strip():
+            lines.append(f"  {key}: {description.strip()}")
+        else:
+            lines.append(f"  {key}: <required>")
+    return "\n".join(lines)
+
+
 def _validate_start_input(
         required_input: dict[str, Any] | None,
         input_value: Any,
@@ -327,7 +348,11 @@ def _validate_start_input(
     if not isinstance(input_value, dict):
         required = _format_required_input(required_input)
         print(
-            f"Workflow settings for {dir_type} '{workflow}' missing required input values: {required}.",
+            f"Workflow settings for {dir_type} '{workflow}' input contract mismatch.\n"
+            f"{_format_required_input_shape(required_input)}\n"
+            f"Received: <none>.\n"
+            f"Missing keys: {required}.\n"
+            f"Unexpected keys: <none>.",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -336,7 +361,11 @@ def _validate_start_input(
     if missing:
         missing_formatted = _format_required_input({key: required_input[key] for key in missing})
         print(
-            f"Workflow settings for {dir_type} '{workflow}' missing required input values: {missing_formatted}.",
+            f"Workflow settings for {dir_type} '{workflow}' input contract mismatch.\n"
+            f"{_format_required_input_shape(required_input)}\n"
+            f"Received keys: {_format_input_keys(input_value)}.\n"
+            f"Missing keys: {missing_formatted}.\n"
+            f"Unexpected keys: {_format_input_keys({key: input_value[key] for key in input_value if key not in required_input}) or '<none>'}.",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -367,7 +396,13 @@ def _run_named_start_fallback(
         dir_type=dir_type,
     )
     if isinstance(start_input, dict):
-        prompt = _format_start_prompt(prompt, start_input, workflow=workflow, dir_type=dir_type)
+        prompt = _format_start_prompt(
+            prompt,
+            start_input,
+            workflow=workflow,
+            dir_type=dir_type,
+            required_input=workflow_settings.input if workflow_settings is not None else None,
+        )
 
     _run_start_fallback(prompt, cwd=folder, workflow_settings=workflow_settings, input=start_input)
     logger(f"Started {dir_type} '{workflow}' using fallback agent runner.")
@@ -431,7 +466,13 @@ def start(
             dir_type="role",
         )
         if isinstance(start_input, dict):
-            prompt = _format_start_prompt(prompt, start_input, workflow=workflow_label, dir_type="role")
+            prompt = _format_start_prompt(
+                prompt,
+                start_input,
+                workflow=workflow_label,
+                dir_type="role",
+                required_input=workflow_settings.input if workflow_settings is not None else None,
+            )
         _run_start_fallback(prompt, cwd=project_root, workflow_settings=workflow_settings, input=start_input)
         logger("Workflow start fallback completed successfully.")
         return
