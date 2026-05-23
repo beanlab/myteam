@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.2.26
+- Expanded `myteam start` so it can resolve Python workflows, YAML workflows, roles, and skills
+  from the project tree.
+- Added support for starting a role or skill directly from its directory by loading that entry's
+  local `load.py` instructions and running the resulting prompt.
+- Improved start-target handling so the command now works as an entry point for role and skill
+  files, not just Python workflow files.
+
 ## 0.2.25
 
 - `run_agent(...)` now defaults to arguments configured in `.myteam/.config.yaml` if they aren't
