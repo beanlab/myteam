@@ -5,8 +5,9 @@ from typing import Any
 from ..agents import get_agent_config
 from ..models import StepDefinition
 
-_REQUIRED_STEP_KEYS = {"prompt", "output"}
+_REQUIRED_STEP_KEYS = {"prompt"}
 _OPTIONAL_STEP_KEYS = {
+    "output",
     "input",
     "agent",
     "model",
@@ -56,7 +57,7 @@ def validate_step_definition(step_name: str, definition: Any) -> StepDefinition:
         extras = ", ".join(sorted(str(key) for key in extra_keys))
         raise ValueError(f"Workflow step '{step_name}' has unsupported keys: {extras}.")
 
-    missing_keys = [key for key in ("prompt", "output") if key not in definition]
+    missing_keys = [key for key in ("prompt",) if key not in definition]
     if missing_keys:
         missing = ", ".join(missing_keys)
         raise ValueError(f"Workflow step '{step_name}' is missing required keys: {missing}.")
@@ -65,13 +66,13 @@ def validate_step_definition(step_name: str, definition: Any) -> StepDefinition:
     if not isinstance(prompt, str):
         raise ValueError(f"Workflow step '{step_name}' field 'prompt' must be a string.")
 
-    output = definition["output"]
+    output = definition.get("output", {})
     validate_output_template(output, context=f"Workflow step '{step_name}'.output")
 
     validated: StepDefinition = {
         "prompt": prompt,
-        "output": output,
         "input": None,
+        "output": output,
     }
 
     if "input" in definition:

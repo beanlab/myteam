@@ -5,7 +5,7 @@ from typing import Any
 
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from myteam.workflow.models import StepResult, UsageInfo
+from myteam.workflow.models import ProjectWorkflowDefaults, StepResult, UsageInfo
 from myteam.workflow.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 
@@ -19,6 +19,45 @@ def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntime
         model: str | None = None,
         extra_args: list[str] | None = None,
     ) -> list[str]:
+        extras = extra_args or []
+        if model is not None:
+            extras = ["--model", model, *extras]
+        if session_id is not None and fork:
+            return ["codex", "fork", session_id, *extras, prompt_text]
+        if session_id is not None:
+            return ["codex", "resume", session_id, *extras, prompt_text]
+        if not interactive:
+            return ["codex", "exec", *extras, prompt_text]
+        return ["codex", *extras, prompt_text]
+
+    return AgentRuntimeConfig(
+        name="codex",
+        exec="codex",
+        exit_sequence=b"/quit",
+        get_session_info=lambda nonce: (session_id, Path("session.jsonl")),
+        build_argv=build_argv,
+        get_usage_info=lambda session_path: None,
+        source="test",
+    )
+
+
+def recording_agent_config(seen: dict[str, Any], *, session_id: str = "discovered-session") -> AgentRuntimeConfig:
+    def build_argv(
+        prompt_text: str,
+        interactive: bool = True,
+        session_id: str | None = None,
+        fork: bool = False,
+        model: str | None = None,
+        extra_args: list[str] | None = None,
+    ) -> list[str]:
+        seen["build_argv"] = {
+            "prompt_text": prompt_text,
+            "interactive": interactive,
+            "session_id": session_id,
+            "fork": fork,
+            "model": model,
+            "extra_args": extra_args,
+        }
         extras = extra_args or []
         if model is not None:
             extras = ["--model", model, *extras]
@@ -91,9 +130,206 @@ def test_run_agent_wrapper_delegates_through_agent_context(monkeypatch, tmp_path
     }
 
 
+def test_agent_context_loads_project_defaults_once(monkeypatch, tmp_path):
+    seen: dict[str, Any] = {"count": 0}
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+
+    def fake_load_project_workflow_defaults(project_root: Path):
+        seen["count"] += 1
+        seen["project_root"] = project_root
+        return ProjectWorkflowDefaults(agent="codex")
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", fake_load_project_workflow_defaults)
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    with AgentContext(cwd=tmp_path) as ctx:
+        for _ in range(2):
+            result = ctx.run_agent(
+                prompt="Write a summary.",
+                output={"summary": "short summary"},
+            )
+            assert result.status == "completed"
+
+    assert seen["count"] == 1
+    assert seen["project_root"] == tmp_path
+
+
+def test_run_agent_uses_project_defaults(monkeypatch, tmp_path):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    config_dir = tmp_path / ".myteam"
+    config_dir.mkdir()
+    (config_dir / ".config.yaml").write_text(
+        "workflow_agent_defaults:\n"
+        "  agent: codex\n"
+        "  model: gpt-5.4\n"
+        "  interactive: false\n"
+        "  session_id: thread-123\n"
+        "  fork: false\n"
+        "  extra_args:\n"
+        "    - --exec\n"
+        "    - pytest -q\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, Any] = {}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        seen["cwd"] = cwd
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    def fake_resolve_agent_runtime_config(agent_name, **_kwargs):
+        seen["agent_name"] = agent_name
+        return recording_agent_config(seen)
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+
+    result = run_agent(
+        cwd=tmp_path,
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert seen["agent_name"] == "codex"
+    assert seen["build_argv"] == {
+        "prompt_text": seen["argv"][-1],
+        "interactive": False,
+        "session_id": "thread-123",
+        "fork": False,
+        "model": "gpt-5.4",
+        "extra_args": ["--exec", "pytest -q"],
+    }
+    assert seen["argv"][0:4] == ["codex", "resume", "thread-123", "--model"]
+    assert seen["cwd"] == tmp_path
+
+
+def test_run_agent_explicit_none_falls_back_to_project_defaults(monkeypatch, tmp_path):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    config_dir = tmp_path / ".myteam"
+    config_dir.mkdir()
+    (config_dir / ".config.yaml").write_text(
+        "workflow_agent_defaults:\n"
+        "  agent: codex\n"
+        "  model: gpt-5.4\n"
+        "  interactive: false\n"
+        "  session_id: thread-123\n"
+        "  fork: true\n"
+        "  extra_args:\n"
+        "    - --exec\n"
+        "    - pytest -q\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, Any] = {}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"summary": "done"},
+        )
+
+    def fake_resolve_agent_runtime_config(agent_name, **_kwargs):
+        seen["agent_name"] = agent_name
+        return recording_agent_config(seen)
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+
+    result = run_agent(
+        cwd=tmp_path,
+        agent="manual-agent",
+        model="gpt-4.1",
+        interactive=True,
+        session_id=None,
+        fork=False,
+        extra_args=["--dry-run"],
+        prompt="Write a summary.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert seen["agent_name"] == "manual-agent"
+    assert seen["build_argv"] == {
+        "prompt_text": seen["argv"][-1],
+        "interactive": True,
+        "session_id": "thread-123",
+        "fork": False,
+        "model": "gpt-4.1",
+        "extra_args": ["--dry-run"],
+    }
+    assert seen["argv"][0:3] == ["codex", "resume", "thread-123"]
+    assert "--model" in seen["argv"]
+    assert "--dry-run" in seen["argv"]
+
+
+def test_run_agent_defaults_missing_output_to_empty_mapping(monkeypatch, tmp_path):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={},
+        )
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+
+    result = run_agent(
+        cwd=tmp_path,
+        agent="codex",
+        prompt="Write a summary.",
+        output=None,
+    )
+
+    assert result.status == "completed"
+    assert result.output == {}
+
+
 def test_agent_context_exit_calls_print_usage(monkeypatch):
     ctx = AgentContext()
     calls: list[str] = []
+    ctx._usage_totals_by_model["gpt-5"] = UsageInfo(model="gpt-5")
 
     monkeypatch.setattr(ctx, "print_usage", lambda: calls.append("print"))
 
@@ -166,7 +402,7 @@ def test_agent_context_aggregates_usage_across_runs(monkeypatch, capsys):
     monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
     monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
-    with AgentContext() as ctx:
+    with AgentContext(usage_logging="verbose") as ctx:
         for _ in range(3):
             result = ctx.run_agent(
                 agent="codex",
@@ -176,17 +412,17 @@ def test_agent_context_aggregates_usage_across_runs(monkeypatch, capsys):
             assert result.status == "completed"
 
     captured = capsys.readouterr().out
-    assert captured.count("Usage:\n") == 3
-    assert "Usage Summary:" in captured
+    assert captured.count("Step Usage") == 3
     assert captured.count("Model: gpt-5-codex") == 3
     assert captured.count("Model: gpt-5.5") == 2
-    assert "    Input: 3" in captured
-    assert "  Grand Total:" in captured
-    assert "    Input: 6" in captured
-    assert "    Cost: $0.6000" in captured
+    assert "  Input: 3" in captured
+    assert "Total:" in captured
+    assert "  Input: 6" in captured
+    assert "  Cost: $0.6000" in captured
 
 
 def test_run_agent_returns_completed_result(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -356,18 +592,20 @@ def test_run_agent_does_not_print_step_usage_for_summary_logging_on_failure(monk
     assert "Total:" in captured
 
 
-def test_run_agent_requires_explicit_agent():
+def test_run_agent_requires_explicit_agent(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
     result = run_agent(
         prompt="Write a summary.",
         output={"summary": "short summary"},
     )
 
     assert result.status == "failed"
-    assert result.error_type == "agent_resolution"
-    assert result.error_message == "Step definition is missing required field 'agent'."
+    assert result.error_type == "argument_validation"
+    assert result.error_message == "Step definition is missing required string 'agent'."
 
 
 def test_run_agent_preserves_literal_input(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -528,6 +766,7 @@ def test_run_agent_reports_invalid_argv_shape(monkeypatch):
 
 
 def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -562,6 +801,7 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
 
 
 def test_run_agent_forks_session_and_discovers_new_session_id(monkeypatch):
+    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -786,8 +1026,8 @@ def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
     assert result.status == "completed"
     assert result.usage == usage
     assert result.usage_state == "collected"
-    assert "Usage:" in captured
-    assert "Model: gpt-5-codex" in captured
+    assert "Usage Summary" in captured
+    assert "Total:" in captured
     assert "Cost: $0.1234" in captured
 
 
@@ -876,7 +1116,7 @@ def test_run_agent_attempts_usage_lookup_for_timeout(monkeypatch, capsys):
     assert result.error_type == "timeout"
     assert result.usage == usage
     assert result.usage_state == "collected"
-    assert "Usage:" in captured
+    assert "Usage Summary" in captured
 
 
 def test_run_agent_does_not_attempt_usage_lookup_before_launch(monkeypatch):

@@ -37,6 +37,19 @@ def test_load_workflow_accepts_documented_workflow_shape(tmp_path: Path):
     assert workflow["step2"]["output"]["best_haiku"]["haiku"] == "the haiku text"
 
 
+def test_load_workflow_defaults_missing_output_to_empty_mapping(tmp_path: Path):
+    workflow_file = tmp_path / "minimal.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  prompt: hello\n",
+        encoding="utf-8",
+    )
+
+    workflow = load_workflow(workflow_file)
+
+    assert workflow["step1"]["output"] == {}
+
+
 def test_load_workflow_rejects_steps_wrapper(tmp_path: Path):
     workflow_file = tmp_path / "wrapped.yaml"
     workflow_file.write_text(

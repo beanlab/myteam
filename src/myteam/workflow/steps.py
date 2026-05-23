@@ -10,7 +10,8 @@ from pyparsing import Literal
 
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from .models import StepResult, UsageInfo, PreparedStep, RunState
+from .config import load_project_workflow_defaults
+from .models import ProjectWorkflowDefaults, StepResult, UsageInfo, PreparedStep, RunState
 from .usage import (
     print_aggregated_usage_summary,
     print_usage_summary,
@@ -20,6 +21,8 @@ from .usage import (
 from .validation.step_validation import validate_step_execution_args, validate_step_output
 from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
+
+_MISSING = object()
 
 class AgentContext:
     def __init__(
@@ -34,6 +37,7 @@ class AgentContext:
         self.project_root = _resolve_project_root(cwd=self.cwd)
         self.timeout = inactivity_timeout_seconds
         self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
+        self.project_defaults: ProjectWorkflowDefaults | None = load_project_workflow_defaults(self.project_root)
         self.session_context = AgentSessionContext(
             home=Path.home().resolve(),
             project_root=self.project_root,
@@ -48,7 +52,7 @@ class AgentContext:
     def __exit__(self, exc_type, exc, tb) -> None:
         if not self._usage_totals_by_model or self.usage_logging == "none":
             return
-        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
+        self.print_usage()
 
     def run_agent(
         self,
@@ -58,19 +62,28 @@ class AgentContext:
         input: Any = None,
         agent: str | None = None,
         model: str | None = None,
-        interactive: bool = True,
+        interactive: Any = _MISSING,
         session_id: str | None = None,
-        fork: bool = False,
-        extra_args: list[str] | None = None,
+        fork: Any = _MISSING,
+        extra_args: Any = None,
     ) -> StepResult:
         state = RunState()
         if output is None:
             output = {}
         try:
+            if output is None:
+                output_template: dict[str, Any] = {}
+            elif isinstance(output, dict):
+                output_template = output
+            else:
+                raise StepExecutionError(
+                    "argument_validation",
+                    "Step definition field 'output' must be a mapping when provided.",
+                )
             prepared = self._prepare_step(
                 state=state,
                 prompt=prompt,
-                output_template=output,
+                output_template=output_template,
                 input=input,
                 agent=agent,
                 model=model,
@@ -97,31 +110,41 @@ class AgentContext:
         input: Any,
         agent: str | None,
         model: str | None,
-        interactive: bool,
+        interactive: Any,
         session_id: str | None,
-        fork: bool,
-        extra_args: list[str] | None,
+        fork: Any,
+        extra_args: Any,
     ) -> PreparedStep:
         nonce = str(uuid.uuid4())
         state.nonce = nonce
 
+        resolved_args = self._resolve_run_agent_args(
+            input=input,
+            agent=agent,
+            model=model,
+            interactive=interactive,
+            session_id=session_id,
+            fork=fork,
+            extra_args=extra_args,
+        )
+
         try:
             validate_step_execution_args(
-                agent_name=agent,
-                interactive=interactive,
-                session_id=session_id,
-                fork=fork,
-                extra_args=extra_args,
-                model=model,
+                agent_name=resolved_args["agent"],
+                interactive=resolved_args["interactive"],
+                session_id=resolved_args["session_id"],
+                fork=resolved_args["fork"],
+                extra_args=resolved_args["extra_args"],
+                model=resolved_args["model"],
             )
         except ValueError as exc:
             raise StepExecutionError("argument_validation", str(exc)) from exc
 
-        agent_config = self._resolve_agent_config(agent)
+        agent_config = self._resolve_agent_config(resolved_args["agent"])
         state.agent_config = agent_config
 
         prompt_text = _build_step_prompt(
-            resolved_input=input,
+            resolved_input=resolved_args["input"],
             objective_text=prompt,
             output_template=output_template,
             session_nonce=nonce,
@@ -129,11 +152,11 @@ class AgentContext:
         argv = _build_agent_argv(
             agent_config=agent_config,
             prompt_text=prompt_text,
-            interactive=interactive,
-            session_id=session_id,
-            fork=fork,
-            model=model,
-            extra_args=extra_args,
+            interactive=resolved_args["interactive"],
+            session_id=resolved_args["session_id"],
+            fork=resolved_args["fork"],
+            model=resolved_args["model"],
+            extra_args=resolved_args["extra_args"],
         )
 
         return PreparedStep(
@@ -141,11 +164,11 @@ class AgentContext:
             agent_config=agent_config,
             prompt_text=prompt_text,
             argv=argv,
-            resolved_input=input,
+            resolved_input=resolved_args["input"],
             output_template=output_template,
-            agent_name=agent,
-            session_id=session_id,
-            fork=fork,
+            agent_name=resolved_args["agent"],
+            session_id=resolved_args["session_id"],
+            fork=resolved_args["fork"],
         )
 
     def _run_prepared_step(
@@ -271,6 +294,57 @@ class AgentContext:
         self._agent_configs[agent_name] = config
         return config
 
+    def _resolve_run_agent_args(
+        self,
+        *,
+        input: Any,
+        agent: str | None,
+        model: str | None,
+        interactive: Any,
+        session_id: str | None,
+        fork: Any,
+        extra_args: Any,
+    ) -> dict[str, Any]:
+        resolved: dict[str, Any] = {
+            "input": None,
+            "agent": None,
+            "model": None,
+            "interactive": True,
+            "session_id": None,
+            "fork": False,
+            "extra_args": None,
+        }
+        defaults = self.project_defaults
+        if defaults is not None:
+            if defaults.agent is not None:
+                resolved["agent"] = defaults.agent
+            if defaults.model is not None:
+                resolved["model"] = defaults.model
+            if defaults.interactive is not None:
+                resolved["interactive"] = defaults.interactive
+            if defaults.session_id is not None:
+                resolved["session_id"] = defaults.session_id
+            if defaults.fork is not None:
+                resolved["fork"] = defaults.fork
+            if defaults.extra_args is not None:
+                resolved["extra_args"] = list(defaults.extra_args)
+
+        if input is not None:
+            resolved["input"] = input
+        if agent is not None:
+            resolved["agent"] = agent
+        if model is not None:
+            resolved["model"] = model
+        if interactive is not _MISSING and interactive is not None:
+            resolved["interactive"] = interactive
+        if session_id is not None:
+            resolved["session_id"] = session_id
+        if fork is not _MISSING and fork is not None:
+            resolved["fork"] = fork
+        if extra_args is not None:
+            resolved["extra_args"] = extra_args
+        return resolved
+
     def _collect_usage_after_failure(
         self,
         *,
@@ -324,18 +398,21 @@ class AgentContext:
             return
         print_usage_summary(" Step Usage ".center(25, "-"), state.usage)
 
+    def print_usage(self) -> None:
+        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
+
 
 def run_agent(
     *,
     prompt: str,
-    output: dict[str, Any],
+    output: dict[str, Any] | None = None,
     input: Any = None,
     agent: str | None = None,
     model: str | None = None,
-    interactive: bool = True,
+    interactive: Any = _MISSING,
     session_id: str | None = None,
-    fork: bool = False,
-    extra_args: list[str] | None = None,
+    fork: Any = _MISSING,
+    extra_args: Any = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
     """
@@ -353,7 +430,7 @@ def run_agent(
         extra_args: Optional additional argv items passed to the agent adapter.
         cwd: Optional working directory for launching the agent process.
     """
-    with AgentContext(cwd=cwd, inactivity_timeout_seconds=300) as ctx:
+    with AgentContext(cwd=cwd) as ctx:
         return ctx.run_agent(
             prompt=prompt,
             output=output,
@@ -420,7 +497,7 @@ def _build_step_prompt(
     *,
     resolved_input: Any,
     objective_text: str,
-    output_template: dict[str, Any],
+    output_template: dict[str, Any] | None,
     session_nonce: str | None,
 ) -> str:
     sections = [
