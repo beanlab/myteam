@@ -1,12 +1,14 @@
 # Change Log
 
 ## 0.2.26
-- Expanded `myteam start` so it can resolve Python workflows, YAML workflows, roles, and skills
-  from the project tree.
-- Added support for starting a role or skill directly from its directory by loading that entry's
-  local `load.py` instructions and running the resulting prompt.
-- Improved start-target handling so the command now works as an entry point for role and skill
-  files, not just Python workflow files.
+- Expanded `myteam start` so it can resolve roles and skills in addition to Python and YAML 
+  workflows.
+- Added optional workflow settings to the frontmatter of skills and roles.
+  - the `input` field can be used to format the prompt and the values may be passed in using
+    `myteam start <path> --input <dict>`.
+  - the input dictionary must match the formatting defined in the md frontmatter.
+- Starting a workflow from a role or skill passes the `load.py` result into `run_agent` as the
+  prompt.
 
 ## 0.2.25
 

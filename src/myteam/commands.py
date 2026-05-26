@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -230,23 +231,9 @@ def _run_start_fallback(
         workflow_settings: Any | None = None,
         input: Any = None,
 ) -> None:
-    workflow_kwargs: dict[str, Any] = {}
-    if workflow_settings is not None:
-        workflow_kwargs = {
-            "agent": workflow_settings.agent,
-            "model": workflow_settings.model,
-            "input": workflow_settings.input,
-            "output": workflow_settings.output,
-            "interactive": workflow_settings.interactive,
-            "session_id": workflow_settings.session_id,
-            "fork": workflow_settings.fork,
-            "extra_args": list(workflow_settings.extra_args) if workflow_settings.extra_args is not None else None,
-            "usage_logging": workflow_settings.usage_logging,
-            "inactivity_timeout_seconds": workflow_settings.inactivity_timeout_seconds,
-        }
-    if input is not None:
-        workflow_kwargs["input"] = input
-    result = run_default_workflow(prompt, cwd=cwd, **workflow_kwargs)
+    if workflow_settings is not None and input is not None:
+        workflow_settings = replace(workflow_settings, input=input)
+    result = run_default_workflow(prompt, cwd=cwd, workflow_settings=workflow_settings)
     if result.status == "completed" or result.error_type == "completion_missing":
         return
     if result.error_message:
