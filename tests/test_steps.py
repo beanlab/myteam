@@ -6,6 +6,7 @@ from typing import Any
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from myteam.workflow.models import ProjectWorkflowDefaults, StepResult, UsageInfo
+from myteam.workflow.terminal.control_channel import ChildWorkflowRequest
 from myteam.workflow.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 
@@ -1292,3 +1293,136 @@ def test_run_agent_allows_launch_cwd_override(tmp_path, monkeypatch):
         project_root=tmp_path.resolve(),
         launch_cwd=requested_cwd.resolve(),
     )
+
+
+def test_run_agent_runs_child_workflow_then_resumes_parent_session(monkeypatch, tmp_path):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    (tmp_path / ".myteam").mkdir()
+    seen: dict[str, Any] = {"terminal_calls": []}
+
+    def get_session_info(nonce: str):
+        seen["discovery_nonce"] = nonce
+        return "parent-session", Path("session.jsonl")
+
+    config = fake_agent_config(session_id="parent-session")
+    config = AgentRuntimeConfig(
+        name=config.name,
+        exec=config.exec,
+        exit_sequence=config.exit_sequence,
+        get_session_info=get_session_info,
+        build_argv=config.build_argv,
+        get_usage_info=lambda _session_path: None,
+        source=config.source,
+    )
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen["terminal_calls"].append(argv)
+        if len(seen["terminal_calls"]) == 1:
+            return TerminalSessionResult(
+                exit_code=0,
+                transcript="parent before child",
+                payload=None,
+                control_request=ChildWorkflowRequest(
+                    workflow="development",
+                    input={"feature_request": "Build X"},
+                ),
+            )
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="parent after child",
+            payload={"summary": "parent done"},
+        )
+
+    class ChildResult:
+        status = "completed"
+        output = {"answer": "child done"}
+        error_message = None
+        failed_step_name = None
+
+    def fake_run_named_workflow(workflow: str, *, input=None):
+        seen["child"] = (workflow, input)
+        return ChildResult()
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.runner.run_named_workflow", fake_run_named_workflow)
+
+    result = run_agent(
+        agent="codex",
+        cwd=tmp_path,
+        prompt="Finish the parent task.",
+        output={"summary": "short summary"},
+        model="gpt-5.4",
+        extra_args=["--sandbox", "workspace-write"],
+    )
+
+    assert result.status == "completed"
+    assert result.output == {"summary": "parent done"}
+    assert result.session_id == "parent-session"
+    assert seen["discovery_nonce"]
+    assert seen["child"] == ("development", {"feature_request": "Build X"})
+    assert len(seen["terminal_calls"]) == 2
+    resume_argv = seen["terminal_calls"][1]
+    assert resume_argv[:5] == ["codex", "resume", "parent-session", "--model", "gpt-5.4"]
+    assert "--sandbox" in resume_argv
+    resume_prompt = resume_argv[-1]
+    assert "Child workflow completed: development" in resume_prompt
+    assert '"answer": "child done"' in resume_prompt
+    assert "Original objective:\nFinish the parent task." in resume_prompt
+    assert "myteam workflow-result <<'JSON'" in resume_prompt
+
+
+def test_run_agent_resumes_parent_with_child_failure_details(monkeypatch, tmp_path):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    (tmp_path / ".myteam").mkdir()
+    seen: dict[str, Any] = {}
+    config = fake_agent_config(session_id="parent-session")
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+    ) -> TerminalSessionResult:
+        seen.setdefault("prompts", []).append(argv[-1])
+        if len(seen["prompts"]) == 1:
+            return TerminalSessionResult(
+                exit_code=0,
+                transcript="parent before child",
+                payload=None,
+                control_request=ChildWorkflowRequest(workflow="broken"),
+            )
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="parent after child",
+            payload={"summary": "handled failure"},
+        )
+
+    class ChildResult:
+        status = "failed"
+        output = None
+        error_message = "child exploded"
+        failed_step_name = "step1"
+
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.runner.run_named_workflow", lambda *_args, **_kwargs: ChildResult())
+
+    result = run_agent(
+        agent="codex",
+        cwd=tmp_path,
+        prompt="Finish the parent task.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert result.output == {"summary": "handled failure"}
+    assert '"status": "failed"' in seen["prompts"][1]
+    assert "child exploded" in seen["prompts"][1]

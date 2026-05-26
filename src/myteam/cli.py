@@ -5,6 +5,7 @@ import fire
 
 from .commands import (
     changelog,
+    child_workflow,
     download_roster,
     get_role,
     get_skill,
@@ -39,6 +40,7 @@ def main(argv: list[str] | None = None):
         "list": list_available_rosters,
         "start": start,
         "workflow-result": workflow_result,
+        "child-workflow": child_workflow,
         "changelog": changelog,
         "--version": version,
     }

@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from typing import Any
+
+from .terminal.control_channel import submit_child_workflow_request
+
+
+def child_workflow(workflow: str, json: Any | None = None, text: str | None = None) -> None:
+    raise SystemExit(_run_submission(workflow=workflow, json_text=json, text=text))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="myteam child-workflow")
+    parser.add_argument("workflow")
+    parser.add_argument("--json")
+    parser.add_argument("--text")
+    args = parser.parse_args(argv)
+    return _run_submission(workflow=args.workflow, json_text=args.json, text=args.text)
+
+
+def _run_submission(*, workflow: str, json_text: Any | None, text: str | None) -> int:
+    try:
+        payload = _read_payload(json_text=json_text, text=text)
+        submit_child_workflow_request(workflow, payload)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    print("Child workflow request accepted.")
+    return 0
+
+
+def _read_payload(*, json_text: Any | None, text: str | None) -> Any | None:
+    if json_text is not None and text is not None:
+        raise ValueError("Pass only one of --json or --text.")
+    if text is not None:
+        return {"text": text}
+    if json_text is not None:
+        if not isinstance(json_text, (str, bytes, bytearray)):
+            return json_text
+        return json.loads(json_text)
+
+    raw = sys.stdin.read().strip()
+    if not raw:
+        return None
+    return json.loads(raw)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

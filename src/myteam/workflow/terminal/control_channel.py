@@ -1,0 +1,147 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+import os
+import secrets
+import socket
+import tempfile
+import threading
+from pathlib import Path
+from typing import Any
+
+from .result_channel import _read_socket_message
+
+
+CONTROL_SOCKET_ENV = "MYTEAM_CONTROL_SOCKET"
+CONTROL_TOKEN_ENV = "MYTEAM_CONTROL_TOKEN"
+
+
+@dataclass(frozen=True)
+class ChildWorkflowRequest:
+    workflow: str
+    input: Any | None = None
+
+
+class ControlChannel:
+    def __init__(self) -> None:
+        self.socket_path = ""
+        self.token = secrets.token_urlsafe(18)
+        self.request: ChildWorkflowRequest | None = None
+        self.closed = threading.Event()
+        self._request_ready = threading.Event()
+        self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
+        self._server: socket.socket | None = None
+        self._thread: threading.Thread | None = None
+
+    def __enter__(self) -> "ControlChannel":
+        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-workflow-")
+        self.socket_path = str(Path(self._tmpdir.name) / "control.sock")
+        self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self._server.bind(self.socket_path)
+        self._server.listen()
+        self._server.settimeout(0.1)
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, _exc_type, _exc, _tb) -> None:
+        self.closed.set()
+        if self._server is not None:
+            try:
+                self._server.close()
+            except OSError:
+                pass
+        if self._thread is not None:
+            self._thread.join(timeout=1)
+        if self._tmpdir is not None:
+            self._tmpdir.cleanup()
+
+    @property
+    def env(self) -> dict[str, str]:
+        return {
+            CONTROL_SOCKET_ENV: self.socket_path,
+            CONTROL_TOKEN_ENV: self.token,
+        }
+
+    def wait(self, timeout: float | None = None) -> ChildWorkflowRequest | None:
+        if not self._request_ready.wait(timeout):
+            return None
+        return self.request
+
+    def _serve(self) -> None:
+        assert self._server is not None
+        while not self.closed.is_set():
+            try:
+                connection, _ = self._server.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            with connection:
+                response = self._handle_message(_read_socket_message(connection))
+                try:
+                    connection.sendall(json.dumps(response).encode("utf-8") + b"\n")
+                except OSError:
+                    pass
+
+    def _handle_message(self, raw: bytes) -> dict[str, Any]:
+        try:
+            message = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return {"ok": False, "error": "Invalid JSON payload."}
+
+        if not isinstance(message, dict):
+            return {"ok": False, "error": "Control message must be a JSON object."}
+        if message.get("version") != 1 or message.get("kind") != "child_workflow_request":
+            return {"ok": False, "error": "Unsupported control message."}
+        if message.get("token") != self.token:
+            return {"ok": False, "error": "Invalid workflow control token."}
+        workflow = message.get("workflow")
+        if not isinstance(workflow, str) or not workflow:
+            return {"ok": False, "error": "Missing child workflow name."}
+        if self._request_ready.is_set():
+            return {"ok": False, "error": "Child workflow request already recorded."}
+
+        self.request = ChildWorkflowRequest(
+            workflow=workflow,
+            input=message["input"] if "input" in message else None,
+        )
+        self._request_ready.set()
+        return {"ok": True}
+
+
+def submit_child_workflow_request(
+    workflow: str,
+    input: Any | None = None,
+    *,
+    socket_path: str | None = None,
+    token: str | None = None,
+) -> None:
+    resolved_socket = socket_path or os.environ.get(CONTROL_SOCKET_ENV)
+    resolved_token = token or os.environ.get(CONTROL_TOKEN_ENV)
+    if not resolved_socket or not resolved_token:
+        raise ValueError("Missing MYTEAM_CONTROL_SOCKET or MYTEAM_CONTROL_TOKEN.")
+
+    message = {
+        "version": 1,
+        "kind": "child_workflow_request",
+        "token": resolved_token,
+        "workflow": workflow,
+    }
+    if input is not None:
+        message["input"] = input
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.connect(resolved_socket)
+        connection.sendall(json.dumps(message).encode("utf-8"))
+        connection.shutdown(socket.SHUT_WR)
+        response = _read_socket_message(connection)
+
+    try:
+        ack = json.loads(response.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Workflow runner returned an invalid acknowledgement.") from exc
+
+    if not ack.get("ok"):
+        raise ValueError(str(ack.get("error") or "Workflow runner rejected the child workflow request."))

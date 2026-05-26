@@ -20,6 +20,7 @@ from .usage import (
 )
 from .validation.step_validation import validate_step_execution_args, validate_step_output
 from .terminal.session import TerminalSessionResult, run_terminal_session
+from .terminal.control_channel import ChildWorkflowRequest
 from ..disclosure import PROJECT_ROOT_ENV_VAR
 
 _MISSING = object()
@@ -105,6 +106,15 @@ class AgentContext:
                 extra_args=extra_args,
             )
             session_result = self._run_prepared_step(state=state, prepared=prepared)
+            while session_result.control_request is not None:
+                prepared = self._handle_child_workflow_request(
+                    state=state,
+                    prepared=prepared,
+                    request=session_result.control_request,
+                    original_prompt=prompt,
+                    original_output_template=output_template,
+                )
+                session_result = self._run_prepared_step(state=state, prepared=prepared)
             return self._update_state(
                 state=state,
                 prepared=prepared,
@@ -179,8 +189,11 @@ class AgentContext:
             resolved_input=resolved_args["input"],
             output_template=output_template,
             agent_name=resolved_args["agent"],
+            model=resolved_args["model"],
+            interactive=resolved_args["interactive"],
             session_id=resolved_args["session_id"],
             fork=resolved_args["fork"],
+            extra_args=resolved_args["extra_args"],
         )
 
     def _run_prepared_step(
@@ -195,8 +208,77 @@ class AgentContext:
             cwd=self.launch_cwd,
             inactivity_timeout_seconds=self.timeout,
         )
-        state.transcript = session_result.transcript
+        if state.transcript:
+            state.transcript = f"{state.transcript}\n{session_result.transcript}"
+        else:
+            state.transcript = session_result.transcript
         return session_result
+
+    def _handle_child_workflow_request(
+        self,
+        *,
+        state: RunState,
+        prepared: PreparedStep,
+        request: ChildWorkflowRequest,
+        original_prompt: str,
+        original_output_template: dict[str, Any],
+    ) -> PreparedStep:
+        parent_session_id, session_path = _resolve_session_id(
+            payload=None,
+            session_id=prepared.session_id,
+            fork=prepared.fork,
+            nonce=prepared.nonce,
+            agent_config=prepared.agent_config,
+        )
+        state.session_path = session_path
+
+        from .runner import run_named_workflow
+
+        try:
+            child_result = run_named_workflow(request.workflow, input=request.input)
+        except Exception as exc:
+            child_payload = {
+                "status": "failed",
+                "error_message": str(exc),
+            }
+        else:
+            child_payload = {
+                "status": child_result.status,
+                "output": child_result.output,
+                "error_message": child_result.error_message,
+                "failed_step_name": child_result.failed_step_name,
+            }
+
+        resume_prompt = _build_child_resume_prompt(
+            child_workflow=request.workflow,
+            child_result=child_payload,
+            original_objective=original_prompt,
+            output_template=original_output_template,
+        )
+        argv = _build_agent_argv(
+            agent_config=prepared.agent_config,
+            prompt_text=resume_prompt,
+            interactive=prepared.interactive,
+            session_id=parent_session_id,
+            fork=False,
+            model=prepared.model,
+            extra_args=prepared.extra_args,
+        )
+
+        return PreparedStep(
+            nonce=str(uuid.uuid4()),
+            agent_config=prepared.agent_config,
+            prompt_text=resume_prompt,
+            argv=argv,
+            resolved_input=prepared.resolved_input,
+            output_template=original_output_template,
+            agent_name=prepared.agent_name,
+            model=prepared.model,
+            interactive=prepared.interactive,
+            session_id=parent_session_id,
+            fork=False,
+            extra_args=prepared.extra_args,
+        )
 
     def _update_state(
         self,
@@ -542,6 +624,45 @@ def _build_step_prompt(
             "",
             "Objective:",
             objective_text,
+        ]
+    )
+    return "\n".join(sections)
+
+
+def _build_child_resume_prompt(
+    *,
+    child_workflow: str,
+    child_result: dict[str, Any],
+    original_objective: str,
+    output_template: dict[str, Any] | None,
+) -> str:
+    sections = [
+        f"Child workflow completed: {child_workflow}",
+        "",
+        "Child workflow result:",
+        json.dumps(child_result, indent=2),
+        "",
+        "Continue from the point where you requested the child workflow.",
+    ]
+    if output_template:
+        sections.extend(
+            [
+                "",
+                "Return the final workflow result by calling this command:",
+                "Replace the placeholder values below with the real final parent result content.",
+                "",
+                "myteam workflow-result <<'JSON'",
+                json.dumps(output_template, indent=2),
+                "JSON",
+                "",
+                "Do not print result markers in the terminal.",
+            ]
+        )
+    sections.extend(
+        [
+            "",
+            "Original objective:",
+            original_objective,
         ]
     )
     return "\n".join(sections)

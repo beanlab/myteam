@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 import threading
 
+from .control_channel import ChildWorkflowRequest, ControlChannel
 from .pty_session import PtySession
 from .recording import TerminalRecording
 from .result_channel import ResultChannel
@@ -15,6 +16,7 @@ class TerminalSessionResult:
     exit_code: int
     transcript: str
     payload: Any | None
+    control_request: ChildWorkflowRequest | None = None
 
 
 def run_terminal_session(
@@ -25,16 +27,21 @@ def run_terminal_session(
     inactivity_timeout_seconds: int = 300,
 ) -> TerminalSessionResult:
     recording = TerminalRecording()
-    with ResultChannel() as result_channel:
+    with ResultChannel() as result_channel, ControlChannel() as control_channel:
         with PtySession(
             argv,
-            env=result_channel.env,
+            env={**result_channel.env, **control_channel.env},
             cwd=cwd,
             inactivity_timeout_seconds=inactivity_timeout_seconds,
         ) as session:
             _start_result_watcher(
                 session,
                 result_channel,
+                exit_input=exit_input,
+            )
+            _start_control_watcher(
+                session,
+                control_channel,
                 exit_input=exit_input,
             )
 
@@ -49,10 +56,12 @@ def run_terminal_session(
                 recording.feed(chunk)
 
             payload = result_channel.wait(timeout=0.1)
+            control_request = control_channel.wait(timeout=0.1)
             return TerminalSessionResult(
                 exit_code=exit_code,
                 transcript=recording.snapshot(),
                 payload=payload,
+                control_request=control_request,
             )
 
 
@@ -66,6 +75,23 @@ def _start_result_watcher(
         while not result_channel.closed.is_set():
             payload = result_channel.wait(timeout=0.1)
             if payload is None:
+                continue
+            session.enqueue_input(exit_input)
+            return
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
+def _start_control_watcher(
+    session: PtySession,
+    control_channel: ControlChannel,
+    *,
+    exit_input: bytes,
+) -> None:
+    def watch() -> None:
+        while not control_channel.closed.is_set():
+            request = control_channel.wait(timeout=0.1)
+            if request is None:
                 continue
             session.enqueue_input(exit_input)
             return

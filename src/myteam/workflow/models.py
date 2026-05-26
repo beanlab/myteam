@@ -66,8 +66,11 @@ class PreparedStep:
     resolved_input: Any
     output_template: dict[str, Any]
     agent_name: str | None
+    model: str | None
+    interactive: bool
     session_id: str | None
     fork: bool
+    extra_args: list[str] | None
 
 
 @dataclass

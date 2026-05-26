@@ -32,6 +32,7 @@ from .upgrade import packaged_changelog_text, write_tracked_version
 from .workflow.default_workflow import run_default_workflow
 from .workflow.engine import run_workflow
 from .workflow.parser import load_workflow
+from .workflow.child_tool import child_workflow as submit_child_workflow
 from .workflow.result_tool import workflow_result as submit_workflow_result
 
 
@@ -511,6 +512,10 @@ def workflow_result(json: str | None = None, text: str | None = None) -> None:
     submit_workflow_result(json=json, text=text)
 
 
+def child_workflow(workflow: str, json: Any | None = None, text: str | None = None) -> None:
+    submit_child_workflow(workflow, json=json, text=text)
+
+
 def version() -> str:
     return f"{APP_NAME} {__version__}"
 
@@ -533,5 +538,6 @@ __all__ = [
     "workflow_result",
     "update_roster",
     "changelog",
+    "child_workflow",
     "version",
 ]
