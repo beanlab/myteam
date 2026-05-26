@@ -322,6 +322,11 @@ def _format_required_input_shape(required_input: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_input_keys(input_value: dict[str, Any]) -> str:
+    keys = sorted(str(key) for key in input_value)
+    return ", ".join(keys)
+
+
 def _validate_start_input(
         required_input: dict[str, Any] | None,
         input_value: Any,
