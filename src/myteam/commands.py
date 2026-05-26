@@ -268,25 +268,6 @@ def _load_start_prompt(name_dir: Path, name: str | None, *, dir_type: str, proje
     return result.stdout or ""
 
 
-def _format_start_prompt(prompt: str, input_value: Any, *, workflow: str, dir_type: str) -> str:
-    if input_value is None:
-        return prompt
-    if not isinstance(input_value, dict):
-        print(
-            f"Workflow settings for {dir_type} '{workflow}' field 'input' must be a mapping to format the prompt.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-    try:
-        return prompt.format(**input_value)
-    except (AttributeError, KeyError, IndexError, ValueError) as exc:
-        print(
-            f"Failed to format prompt for {dir_type} '{workflow}' using frontmatter input: {exc}",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
-
 def _run_named_start_fallback(
         *,
         workflow: str,
@@ -302,8 +283,6 @@ def _run_named_start_fallback(
         raise SystemExit(1)
 
     prompt = _load_start_prompt(folder, workflow, dir_type=dir_type, project_root=project_root)
-    if workflow_settings is not None:
-        prompt = _format_start_prompt(prompt, workflow_settings.input, workflow=workflow, dir_type=dir_type)
 
     _run_start_fallback(prompt, cwd=folder, workflow_settings=workflow_settings)
     logger(f"Started {dir_type} '{workflow}' using fallback agent runner.")
@@ -355,8 +334,6 @@ def start(workflow: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT, verbose
             print(f"Failed to load workflow settings for role '{workflow_label}': {exc}", file=sys.stderr)
             raise SystemExit(1)
         prompt = _load_start_prompt(project_root, None, dir_type="role", project_root=project_root)
-        if workflow_settings is not None:
-            prompt = _format_start_prompt(prompt, workflow_settings.input, workflow=workflow_label, dir_type="role")
         _run_start_fallback(prompt, cwd=project_root, workflow_settings=workflow_settings)
         logger("Workflow start fallback completed successfully.")
         return

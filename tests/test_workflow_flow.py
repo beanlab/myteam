@@ -213,8 +213,6 @@ def test_start_uses_role_frontmatter_workflow_settings(run_myteam_inprocess, ini
         "name: Review role\n"
         "workflow-settings:\n"
         "  agent: pi\n"
-        "  input:\n"
-        "    file: the file to review\n"
         "  output:\n"
         "    findings: list of findings\n"
         "  interactive: false\n"
@@ -243,7 +241,6 @@ def test_start_uses_role_frontmatter_workflow_settings(run_myteam_inprocess, ini
     assert seen["prompt"] == "PROMPT BODY\n"
     assert seen["cwd"] == role_dir
     assert seen["workflow_settings"].agent == "pi"
-    assert seen["workflow_settings"].input == {"file": "the file to review"}
     assert seen["workflow_settings"].output == {"findings": "list of findings"}
     assert seen["workflow_settings"].interactive is False
     assert seen["workflow_settings"].fork is False
@@ -251,15 +248,52 @@ def test_start_uses_role_frontmatter_workflow_settings(run_myteam_inprocess, ini
     assert seen["workflow_settings"].inactivity_timeout_seconds == 900
 
 
-def test_start_formats_prompt_from_frontmatter_input(run_myteam_inprocess, initialized_project: Path, monkeypatch):
-    role_dir = initialized_project / ".myteam" / "formatter"
-    role_dir.mkdir()
-    (role_dir / "role.md").write_text(
+def test_start_rejects_role_frontmatter_input(run_myteam_inprocess, initialized_project: Path):
+    workflow_dir = initialized_project / ".myteam" / "role-with-input"
+    workflow_dir.mkdir()
+    (workflow_dir / "role.md").write_text(
         "---\n"
         "workflow-settings:\n"
         "  input:\n"
         "    file: review-notes.md\n"
         "---\n\n"
+        "Please review the file.\n",
+        encoding="utf-8",
+    )
+    (workflow_dir / "load.py").write_text("print('PROMPT BODY')\n", encoding="utf-8")
+
+    result = run_myteam_inprocess(initialized_project, "start", "role-with-input")
+
+    assert result.exit_code == 1
+    assert "workflow-settings.input' is not supported" in result.stderr
+    assert "Failed to load workflow settings for role" in result.stderr
+
+
+def test_start_rejects_skill_frontmatter_input(run_myteam_inprocess, initialized_project: Path):
+    workflow_dir = initialized_project / ".myteam" / "skill-with-input"
+    workflow_dir.mkdir()
+    (workflow_dir / "skill.md").write_text(
+        "---\n"
+        "workflow-settings:\n"
+        "  input:\n"
+        "    file: review-notes.md\n"
+        "---\n\n"
+        "Please review the file.\n",
+        encoding="utf-8",
+    )
+    (workflow_dir / "load.py").write_text("print('PROMPT BODY')\n", encoding="utf-8")
+
+    result = run_myteam_inprocess(initialized_project, "start", "skill-with-input")
+
+    assert result.exit_code == 1
+    assert "workflow-settings.input' is not supported" in result.stderr
+    assert "Failed to load workflow settings for skill" in result.stderr
+
+
+def test_start_keeps_prompt_unformatted_without_frontmatter_input(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    role_dir = initialized_project / ".myteam" / "formatter"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
         "Please review {file}.\n",
         encoding="utf-8",
     )
@@ -277,8 +311,8 @@ def test_start_formats_prompt_from_frontmatter_input(run_myteam_inprocess, initi
     result = run_myteam_inprocess(initialized_project, "start", "formatter")
 
     assert result.exit_code == 0
-    assert seen["prompt"] == "Review review-notes.md.\n"
-    assert seen["workflow_settings"].input == {"file": "review-notes.md"}
+    assert seen["prompt"] == "Review {file}.\n"
+    assert seen["workflow_settings"] is None
 
 
 def test_start_fails_when_role_load_py_is_missing(run_myteam_inprocess, initialized_project: Path):
