@@ -17,6 +17,7 @@ from ..disclosure import (
 from ..paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir
 from .default_workflow import run_default_workflow
 from .engine import run_workflow
+from .models import StepResult
 from .parser import load_workflow
 
 
@@ -187,6 +188,13 @@ def _run_python_child_workflow(
         return NamedWorkflowRunResult(
             status="failed",
             error_message=f"Python workflow '{workflow}' failed: {exc}",
+        )
+
+    if isinstance(output, StepResult):
+        return NamedWorkflowRunResult(
+            status=output.status,
+            output=output.output,
+            error_message=output.error_message,
         )
 
     return NamedWorkflowRunResult(
