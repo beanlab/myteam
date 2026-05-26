@@ -8,6 +8,23 @@ from .models import StepResult
 from .steps import AgentContext
 
 
+def _workflow_settings_kwargs(workflow_settings: WorkflowStepSettings | None) -> dict[str, Any]:
+    if workflow_settings is None:
+        return {}
+
+    kwargs: dict[str, Any] = {
+        "output": workflow_settings.output,
+        "input": workflow_settings.input,
+        "agent": workflow_settings.agent,
+        "model": workflow_settings.model,
+        "interactive": workflow_settings.interactive,
+        "session_id": workflow_settings.session_id,
+        "fork": workflow_settings.fork,
+        "extra_args": list(workflow_settings.extra_args) if workflow_settings.extra_args is not None else None,
+    }
+    return {key: value for key, value in kwargs.items() if value is not None}
+
+
 def run_default_workflow(
         prompt: str,
         *,
@@ -22,21 +39,5 @@ def run_default_workflow(
             ),
     ) as ctx:
         run_kwargs: dict[str, Any] = {"prompt": prompt}
-        if workflow_settings is not None:
-            if workflow_settings.output is not None:
-                run_kwargs["output"] = workflow_settings.output
-            if workflow_settings.input is not None:
-                run_kwargs["input"] = workflow_settings.input
-            if workflow_settings.agent is not None:
-                run_kwargs["agent"] = workflow_settings.agent
-            if workflow_settings.model is not None:
-                run_kwargs["model"] = workflow_settings.model
-            if workflow_settings.interactive is not None:
-                run_kwargs["interactive"] = workflow_settings.interactive
-            if workflow_settings.session_id is not None:
-                run_kwargs["session_id"] = workflow_settings.session_id
-            if workflow_settings.fork is not None:
-                run_kwargs["fork"] = workflow_settings.fork
-            if workflow_settings.extra_args is not None:
-                run_kwargs["extra_args"] = list(workflow_settings.extra_args)
+        run_kwargs.update(_workflow_settings_kwargs(workflow_settings))
         return ctx.run_agent(**run_kwargs)
