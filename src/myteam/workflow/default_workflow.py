@@ -3,32 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..config import DefaultWorkflowConfig, load_default_workflow_config as _load_default_workflow_config
-from .agents import DEFAULT_AGENT
 from .models import StepResult
 from .steps import AgentContext
-
-
-DEFAULT_MODEL = ""
-DEFAULT_USAGE_LOGGING = "summary"
-DEFAULT_TIMEOUT_SECONDS = 300
-
-
-def load_default_workflow_config(
-    local_root: Path,
-    *,
-    default_agent: str = DEFAULT_AGENT,
-    default_model: str = DEFAULT_MODEL,
-    default_usage_logging: str = DEFAULT_USAGE_LOGGING,
-    default_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
-) -> DefaultWorkflowConfig:
-    return _load_default_workflow_config(
-        local_root,
-        default_agent=default_agent,
-        default_model=default_model,
-        default_usage_logging=default_usage_logging,
-        default_timeout_seconds=default_timeout_seconds,
-    )
 
 
 def run_default_workflow(
