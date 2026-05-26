@@ -1,6 +1,7 @@
 # Change Log
 
 ## 0.2.26
+
 - Expanded `myteam start` so it can resolve roles and skills in addition to Python and YAML 
   workflows.
 - Added optional workflow settings to the frontmatter of skills and roles.
