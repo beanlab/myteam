@@ -610,7 +610,7 @@ def _build_step_prompt(
             "Do not print result markers in the terminal.",
         ])
     if session_nonce is not None:
-        sections.append(f"Session nonce: {session_nonce}")
+        sections.append(f"Your ID: {session_nonce}")
     if resolved_input is not None:
         sections.extend(
             [

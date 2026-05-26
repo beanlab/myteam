@@ -8,12 +8,12 @@ from typing import Any
 from .terminal.control_channel import submit_child_workflow_request
 
 
-def child_workflow(workflow: str, json: Any | None = None, text: str | None = None) -> None:
+def workflow_start(workflow: str, json: Any | None = None, text: str | None = None) -> None:
     raise SystemExit(_run_submission(workflow=workflow, json_text=json, text=text))
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="myteam child-workflow")
+    parser = argparse.ArgumentParser(prog="myteam workflow-start")
     parser.add_argument("workflow")
     parser.add_argument("--json")
     parser.add_argument("--text")
@@ -29,7 +29,7 @@ def _run_submission(*, workflow: str, json_text: Any | None, text: str | None) -
         print(str(exc), file=sys.stderr)
         return 1
 
-    print("Child workflow request accepted.")
+    print("Workflow start request accepted.")
     return 0
 
 

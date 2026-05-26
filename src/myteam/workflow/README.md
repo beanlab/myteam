@@ -88,7 +88,7 @@ The terminal contract is:
 - [validation/step_validation.py](validation/step_validation.py)
   Owns runtime validation for step execution arguments and returned step output.
 
-- [result_tool.py](result_tool.py)
+- [result_tool.py](workflow_result.py)
   Owns the child-facing `myteam workflow-result` command implementation.
 
 ### Agents
