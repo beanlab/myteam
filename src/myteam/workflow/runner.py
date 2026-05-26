@@ -35,7 +35,7 @@ def run_named_workflow(
     prefix: str = DEFAULT_LOCAL_ROOT,
     logger=None,
 ) -> NamedWorkflowRunResult:
-    project_root = agents_root(base_dir(), prefix)
+    project_root = _resolve_named_workflow_root(prefix=prefix)
 
     if workflow is None:
         if not is_role_dir(project_root):
@@ -78,6 +78,14 @@ def run_named_workflow(
         )
 
     return NamedWorkflowRunResult(status="failed", error_message=f"Workflow '{workflow}' not found.")
+
+
+def _resolve_named_workflow_root(*, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
+    cwd = base_dir().resolve()
+    for candidate in (cwd, *cwd.parents):
+        if candidate.name == prefix and candidate.is_dir():
+            return candidate
+    return agents_root(cwd, prefix)
 
 
 def _workflow_target(project_root: Path, workflow: str) -> Path | None:

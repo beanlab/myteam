@@ -20,6 +20,22 @@ def test_python_child_workflow_main_return_value_becomes_output(initialized_proj
     assert result.output == {"answer": "BUILD X"}
 
 
+def test_python_child_workflow_resolves_from_nested_myteam_cwd(initialized_project: Path, monkeypatch):
+    workflow_file = initialized_project / ".myteam" / "child.py"
+    workflow_file.write_text(
+        "def main():\n"
+        "    return {'answer': 'ok'}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MYTEAM_PROJECT_ROOT", str(initialized_project / ".myteam"))
+    monkeypatch.chdir(initialized_project / ".myteam")
+
+    result = run_named_workflow("child")
+
+    assert result.status == "completed"
+    assert result.output == {"answer": "ok"}
+
+
 def test_python_child_workflow_none_return_gets_completion_output(initialized_project: Path, monkeypatch):
     workflow_file = initialized_project / ".myteam" / "child.py"
     workflow_file.write_text(
