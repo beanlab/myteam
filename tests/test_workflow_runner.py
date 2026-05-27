@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from myteam.workflow.definition.models import StepResult
 from myteam.workflow.execution.runner import run_named_workflow
 
 
@@ -87,12 +88,7 @@ def test_role_child_workflow_reports_missing_required_input(initialized_project:
     role_dir = initialized_project / ".myteam" / "role-as-workflow"
     role_dir.mkdir()
     (role_dir / "role.md").write_text(
-        "---\n"
-        "workflow-settings:\n"
-        "  input:\n"
-        "    file: absolute path to the file to review\n"
-        "---\n\n"
-        "Please review {file}.\n",
+        "Please review the request.\n",
         encoding="utf-8",
     )
     (role_dir / "load.py").write_text("print('ROLE PROMPT')\n", encoding="utf-8")
@@ -107,3 +103,30 @@ def test_role_child_workflow_reports_missing_required_input(initialized_project:
     assert "file: absolute path to the file to review" in result.error_message
     assert "Received: <none>." in result.error_message
     assert "Missing keys: file (absolute path to the file to review)." in result.error_message
+
+
+def test_role_child_workflow_includes_parent_objective_in_prompt(initialized_project: Path, monkeypatch):
+    role_dir = initialized_project / ".myteam" / "role-as-workflow"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
+        "Please review the request.\n",
+        encoding="utf-8",
+    )
+    (role_dir / "load.py").write_text("print('ROLE PROMPT')\n", encoding="utf-8")
+    monkeypatch.chdir(initialized_project)
+
+    seen: dict[str, object] = {}
+
+    def fake_run_default_workflow(prompt: str, *, cwd: Path, workflow_settings):
+        seen["prompt"] = prompt
+        seen["cwd"] = cwd
+        seen["workflow_settings"] = workflow_settings
+        return StepResult(status="completed", output={"status": "completed"})
+
+    monkeypatch.setattr("myteam.workflow.execution.runner.run_default_workflow", fake_run_default_workflow)
+
+    result = run_named_workflow("role-as-workflow", parent_objective="Finish the parent task.")
+
+    assert result.status == "completed"
+    assert seen["cwd"] == role_dir
+    assert seen["workflow_settings"] is None

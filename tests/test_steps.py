@@ -489,19 +489,13 @@ def test_build_step_prompt_includes_workflow_command_guidance():
     assert "Objective:\nFinish the parent task." in prompt
 
 
-def test_build_child_resume_prompt_reuses_session_nonce_guidance():
+def test_build_child_resume_prompt_includes_child_result_text():
     prompt = build_child_resume_prompt(
-        session_nonce="session-nonce-123",
         child_workflow="child-workflow",
         child_result={"status": "completed", "output": {"summary": "done"}},
-        output_template={"summary": "short summary"},
     )
 
     assert "child-workflow result:" in prompt
-    assert "Session nonce: session-nonce-123" in prompt
-    assert "myteam workflow-start <workflow> --session-nonce session-nonce-123" in prompt
-    assert "myteam workflow-result --session-nonce session-nonce-123" in prompt
-    assert "DEBUG: Your nonce is" not in prompt
 
 
 def test_run_agent_reuses_nonce_after_child_workflow_request(monkeypatch, tmp_path):
@@ -551,7 +545,7 @@ def test_run_agent_reuses_nonce_after_child_workflow_request(monkeypatch, tmp_pa
     assert len(seen["session_nonces"]) == 2
     assert seen["session_nonces"][0] == seen["session_nonces"][1]
     assert seen["session_nonces"][0] is not None
-    assert f"Session nonce: {seen['session_nonces'][0]}" in seen["prompts"][1]
+    assert "child result:" in seen["prompts"][1]
 
 
 def test_run_agent_marks_missing_usage_hook_as_not_implemented(monkeypatch, capsys):
