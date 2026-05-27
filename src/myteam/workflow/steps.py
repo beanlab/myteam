@@ -531,7 +531,7 @@ def _build_step_prompt(
 
 def _resolve_session_id(
     *,
-    payload: Any,
+    payload: dict,
     session_id: str | None,
     fork: bool,
     nonce: str | None,
@@ -539,42 +539,27 @@ def _resolve_session_id(
 ) -> tuple[str, Path | None] | None:
     if nonce is None:
         return None
-
-    session_lookup_error: LookupError | None = None
     try:
         session_info = agent_config.get_session_info(nonce)
     except LookupError as exc:
-        session_lookup_error = exc
         session_info = None
-
-    payload_session_id = _extract_session_id(payload)
-    if payload_session_id is not None:
-        return payload_session_id, None if session_info is None else session_info[1]
-    if session_id is not None and not fork:
-        return session_id, None if session_info is None else session_info[1]
+        session_lookup_error = exc
+    discovered_session_id = payload.get("session_id")
+    if discovered_session_id is None and session_id is not None and not fork:
+        discovered_session_id = session_id
+    if discovered_session_id is not None:
+        return discovered_session_id, None if session_info is None else session_info[1]
     if session_info is None:
-        assert session_lookup_error is not None
         raise StepExecutionError("session_discovery", str(session_lookup_error)) from session_lookup_error
     return session_info
 
 
-def _extract_session_id(output_value: Any) -> str | None:
-    if not isinstance(output_value, dict):
-        return None
-    value = output_value.get("session_id")
-    if isinstance(value, str) and value:
-        return value
-    return None
-
-
 def _build_payload_validator(output_template: dict[str, Any]) -> Callable[[Any], str | None]:
-    expected_output = json.dumps(output_template, indent=2)
-
     def validate(payload: Any) -> str | None:
         try:
             _validate_output_node(output_template, payload, path="output")
         except ValueError:
-            return "output format mismatch\nRequired output format:\n" + expected_output
+            return "output format mismatch"
         return None
 
     return validate
