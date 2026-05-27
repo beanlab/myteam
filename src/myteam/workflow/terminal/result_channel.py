@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable
 import json
 import os
 import secrets
@@ -16,7 +16,11 @@ RESULT_TOKEN_ENV = "MYTEAM_RESULT_TOKEN"
 
 
 class ResultChannel:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        payload_validator: Callable[[Any], str | None] | None = None,
+    ) -> None:
         self.socket_path = ""
         self.token = secrets.token_urlsafe(18)
         self.payload: Any | None = None
@@ -25,6 +29,7 @@ class ResultChannel:
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
         self._server: socket.socket | None = None
         self._thread: threading.Thread | None = None
+        self._payload_validator = payload_validator
 
     def __enter__(self) -> "ResultChannel":
         self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-workflow-")
@@ -94,7 +99,13 @@ class ResultChannel:
         if self._result_ready.is_set():
             return {"ok": False, "error": "Workflow result already recorded."}
 
-        self.payload = message["payload"]
+        payload = message["payload"]
+        if self._payload_validator is not None:
+            error_message = self._payload_validator(payload)
+            if error_message is not None:
+                return {"ok": False, "error": error_message}
+
+        self.payload = payload
         self._result_ready.set()
         return {"ok": True}
 
