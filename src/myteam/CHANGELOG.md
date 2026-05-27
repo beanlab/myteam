@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.25
+
+- Fixed workflow output shape enforcing order. Before, the agent session was closed before shape
+  validation. Now it validates the shape before closing the session, allowing the agent to retry.
+
 ## 0.2.24
 
 - Fixed role and skill loaders so listed tool paths stay rooted at the project tree, which keeps
