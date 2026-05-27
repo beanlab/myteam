@@ -281,9 +281,6 @@ class AgentContext:
         resume_nonce = str(uuid.uuid4())
         resume_prompt = build_child_resume_prompt(
             session_nonce=resume_nonce,
-            objective_text=prepared.objective_text,
-            resolved_input=prepared.resolved_input,
-            output_template=original_output_template,
             child_workflow=request.workflow,
             child_result=child_payload,
         )
