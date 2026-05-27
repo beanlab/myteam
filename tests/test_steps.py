@@ -6,10 +6,11 @@ from typing import Any
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from myteam.workflow.definition.models import ProjectWorkflowDefaults, StepResult, UsageInfo
-from myteam.workflow.execution.prompts import build_step_prompt
+from myteam.workflow.execution.prompts import build_child_resume_prompt, build_step_prompt
 from myteam.workflow.terminal.control_channel import ChildWorkflowRequest
 from myteam.workflow.execution.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
+from myteam.workflow.execution.runner import NamedWorkflowRunResult
 
 
 def fake_agent_config(*, session_id: str = "discovered-session") -> AgentRuntimeConfig:
@@ -486,6 +487,71 @@ def test_build_step_prompt_includes_workflow_command_guidance():
     assert "myteam workflow-result --session-nonce session-nonce-123 <<'JSON'" in prompt
     assert "Input:" in prompt
     assert "Objective:\nFinish the parent task." in prompt
+
+
+def test_build_child_resume_prompt_reuses_session_nonce_guidance():
+    prompt = build_child_resume_prompt(
+        session_nonce="session-nonce-123",
+        child_workflow="child-workflow",
+        child_result={"status": "completed", "output": {"summary": "done"}},
+        output_template={"summary": "short summary"},
+    )
+
+    assert "child-workflow result:" in prompt
+    assert "Session nonce: session-nonce-123" in prompt
+    assert "myteam workflow-start <workflow> --session-nonce session-nonce-123" in prompt
+    assert "myteam workflow-result --session-nonce session-nonce-123" in prompt
+    assert "DEBUG: Your nonce is" not in prompt
+
+
+def test_run_agent_reuses_nonce_after_child_workflow_request(monkeypatch, tmp_path):
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", lambda _project_root: None)
+
+    seen: dict[str, Any] = {"session_nonces": [], "prompts": []}
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        payload_validator=None,
+        cwd,
+        inactivity_timeout_seconds: int,
+        session_nonce: str | None = None,
+    ) -> TerminalSessionResult:
+        seen["session_nonces"].append(session_nonce)
+        seen["prompts"].append(argv[-1])
+        if len(seen["session_nonces"]) == 1:
+            return TerminalSessionResult(
+                exit_code=0,
+                transcript="parent transcript",
+                payload=None,
+                control_request=ChildWorkflowRequest(workflow="child", input={"topic": "docs"}),
+            )
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="resumed transcript",
+            payload={"summary": "done"},
+        )
+
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr(
+        "myteam.workflow.execution.runner.run_named_workflow",
+        lambda _workflow, **_kwargs: NamedWorkflowRunResult(status="completed", output={"status": "completed"}),
+    )
+
+    result = run_agent(
+        cwd=tmp_path,
+        agent="codex",
+        prompt="Finish the parent task.",
+        output={"summary": "short summary"},
+    )
+
+    assert result.status == "completed"
+    assert len(seen["session_nonces"]) == 2
+    assert seen["session_nonces"][0] == seen["session_nonces"][1]
+    assert seen["session_nonces"][0] is not None
+    assert f"Session nonce: {seen['session_nonces'][0]}" in seen["prompts"][1]
 
 
 def test_run_agent_marks_missing_usage_hook_as_not_implemented(monkeypatch, capsys):

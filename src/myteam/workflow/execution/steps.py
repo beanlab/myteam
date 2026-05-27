@@ -278,9 +278,7 @@ class AgentContext:
                 "failed_step_name": child_result.failed_step_name,
             }
 
-        resume_nonce = str(uuid.uuid4())
         resume_prompt = build_child_resume_prompt(
-            session_nonce=resume_nonce,
             child_workflow=request.workflow,
             child_result=child_payload,
         )
@@ -295,7 +293,7 @@ class AgentContext:
         )
 
         return PreparedStep(
-            nonce=resume_nonce,
+            nonce=prepared.nonce,
             agent_config=prepared.agent_config,
             prompt_text=resume_prompt,
             objective_text=prepared.objective_text,
