@@ -21,13 +21,16 @@ def build_step_prompt(
                 f"Session nonce: {session_nonce}",
                 "",
                 "Use this nonce with both workflow commands.",
-                "If asked to launch a workflow, run",
+                "",
+                "If you are asked to launch a workflow, run",
                 f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
                 "and pass required input with `--json`, `--text`, or standard input.",
+                "Otherwise, perform the task yourself."
             ]
         )
     if output_template:
         sections.extend([
+            "",
             "Return the final workflow result by calling this command:",
             "Replace the placeholder values below with the real final result content.",
             "",
