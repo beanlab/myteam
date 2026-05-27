@@ -88,7 +88,7 @@ class StepExecutionArgs(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     input: Any = None
-    agent_name: str = Field(min_length=1)
+    agent: str = Field(min_length=1)
     interactive: bool = True
     session_id: Optional[str] = Field(default=None, min_length=1)
     fork: bool = False

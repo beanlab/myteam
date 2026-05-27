@@ -42,14 +42,18 @@ class AgentContext:
         usage_logging: Literal["none","summary","per_model","verbose"] = "summary",
         cwd: Path | str | None = None,
         inactivity_timeout_seconds: int = 300,
-        # TODO: allow passing in default settings
+        project_defaults: ProjectWorkflowDefaults | None = None,
     ) -> None:
         self.usage_logging = usage_logging
         self.cwd = None if cwd is None else Path(cwd).resolve()
         self.project_root = _resolve_project_root(cwd=self.cwd)
         self.timeout = inactivity_timeout_seconds
         self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
-        self.project_defaults: ProjectWorkflowDefaults | None = load_project_workflow_defaults(self.project_root)
+        self.project_defaults = (
+            project_defaults
+            or load_project_workflow_defaults(self.project_root)
+            or ProjectWorkflowDefaults()
+        )
         self.session_context = AgentSessionContext(
             home=Path.home().resolve(),
             project_root=self.project_root,
@@ -138,7 +142,7 @@ class AgentContext:
             extra_args=extra_args,
         )
 
-        agent_config = self._resolve_agent_config(resolved_args.agent_name)
+        agent_config = self._resolve_agent_config(resolved_args.agent)
         state.agent_config = agent_config
 
         prompt_text = _build_step_prompt(
@@ -164,7 +168,7 @@ class AgentContext:
             argv=argv,
             resolved_input=resolved_args.input,
             output_template=output_template,
-            agent_name=resolved_args.agent_name,
+            agent_name=resolved_args.agent,
             session_id=resolved_args.session_id,
             fork=resolved_args.fork,
         )
@@ -304,28 +308,19 @@ class AgentContext:
         fork: bool | None,
         extra_args: Any,
     ) -> StepExecutionArgs:
-        resolved: dict[str, Any] = {"input": input}
-        defaults = self.project_defaults
-        if defaults is not None:
-            resolved["agent_name"] = defaults.agent
-            resolved["model"] = defaults.model
-            resolved["interactive"] = defaults.interactive
-            resolved["session_id"] = defaults.session_id
-            resolved["fork"] = defaults.fork
-            resolved["extra_args"] = defaults.extra_args
-
-        for key, value in {
-            "agent_name": agent,
-            "model": model,
-            "interactive": interactive,
-            "session_id": session_id,
-            "fork": fork,
-            "extra_args": extra_args,
-        }.items():
-            if value is not None:
-                resolved[key] = value
-
-        return StepExecutionArgs.model_validate(resolved)
+        defaults = self.project_defaults.model_dump(exclude_none=True)
+        return StepExecutionArgs.model_validate({
+            "input": input,
+            **defaults,
+            **{key: value for key, value in {
+                "agent": agent,
+                "model": model,
+                "interactive": interactive,
+                "session_id": session_id,
+                "fork": fork,
+                "extra_args": extra_args,
+            }.items() if value is not None},
+        })
 
     def _collect_usage_after_failure(
         self,
