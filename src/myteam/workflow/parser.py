@@ -5,8 +5,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from .models import WorkflowDefinition
-from .validation.parser_validation import WorkflowDefinitionModel
+from .models import WorkflowDefinition, WorkflowDefinitionModel
 
 
 def load_workflow(path: Path) -> WorkflowDefinition:

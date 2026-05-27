@@ -22,11 +22,11 @@ The workflow layer is further split so each file stays narrow:
 
 - `parser.py` loads authored YAML
 - `reference_resolver.py` resolves `$step.path` references
-- `validation/parser_validation.py` owns parser/schema validation for step definitions
+- `models.py` owns the workflow schema models used for parser validation
 - `engine.py` handles multi-step orchestration
 - `steps.py` handles single-step execution and prompt/argv construction
 - `usage.py` owns usage tracking and reporting helpers
-- `validation/step_validation.py` owns execution-time step validation
+- `models.py` owns the pydantic models used for execution-time step validation
 
 ## Black-Box View
 
@@ -67,8 +67,8 @@ The terminal contract is:
 - [parser.py](parser.py)
   Owns workflow-file loading and top-level orchestration around workflow schema validation.
 
-- [validation/parser_validation.py](validation/parser_validation.py)
-  Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, and step-definition validation.
+- [models.py](models.py)
+  Owns shared workflow types, including the pydantic models used to validate authored YAML step definitions.
 
 - [models.py](models.py)
   Owns shared workflow types: authored step definitions, completed-step state, and run results.
@@ -85,8 +85,8 @@ The terminal contract is:
 - [usage.py](usage.py)
   Owns usage-tracking helpers and usage-summary formatting.
 
-- [validation/step_validation.py](validation/step_validation.py)
-  Owns runtime validation for step execution arguments and returned step output.
+- [models.py](models.py)
+  Owns the pydantic models used for step execution arguments and shared workflow types.
 
 - [result_tool.py](result_tool.py)
   Owns the child-facing `myteam workflow-result` command implementation.

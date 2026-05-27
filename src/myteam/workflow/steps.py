@@ -13,14 +13,13 @@ from pydantic import ValidationError
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from .config import load_project_workflow_defaults
-from .models import ProjectWorkflowDefaults, StepResult, UsageInfo, PreparedStep, RunState
+from .models import ProjectWorkflowDefaults, StepExecutionArgs, StepResult, UsageInfo, PreparedStep, RunState
 from .usage import (
     print_aggregated_usage_summary,
     print_usage_summary,
     resolve_usage_session_path,
     resolve_usage_tracking,
 )
-from .validation.step_validation import StepExecutionArgs
 from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
 
