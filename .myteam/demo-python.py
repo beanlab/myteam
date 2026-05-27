@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from myteam.workflow.steps import AgentContext
-from myteam.workflow.models import StepResult
+from myteam.workflow.execution import AgentContext
+from myteam.workflow.definition import StepResult
 
 WORKFLOW_AGENT = "codex"
 
