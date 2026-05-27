@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import inspect
 import os
 import uuid
 from collections.abc import Callable
@@ -179,14 +178,13 @@ class AgentContext:
         state: RunState,
         prepared: PreparedStep,
     ) -> TerminalSessionResult:
-        kwargs = {
-            "exit_input": prepared.agent_config.exit_sequence,
-            "cwd": self.launch_cwd,
-            "inactivity_timeout_seconds": self.timeout,
-        }
-        if "payload_validator" in inspect.signature(run_terminal_session).parameters:
-            kwargs["payload_validator"] = _build_payload_validator(prepared.output_template)
-        session_result = run_terminal_session(prepared.argv, **kwargs)
+        session_result = run_terminal_session(
+            prepared.argv,
+            exit_input=prepared.agent_config.exit_sequence,
+            cwd=self.launch_cwd,
+            inactivity_timeout_seconds=self.timeout,
+            payload_validator=_build_payload_validator(prepared.output_template),
+        )
         state.transcript = session_result.transcript
         return session_result
 
