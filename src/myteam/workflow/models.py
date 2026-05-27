@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator
 
 
 class AgentConfig(TypedDict):
@@ -34,16 +36,26 @@ class CompletedStepState(TypedDict, total=False):
 WorkflowOutput = dict[str, CompletedStepState]
 
 
-@dataclass(frozen=True)
-class ProjectWorkflowDefaults:
-    agent: str | None = None
-    model: str | None = None
+class ProjectWorkflowDefaults(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    agent: Optional[str] = Field(default=None, min_length=1)
+    model: Optional[str] = Field(default=None, min_length=1)
     interactive: bool | None = None
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, min_length=1)
     fork: bool | None = None
     extra_args: tuple[str, ...] | None = None
-    usage_logging: str | None = None
-    inactivity_timeout_seconds: int | None = None
+    usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None
+    inactivity_timeout_seconds: PositiveInt | None = None
+
+    @field_validator("extra_args", mode="before")
+    @classmethod
+    def _coerce_extra_args(cls, value: Any) -> Any:
+        if value is None or isinstance(value, tuple):
+            return value
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
 
 @dataclass

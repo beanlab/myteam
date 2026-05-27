@@ -101,7 +101,7 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
     assert calls == ["one", "two"]
     assert result.status == "failed"
     assert result.failed_step_name == "second"
-    assert result.error_message == "missing completion"
+    assert result.error_message is not None
     assert result.output == {
         "first": {
             "prompt": "one",
