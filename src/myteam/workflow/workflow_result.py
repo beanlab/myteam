@@ -8,22 +8,27 @@ from typing import Any
 from .terminal.result_channel import submit_result_payload
 
 
-def workflow_result(json: str | None = None, text: str | None = None) -> None:
-    raise SystemExit(_run_submission(json_text=json, text=text))
+def workflow_result(
+    json: str | None = None,
+    text: str | None = None,
+    session_nonce: str | None = None,
+) -> None:
+    raise SystemExit(_run_submission(json_text=json, text=text, session_nonce=session_nonce))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="myteam workflow-result")
+    parser.add_argument("--session-nonce", required=True)
     parser.add_argument("--json")
     parser.add_argument("--text")
     args = parser.parse_args(argv)
-    return _run_submission(json_text=args.json, text=args.text)
+    return _run_submission(json_text=args.json, text=args.text, session_nonce=args.session_nonce)
 
 
-def _run_submission(*, json_text: str | None, text: str | None) -> int:
+def _run_submission(*, json_text: str | None, text: str | None, session_nonce: str | None) -> int:
     try:
         payload = _read_payload(json_text=json_text, text=text)
-        submit_result_payload(payload)
+        submit_result_payload(payload, session_nonce=session_nonce)
     except (OSError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

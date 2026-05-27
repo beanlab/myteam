@@ -10,13 +10,15 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from .session_registry import register_channel, unregister_channel, load_channel_details
+
 
 RESULT_SOCKET_ENV = "MYTEAM_RESULT_SOCKET"
 RESULT_TOKEN_ENV = "MYTEAM_RESULT_TOKEN"
 
 
 class ResultChannel:
-    def __init__(self) -> None:
+    def __init__(self, *, session_nonce: str | None = None) -> None:
         self.socket_path = ""
         self.token = secrets.token_urlsafe(18)
         self.payload: Any | None = None
@@ -25,6 +27,7 @@ class ResultChannel:
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
         self._server: socket.socket | None = None
         self._thread: threading.Thread | None = None
+        self._session_nonce = session_nonce
 
     def __enter__(self) -> "ResultChannel":
         self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-workflow-")
@@ -35,9 +38,18 @@ class ResultChannel:
         self._server.settimeout(0.1)
         self._thread = threading.Thread(target=self._serve, daemon=True)
         self._thread.start()
+        if self._session_nonce is not None:
+            register_channel(
+                self._session_nonce,
+                "result",
+                socket_path=self.socket_path,
+                token=self.token,
+            )
         return self
 
     def __exit__(self, _exc_type, _exc, _tb) -> None:
+        if self._session_nonce is not None:
+            unregister_channel(self._session_nonce, "result")
         self.closed.set()
         if self._server is not None:
             try:
@@ -102,13 +114,22 @@ class ResultChannel:
 def submit_result_payload(
     payload: Any,
     *,
+    session_nonce: str | None = None,
     socket_path: str | None = None,
     token: str | None = None,
 ) -> None:
-    resolved_socket = socket_path or os.environ.get(RESULT_SOCKET_ENV)
-    resolved_token = token or os.environ.get(RESULT_TOKEN_ENV)
-    if not resolved_socket or not resolved_token:
-        raise ValueError("Missing MYTEAM_RESULT_SOCKET or MYTEAM_RESULT_TOKEN.")
+    if session_nonce is not None:
+        resolved_socket, resolved_token = load_channel_details(session_nonce, "result")
+    else:
+        resolved_socket = socket_path or os.environ.get(RESULT_SOCKET_ENV)
+        resolved_token = token or os.environ.get(RESULT_TOKEN_ENV)
+        if not resolved_socket or not resolved_token:
+            raise ValueError("Missing session nonce or MYTEAM_RESULT_SOCKET or MYTEAM_RESULT_TOKEN.")
+
+    if socket_path is not None:
+        resolved_socket = socket_path
+    if token is not None:
+        resolved_token = token
 
     message = {
         "version": 1,

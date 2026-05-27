@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .result_channel import _read_socket_message
+from .session_registry import load_channel_details, register_channel, unregister_channel
 
 
 CONTROL_SOCKET_ENV = "MYTEAM_CONTROL_SOCKET"
@@ -24,7 +25,7 @@ class ChildWorkflowRequest:
 
 
 class ControlChannel:
-    def __init__(self) -> None:
+    def __init__(self, *, session_nonce: str | None = None) -> None:
         self.socket_path = ""
         self.token = secrets.token_urlsafe(18)
         self.request: ChildWorkflowRequest | None = None
@@ -33,6 +34,7 @@ class ControlChannel:
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
         self._server: socket.socket | None = None
         self._thread: threading.Thread | None = None
+        self._session_nonce = session_nonce
 
     def __enter__(self) -> "ControlChannel":
         self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-workflow-")
@@ -43,9 +45,18 @@ class ControlChannel:
         self._server.settimeout(0.1)
         self._thread = threading.Thread(target=self._serve, daemon=True)
         self._thread.start()
+        if self._session_nonce is not None:
+            register_channel(
+                self._session_nonce,
+                "control",
+                socket_path=self.socket_path,
+                token=self.token,
+            )
         return self
 
     def __exit__(self, _exc_type, _exc, _tb) -> None:
+        if self._session_nonce is not None:
+            unregister_channel(self._session_nonce, "control")
         self.closed.set()
         if self._server is not None:
             try:
@@ -115,13 +126,22 @@ def submit_child_workflow_request(
     workflow: str,
     input: Any | None = None,
     *,
+    session_nonce: str | None = None,
     socket_path: str | None = None,
     token: str | None = None,
 ) -> None:
-    resolved_socket = socket_path or os.environ.get(CONTROL_SOCKET_ENV)
-    resolved_token = token or os.environ.get(CONTROL_TOKEN_ENV)
-    if not resolved_socket or not resolved_token:
-        raise ValueError("Missing MYTEAM_CONTROL_SOCKET or MYTEAM_CONTROL_TOKEN.")
+    if session_nonce is not None:
+        resolved_socket, resolved_token = _resolve_channel_details(session_nonce, kind="control")
+    else:
+        resolved_socket = socket_path or os.environ.get(CONTROL_SOCKET_ENV)
+        resolved_token = token or os.environ.get(CONTROL_TOKEN_ENV)
+        if not resolved_socket or not resolved_token:
+            raise ValueError("Missing session nonce or MYTEAM_CONTROL_SOCKET or MYTEAM_CONTROL_TOKEN.")
+
+    if socket_path is not None:
+        resolved_socket = socket_path
+    if token is not None:
+        resolved_token = token
 
     message = {
         "version": 1,
@@ -129,6 +149,8 @@ def submit_child_workflow_request(
         "token": resolved_token,
         "workflow": workflow,
     }
+    if session_nonce is not None:
+        message["nonce"] = session_nonce
     if input is not None:
         message["input"] = input
 
@@ -145,3 +167,10 @@ def submit_child_workflow_request(
 
     if not ack.get("ok"):
         raise ValueError(str(ack.get("error") or "Workflow runner rejected the child workflow request."))
+
+
+def _resolve_channel_details(session_nonce: str, *, kind: str) -> tuple[str, str]:
+    try:
+        return load_channel_details(session_nonce, kind)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc

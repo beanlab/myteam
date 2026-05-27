@@ -6,12 +6,11 @@ from myteam.workflow.terminal.control_channel import ControlChannel
 
 
 def test_workflow_start_reads_json_from_stdin(run_myteam_inprocess, initialized_project: Path, monkeypatch):
-    with ControlChannel() as channel:
-        monkeypatch.setenv("MYTEAM_CONTROL_SOCKET", channel.socket_path)
-        monkeypatch.setenv("MYTEAM_CONTROL_TOKEN", channel.token)
+    nonce = "session-nonce-123"
+    with ControlChannel(session_nonce=nonce) as channel:
         monkeypatch.setattr("sys.stdin.read", lambda: '{"feature_request":"Build X"}')
 
-        result = run_myteam_inprocess(initialized_project, "workflow-start", "development")
+        result = run_myteam_inprocess(initialized_project, "workflow-start", "development", "--session-nonce", nonce)
 
         assert result.exit_code == 0
         assert "Workflow start request accepted." in result.stdout
@@ -22,14 +21,15 @@ def test_workflow_start_reads_json_from_stdin(run_myteam_inprocess, initialized_
 
 
 def test_workflow_start_accepts_json_flag(run_myteam_inprocess, initialized_project: Path, monkeypatch):
-    with ControlChannel() as channel:
-        monkeypatch.setenv("MYTEAM_CONTROL_SOCKET", channel.socket_path)
-        monkeypatch.setenv("MYTEAM_CONTROL_TOKEN", channel.token)
+    nonce = "session-nonce-123"
+    with ControlChannel(session_nonce=nonce) as channel:
 
         result = run_myteam_inprocess(
             initialized_project,
             "workflow-start",
             "development",
+            "--session-nonce",
+            nonce,
             "--json",
             '{"feature_request":"Build X"}',
         )

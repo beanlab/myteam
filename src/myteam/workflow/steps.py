@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import uuid
@@ -204,15 +205,43 @@ class AgentContext:
     ) -> TerminalSessionResult:
         session_result = run_terminal_session(
             prepared.argv,
-            exit_input=prepared.agent_config.exit_sequence,
-            cwd=self.launch_cwd,
-            inactivity_timeout_seconds=self.timeout,
+            **self._terminal_session_kwargs(
+                exit_input=prepared.agent_config.exit_sequence,
+                cwd=self.launch_cwd,
+                inactivity_timeout_seconds=self.timeout,
+                session_nonce=prepared.nonce,
+            ),
         )
         if state.transcript:
             state.transcript = f"{state.transcript}\n{session_result.transcript}"
         else:
             state.transcript = session_result.transcript
         return session_result
+
+    def _terminal_session_kwargs(
+        self,
+        *,
+        exit_input: bytes,
+        cwd: Path | str | None,
+        inactivity_timeout_seconds: int,
+        session_nonce: str | None,
+    ) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "exit_input": exit_input,
+            "cwd": cwd,
+            "inactivity_timeout_seconds": inactivity_timeout_seconds,
+        }
+        if session_nonce is None:
+            return kwargs
+
+        try:
+            params = inspect.signature(run_terminal_session).parameters
+        except (TypeError, ValueError):
+            return kwargs
+
+        if "session_nonce" in params or any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values()):
+            kwargs["session_nonce"] = session_nonce
+        return kwargs
 
     def _handle_child_workflow_request(
         self,
@@ -610,7 +639,7 @@ def _build_step_prompt(
             "Do not print result markers in the terminal.",
         ])
     if session_nonce is not None:
-        sections.append(f"Your ID: {session_nonce}")
+        sections.append(f"Session nonce: {session_nonce}")
     if resolved_input is not None:
         sections.extend(
             [

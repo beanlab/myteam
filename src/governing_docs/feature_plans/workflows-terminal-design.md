@@ -135,16 +135,12 @@ The workflow runtime uses a Unix domain socket result channel:
 
 1. The parent creates a private temporary directory and Unix socket.
 2. The parent generates a per-session token.
-3. The parent launches the child with environment variables such as:
-
-   ```text
-   MYTEAM_RESULT_SOCKET=/path/to/result.sock
-   MYTEAM_RESULT_TOKEN=<nonce>
-   MYTEAM_RESULT_SCHEMA=<optional-json-schema-or-schema-name>
-   ```
+3. The parent registers the session under a nonce and makes the socket/token
+   details available to the child through the nonce registry.
 
 4. The agent is instructed to call a helper/tool when it has the final result.
-5. The helper reads the env vars, connects to the socket, and sends newline-delimited JSON.
+5. The helper accepts `--session-nonce`, looks up the socket details for that
+   nonce, and sends newline-delimited JSON.
 6. The parent validates the token and records the first valid result.
 7. The parent queues an agent-specific exit sequence into the PTY session.
 8. The parent waits for the PTY session to exit and returns the structured result
@@ -193,15 +189,8 @@ or, if implemented as a Python module entrypoint:
 python -m myteam.workflow.result_tool
 ```
 
-The command reads connection details from the environment:
-
-```text
-MYTEAM_RESULT_SOCKET
-MYTEAM_RESULT_TOKEN
-```
-
 The agent should not need to know the socket path or token values. It only needs
-to call the tool with the payload.
+to call the tool with the payload and the current session nonce.
 
 ### Calling the tool
 
@@ -209,7 +198,7 @@ The preferred interface supports JSON from stdin because it avoids shell
 quoting issues:
 
 ```bash
-myteam workflow-result <<'JSON'
+myteam workflow-result --session-nonce <nonce> <<'JSON'
 {"answer":"The final answer","status":"complete"}
 JSON
 ```
@@ -217,14 +206,14 @@ JSON
 It also supports a `--json` argument for simple cases:
 
 ```bash
-myteam workflow-result --json '{"answer":"The final answer","status":"complete"}'
+myteam workflow-result --session-nonce <nonce> --json '{"answer":"The final answer","status":"complete"}'
 ```
 
 For plain-text outputs, a convenience flag wraps text in a conventional
 payload shape:
 
 ```bash
-myteam workflow-result --text "The final answer"
+myteam workflow-result --session-nonce <nonce> --text "The final answer"
 ```
 
 which sends:
@@ -243,7 +232,7 @@ The tool:
 
 1. read the payload from stdin, `--json`, or `--text`
 2. parse and validate JSON when appropriate
-3. read `MYTEAM_RESULT_SOCKET` and `MYTEAM_RESULT_TOKEN`
+3. read `--session-nonce` and resolve the socket details for that nonce
 4. connect to the Unix socket
 5. send one newline-delimited JSON message:
 
@@ -259,9 +248,9 @@ The tool:
 6. wait for an acknowledgement from the parent
 7. print a short confirmation and exit zero if the parent accepts the result
 
-If the env vars are missing, the socket cannot be reached, the parent rejects the
-token, or the payload is invalid, the tool should print a concise error to stderr
-and exit non-zero.
+If the nonce is missing, the session cannot be resolved, the socket cannot be
+reached, the parent rejects the token, or the payload is invalid, the tool
+should print a concise error to stderr and exit non-zero.
 
 The tool should not terminate the agent process directly. It only reports the
 result. The parent decides what to do after receipt, usually by queueing the
@@ -345,7 +334,7 @@ The workflow-level orchestration composes the pieces:
 
 ```text
 parent creates result channel
-parent launches PTY session with result-channel env vars
+parent launches PTY session and registers the result/control channels by nonce
 PTY session yields raw output bytes
 TerminalRecording builds a transcript
 agent calls result tool

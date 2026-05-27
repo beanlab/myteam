@@ -6,12 +6,12 @@ from myteam.workflow.terminal.control_channel import ControlChannel, submit_chil
 
 
 def test_control_channel_accepts_child_workflow_request():
-    with ControlChannel() as channel:
+    nonce = "session-nonce-123"
+    with ControlChannel(session_nonce=nonce) as channel:
         submit_child_workflow_request(
             "development-workflow/development",
             {"feature_request": "Build X"},
-            socket_path=channel.socket_path,
-            token=channel.token,
+            session_nonce=nonce,
         )
 
         request = channel.wait(timeout=1)
@@ -38,9 +38,9 @@ def test_control_channel_rejects_duplicate_request():
             submit_child_workflow_request("other", socket_path=channel.socket_path, token=channel.token)
 
 
-def test_submit_child_workflow_request_requires_env(monkeypatch):
+def test_submit_child_workflow_request_requires_connection_details(monkeypatch):
     monkeypatch.delenv("MYTEAM_CONTROL_SOCKET", raising=False)
     monkeypatch.delenv("MYTEAM_CONTROL_TOKEN", raising=False)
 
-    with pytest.raises(ValueError, match="Missing MYTEAM_CONTROL_SOCKET"):
+    with pytest.raises(ValueError, match="Missing session nonce or MYTEAM_CONTROL_SOCKET or MYTEAM_CONTROL_TOKEN"):
         submit_child_workflow_request("demo")

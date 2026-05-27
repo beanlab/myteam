@@ -268,19 +268,20 @@ Failure conditions that matter at the interface:
   steps, and exits with an error.
 - If a Python workflow exits non-zero, `myteam` exits with the same non-zero status.
 
-### `myteam workflow-result [--json <json> | --text <text>]`
+### `myteam workflow-result --session-nonce <nonce> [--json <json> | --text <text>]`
 
 Submits the final structured result for the current workflow step.
 
 Inputs:
 
+- `--session-nonce <nonce>` identifies the active workflow step to submit to.
 - `--json <json>` passes the payload directly as JSON text.
 - `--text <text>` wraps plain text as `{"text": <text>}`.
 - If neither flag is provided, the command reads JSON from standard input.
 
 Expected outcome on success:
 
-- Reads the workflow result socket path and token from the current process environment.
+- Resolves the workflow result socket path and token from the active session nonce.
 - Validates the provided payload input.
 - Sends the payload once to the parent workflow runner for the active step.
 - Prints a short confirmation message.
@@ -295,7 +296,7 @@ Failure conditions that matter at the interface:
 
 - If both `--json` and `--text` are provided, the command exits with an error.
 - If no payload is provided and standard input is empty, the command exits with an error.
-- If the environment does not contain the workflow result socket metadata, the command exits with an
+- If the session nonce cannot be resolved to an active workflow session, the command exits with an
   error.
 - If the parent runner rejects the payload or acknowledgement is invalid, the command exits with an
   error.

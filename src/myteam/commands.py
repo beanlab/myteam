@@ -508,12 +508,17 @@ def start(
     raise SystemExit(1)
 
 
-def workflow_result(json: str | None = None, text: str | None = None) -> None:
-    submit_workflow_result(json=json, text=text)
+def workflow_result(json: str | None = None, text: str | None = None, session_nonce: str | None = None) -> None:
+    submit_workflow_result(json=json, text=text, session_nonce=session_nonce)
 
 
-def workflow_start(workflow: str, json: Any | None = None, text: str | None = None) -> None:
-    submit_workflow_start(workflow, json=json, text=text)
+def workflow_start(
+    workflow: str,
+    json: Any | None = None,
+    text: str | None = None,
+    session_nonce: str | None = None,
+) -> None:
+    submit_workflow_start(workflow, json=json, text=text, session_nonce=session_nonce)
 
 
 def version() -> str:

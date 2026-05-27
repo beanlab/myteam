@@ -25,12 +25,13 @@ def run_terminal_session(
     exit_input: bytes,
     cwd: Path | str | None = None,
     inactivity_timeout_seconds: int = 300,
+    session_nonce: str | None = None,
 ) -> TerminalSessionResult:
     recording = TerminalRecording()
-    with ResultChannel() as result_channel, ControlChannel() as control_channel:
+    with ResultChannel(session_nonce=session_nonce) as result_channel, ControlChannel(session_nonce=session_nonce) as control_channel:
         with PtySession(
             argv,
-            env={**result_channel.env, **control_channel.env},
+            env=None,
             cwd=cwd,
             inactivity_timeout_seconds=inactivity_timeout_seconds,
         ) as session:

@@ -106,8 +106,8 @@ EXIT_SEQUENCE = b"exit\r"
 ### `get_session_info(nonce, context)`
 
 `get_session_info` returns the session id for a completed step and the 
-session filepath. `myteam` embeds a nonce in the prompt, then calls this
-function after completion so Python workflows can resume or fork previous
+session filepath. `myteam` embeds a session nonce in the prompt, then calls
+this function after completion so Python workflows can resume or fork previous
 sessions.
 
 The `context` argument is an `AgentSessionContext` with explicit dependencies
@@ -119,7 +119,7 @@ for session lookup:
 
 A typical implementation searches the agent CLI's session files newest-first,
 looks for the nonce, extracts the session id from the matching filename, and
-raises `LookupError` if no match can be found (See example below).
+raises `LookupError` if no match can be found (see the examples below).
 
 Session discovery should be conservative:
 
