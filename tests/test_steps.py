@@ -6,6 +6,7 @@ from typing import Any
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from myteam.workflow.definition.models import ProjectWorkflowDefaults, StepResult, UsageInfo
+from myteam.workflow.execution.prompts import build_step_prompt
 from myteam.workflow.terminal.control_channel import ChildWorkflowRequest
 from myteam.workflow.execution.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
@@ -463,6 +464,22 @@ def test_run_agent_returns_completed_result(monkeypatch):
     assert result.session_id == "discovered-session"
     assert result.usage is None
     assert result.usage_state == "unavailable"
+
+
+def test_build_step_prompt_includes_workflow_command_guidance():
+    prompt = build_step_prompt(
+        resolved_input={"feature_request": "Build X"},
+        objective_text="Finish the parent task.",
+        output_template={"summary": "short summary"},
+        session_nonce="session-nonce-123",
+    )
+
+    assert "Session nonce: session-nonce-123" in prompt
+    assert "myteam workflow-start <workflow> --session-nonce session-nonce-123" in prompt
+    assert "myteam workflow-result --session-nonce session-nonce-123" in prompt
+    assert "myteam workflow-result --session-nonce session-nonce-123 <<'JSON'" in prompt
+    assert "Input:" in prompt
+    assert "Objective:\nFinish the parent task." in prompt
 
 
 def test_run_agent_marks_missing_usage_hook_as_not_implemented(monkeypatch, capsys):

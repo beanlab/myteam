@@ -15,19 +15,28 @@ def build_step_prompt(
         "Complete the objective below.",
         "",
     ]
+    if session_nonce is not None:
+        sections.extend(
+            [
+                f"Session nonce: {session_nonce}",
+                "Use this nonce with both workflow commands.",
+                "If you need to launch a child workflow, call `myteam workflow-start <workflow> --session-nonce "
+                f"{session_nonce}` and pass the child input with `--json`, `--text`, or standard input.",
+                "When the step is complete, call `myteam workflow-result --session-nonce "
+                f"{session_nonce}` and pass the payload with `--json`, `--text`, or standard input.",
+            ]
+        )
     if output_template:
         sections.extend([
             "Return the final workflow result by calling this command:",
             "Replace the placeholder values below with the real final result content.",
             "",
-            "myteam workflow-result <<'JSON'",
+            f"myteam workflow-result --session-nonce {session_nonce} <<'JSON'",
             json.dumps(output_template, indent=2),
             "JSON",
             "",
             "Do not print result markers in the terminal.",
         ])
-    if session_nonce is not None:
-        sections.append(f"Session nonce: {session_nonce}")
     if resolved_input is not None:
         sections.extend(
             [
