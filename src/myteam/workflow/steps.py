@@ -306,7 +306,10 @@ class AgentContext:
         fork: bool | None,
         extra_args: Any,
     ) -> StepExecutionArgs:
-        defaults = self.project_defaults.model_dump(exclude_none=True)
+        defaults = self.project_defaults.model_dump(
+            exclude_none=True,
+            include={"agent", "model", "interactive", "session_id", "fork", "extra_args"},
+        )
         return StepExecutionArgs.model_validate({
             "input": input,
             **defaults,
