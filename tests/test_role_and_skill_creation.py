@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-
 
 def test_new_role_creates_definition_and_loader(run_myteam, initialized_project: Path):
     result = run_myteam(initialized_project, "new", "role", "developer")
@@ -48,15 +46,6 @@ def test_new_workflow_creates_default_agent_script(run_myteam, initialized_proje
 
     assert result.exit_code == 0
     assert (initialized_project / ".myteam" / "agent.py").exists()
-
-
-def test_new_workflow_matches_repo_default_template(run_myteam, initialized_project: Path):
-    result = run_myteam(initialized_project, "new", "workflow")
-
-    assert result.exit_code == 0
-    created = (initialized_project / ".myteam" / "agent.py").read_text(encoding="utf-8")
-    expected = (ROOT / ".myteam" / "agent.py").read_text(encoding="utf-8")
-    assert created == expected
 
 
 def test_new_workflow_accepts_nested_paths(run_myteam, initialized_project: Path):

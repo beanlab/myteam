@@ -3,7 +3,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from myteam.disclosure import PROJECT_ROOT_ENV_VAR
+from myteam.workflow.agents.runtime import AgentRuntimeConfig
 from myteam.workflow.models import WorkflowRunResult
+from myteam.workflow.terminal.session import TerminalSessionResult
 
 
 def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -255,3 +258,205 @@ def test_start_verbose_logs_to_stderr(run_myteam_inprocess, initialized_project:
     assert "Starting step 'step1'" in result.stderr
     assert "Completed step 'step1'" in result.stderr
     assert "Workflow 'demo' completed successfully." in result.stderr
+
+
+def test_start_uses_project_workflow_defaults_from_config(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    (initialized_project / ".myteam" / ".config.yaml").write_text(
+        "agent: codex\n"
+        "model: gpt-5.4\n"
+        "interactive: false\n"
+        "session_id: thread-123\n"
+        "fork: false\n"
+        "extra_args:\n"
+        "  - --exec\n"
+        "  - pytest -q\n",
+        encoding="utf-8",
+    )
+    (initialized_project / ".myteam" / "demo.yaml").write_text(
+        "step1:\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    message: hi\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, object] = {}
+
+    def fake_build_argv(
+        prompt_text: str,
+        interactive: bool = True,
+        session_id: str | None = None,
+        fork: bool = False,
+        model: str | None = None,
+        extra_args: list[str] | None = None,
+    ) -> list[str]:
+        seen["prompt_text"] = prompt_text
+        seen["interactive"] = interactive
+        seen["session_id"] = session_id
+        seen["fork"] = fork
+        seen["model"] = model
+        seen["extra_args"] = extra_args
+        extras = extra_args or []
+        if model is not None:
+            extras = ["--model", model, *extras]
+        if session_id is not None and fork:
+            return ["codex", "fork", session_id, *extras, prompt_text]
+        if session_id is not None:
+            return ["codex", "resume", session_id, *extras, prompt_text]
+        if not interactive:
+            return ["codex", "exec", *extras, prompt_text]
+        return ["codex", *extras, prompt_text]
+
+    def fake_get_session_info(_nonce: str) -> tuple[str, Path]:
+        return "thread-123", initialized_project / ".myteam" / "session.jsonl"
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+        payload_validator=None,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        seen["cwd"] = cwd
+        seen["exit_input"] = exit_input
+        seen["payload_validator"] = payload_validator
+        seen["inactivity_timeout_seconds"] = inactivity_timeout_seconds
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"message": "hi"},
+        )
+
+    monkeypatch.setattr(
+        "myteam.workflow.steps.resolve_agent_runtime_config",
+        lambda _agent, **_kwargs: AgentRuntimeConfig(
+            name="codex",
+            exec="codex",
+            exit_sequence=b"/quit",
+            get_session_info=fake_get_session_info,
+            build_argv=fake_build_argv,
+            source="test",
+        ),
+    )
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert seen["argv"][0:4] == ["codex", "resume", "thread-123", "--model"]
+    assert "--exec" in seen["argv"]
+    assert "pytest -q" in seen["argv"]
+    assert isinstance(seen["prompt_text"], str)
+    assert seen["prompt_text"]
+    assert seen["session_id"] == "thread-123"
+    assert seen["fork"] is False
+    assert seen["cwd"] == initialized_project
+    assert seen["exit_input"] == b"/quit"
+    assert seen["inactivity_timeout_seconds"] == 300
+
+
+def test_start_prefers_step_values_over_project_defaults(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
+    (initialized_project / ".myteam" / ".config.yaml").write_text(
+        "agent: codex\n"
+        "model: gpt-5.4\n"
+        "interactive: false\n"
+        "session_id: thread-123\n"
+        "fork: false\n"
+        "extra_args:\n"
+        "  - --exec\n"
+        "  - pytest -q\n",
+        encoding="utf-8",
+    )
+    (initialized_project / ".myteam" / "demo.yaml").write_text(
+        "step1:\n"
+        "  agent: codex\n"
+        "  model: gpt-4.1\n"
+        "  interactive: false\n"
+        "  session_id: step-session\n"
+        "  fork: true\n"
+        "  extra_args:\n"
+        "    - --dry-run\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    message: hi\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, object] = {}
+
+    def fake_build_argv(
+        prompt_text: str,
+        interactive: bool = True,
+        session_id: str | None = None,
+        fork: bool = False,
+        model: str | None = None,
+        extra_args: list[str] | None = None,
+    ) -> list[str]:
+        seen["prompt_text"] = prompt_text
+        seen["interactive"] = interactive
+        seen["session_id"] = session_id
+        seen["fork"] = fork
+        seen["model"] = model
+        seen["extra_args"] = extra_args
+        extras = extra_args or []
+        if model is not None:
+            extras = ["--model", model, *extras]
+        if session_id is not None and fork:
+            return ["codex", "fork", session_id, *extras, prompt_text]
+        if session_id is not None:
+            return ["codex", "resume", session_id, *extras, prompt_text]
+        if not interactive:
+            return ["codex", "exec", *extras, prompt_text]
+        return ["codex", *extras, prompt_text]
+
+    def fake_get_session_info(_nonce: str) -> tuple[str, Path]:
+        return "step-session", initialized_project / ".myteam" / "session.jsonl"
+
+    def fake_run_terminal_session(
+        argv: list[str],
+        *,
+        exit_input: bytes,
+        cwd,
+        inactivity_timeout_seconds: int,
+        payload_validator=None,
+    ) -> TerminalSessionResult:
+        seen["argv"] = argv
+        seen["cwd"] = cwd
+        seen["exit_input"] = exit_input
+        seen["payload_validator"] = payload_validator
+        seen["inactivity_timeout_seconds"] = inactivity_timeout_seconds
+        return TerminalSessionResult(
+            exit_code=0,
+            transcript="runner transcript",
+            payload={"message": "hi"},
+        )
+
+    monkeypatch.setattr(
+        "myteam.workflow.steps.resolve_agent_runtime_config",
+        lambda _agent, **_kwargs: AgentRuntimeConfig(
+            name="codex",
+            exec="codex",
+            exit_sequence=b"/quit",
+            get_session_info=fake_get_session_info,
+            build_argv=fake_build_argv,
+            source="test",
+        ),
+    )
+    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert seen["argv"][0:3] == ["codex", "fork", "step-session"]
+    assert "--model" in seen["argv"]
+    assert "gpt-4.1" in seen["argv"]
+    assert "--dry-run" in seen["argv"]
+    assert seen["interactive"] is False
+    assert seen["session_id"] == "step-session"
+    assert seen["fork"] is True
+    assert isinstance(seen["prompt_text"], str)
+    assert seen["prompt_text"]
