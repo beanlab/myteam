@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 import json
 import secrets
 import socket
@@ -10,10 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from .session_registry import register_channel, unregister_channel, load_channel_details
-
-
-RESULT_SOCKET_ENV = "MYTEAM_RESULT_SOCKET"
-RESULT_TOKEN_ENV = "MYTEAM_RESULT_TOKEN"
 
 
 class ResultChannel:
@@ -59,13 +54,6 @@ class ResultChannel:
             self._thread.join(timeout=1)
         if self._tmpdir is not None:
             self._tmpdir.cleanup()
-
-    @property
-    def env(self) -> dict[str, str]:
-        return {
-            RESULT_SOCKET_ENV: self.socket_path,
-            RESULT_TOKEN_ENV: self.token,
-        }
 
     def wait(self, timeout: float | None = None) -> Any | None:
         if not self._result_ready.wait(timeout):

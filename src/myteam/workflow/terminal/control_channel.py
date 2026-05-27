@@ -13,10 +13,6 @@ from .result_channel import _read_socket_message
 from .session_registry import load_channel_details, register_channel, unregister_channel
 
 
-CONTROL_SOCKET_ENV = "MYTEAM_CONTROL_SOCKET"
-CONTROL_TOKEN_ENV = "MYTEAM_CONTROL_TOKEN"
-
-
 @dataclass(frozen=True)
 class ChildWorkflowRequest:
     workflow: str
@@ -66,13 +62,6 @@ class ControlChannel:
             self._thread.join(timeout=1)
         if self._tmpdir is not None:
             self._tmpdir.cleanup()
-
-    @property
-    def env(self) -> dict[str, str]:
-        return {
-            CONTROL_SOCKET_ENV: self.socket_path,
-            CONTROL_TOKEN_ENV: self.token,
-        }
 
     def wait(self, timeout: float | None = None) -> ChildWorkflowRequest | None:
         if not self._request_ready.wait(timeout):
