@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict, Optional
+from typing import Any, Literal, Optional, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
 
 class AgentConfig(TypedDict):
@@ -41,21 +41,12 @@ class ProjectWorkflowDefaults(BaseModel):
 
     agent: Optional[str] = Field(default=None, min_length=1)
     model: Optional[str] = Field(default=None, min_length=1)
-    interactive: bool | None = None
-    session_id: str | None = Field(default=None, min_length=1)
-    fork: bool | None = None
-    extra_args: tuple[str, ...] | None = None
-    usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None
-    inactivity_timeout_seconds: PositiveInt | None = None
-
-    @field_validator("extra_args", mode="before")
-    @classmethod
-    def _coerce_extra_args(cls, value: Any) -> Any:
-        if value is None or isinstance(value, tuple):
-            return value
-        if isinstance(value, list):
-            return tuple(value)
-        return value
+    interactive: Optional[bool] = None
+    session_id: Optional[str] = Field(default=None, min_length=1)
+    fork: Optional[bool] = Field(default=None)
+    extra_args: Optional[list[str]] = Field(default=None)
+    usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
+    inactivity_timeout_seconds: Optional[PositiveInt] = Field(default=None)
 
 
 @dataclass

@@ -6,9 +6,8 @@ import os
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pyparsing import Literal
 from pydantic import ValidationError
 
 from .agents import resolve_agent_runtime_config
@@ -320,31 +319,24 @@ class AgentContext:
         resolved: dict[str, Any] = {"input": input}
         defaults = self.project_defaults
         if defaults is not None:
-            resolved.update(
-                {key: value for key, value in {
-                    "agent_name": defaults.agent,
-                    "model": defaults.model,
-                    "interactive": defaults.interactive,
-                    "session_id": defaults.session_id,
-                    "fork": defaults.fork,
-                    "extra_args": list(defaults.extra_args) if defaults.extra_args is not None else None,
-                }.items() if value is not None}
-            )
+            resolved["agent_name"] = defaults.agent
+            resolved["model"] = defaults.model
+            resolved["interactive"] = defaults.interactive
+            resolved["session_id"] = defaults.session_id
+            resolved["fork"] = defaults.fork
+            resolved["extra_args"] = defaults.extra_args
 
-        resolved.update(
-            {
-                key: value
-                for key, value in {
-                    "agent_name": agent,
-                    "model": model,
-                    "interactive": interactive,
-                    "session_id": session_id,
-                    "fork": fork,
-                    "extra_args": extra_args,
-                }.items()
-                if value is not None
-            }
-        )
+        for key, value in {
+            "agent_name": agent,
+            "model": model,
+            "interactive": interactive,
+            "session_id": session_id,
+            "fork": fork,
+            "extra_args": extra_args,
+        }.items():
+            if value is not None:
+                resolved[key] = value
+
         return StepExecutionArgs.model_validate(resolved)
 
     def _collect_usage_after_failure(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -9,10 +9,10 @@ class StepExecutionArgs(BaseModel):
     input: Any = None
     agent_name: str = Field(min_length=1)
     interactive: bool = True
-    session_id: str | None = Field(default=None, min_length=1)
+    session_id: Optional[str] = Field(default=None, min_length=1)
     fork: bool = False
     extra_args: list[str] | None = None
-    model: str | None = Field(default=None, min_length=1)
+    model: Optional[str] = Field(default=None, min_length=1)
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
