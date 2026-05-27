@@ -19,11 +19,11 @@ def build_step_prompt(
         sections.extend(
             [
                 f"Session nonce: {session_nonce}",
+                "",
                 "Use this nonce with both workflow commands.",
-                "If you need to launch a child workflow, call "
-                "`myteam workflow-start <workflow> --session-nonce "
-                f"{session_nonce}` and pass the child input with "
-                f"`--json`, `--text`, or standard input.",
+                "If you are asked to launch a child workflow, call",
+                f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
+                "and pass the child input with `--json`, `--text`, or standard input.",
             ]
         )
     if output_template:
