@@ -112,7 +112,6 @@ class AgentContext:
                     state=state,
                     prepared=prepared,
                     request=session_result.control_request,
-                    original_prompt=prompt,
                     original_output_template=output_template,
                 )
                 session_result = self._run_prepared_step(state=state, prepared=prepared)
@@ -250,7 +249,6 @@ class AgentContext:
         state: RunState,
         prepared: PreparedStep,
         request: ChildWorkflowRequest,
-        original_prompt: str,
         original_output_template: dict[str, Any],
     ) -> PreparedStep:
         parent_session_id, session_path = resolve_session_id(
@@ -282,8 +280,6 @@ class AgentContext:
         resume_prompt = build_child_resume_prompt(
             child_workflow=request.workflow,
             child_result=child_payload,
-            original_objective=original_prompt,
-            output_template=original_output_template,
         )
         argv = _build_agent_argv(
             agent_config=prepared.agent_config,

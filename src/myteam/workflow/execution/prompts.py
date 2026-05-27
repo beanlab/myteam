@@ -60,8 +60,6 @@ def build_child_resume_prompt(
     *,
     child_workflow: str,
     child_result: dict[str, Any],
-    original_objective: str,
-    output_template: dict[str, Any] | None,
 ) -> str:
     sections = [
         f"Child workflow completed: {child_workflow}",
@@ -71,25 +69,4 @@ def build_child_resume_prompt(
         "",
         "Continue from the point where you requested the child workflow.",
     ]
-    if output_template:
-        sections.extend(
-            [
-                "",
-                "Return the final workflow result by calling this command:",
-                "Replace the placeholder values below with the real final parent result content.",
-                "",
-                "myteam workflow-result <<'JSON'",
-                json.dumps(output_template, indent=2),
-                "JSON",
-                "",
-                "Do not print result markers in the terminal.",
-            ]
-        )
-    sections.extend(
-        [
-            "",
-            "Original objective:",
-            original_objective,
-        ]
-    )
     return "\n".join(sections)
