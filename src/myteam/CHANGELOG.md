@@ -1,13 +1,13 @@
 # Change Log
 
-## 0.2.27
+## 0.2.28
 
 - Allow workflows to start nested workflows using `myteam workflow-start`.
 - Refactored workflow commands to rely on session nonce instead of environment variables to
   allow for concurrency.
 - Refactored the structure of `src/myteam/workflow` to be more agent- and human-readable.
 
-## 0.2.26
+## 0.2.27
 
 - Expanded `myteam start` so it can resolve roles and skills in addition to Python and YAML 
   workflows.
@@ -18,12 +18,17 @@
 - Starting a workflow from a role or skill passes the `load.py` result into `run_agent` as the
   prompt.
 
-## 0.2.25
+## 0.2.26
 
 - `run_agent(...)` now defaults to arguments configured in `.myteam/.config.yaml` if they aren't
   provided.
 - The `output` argument is also made optional, but doesn't allow for a configured default value.
   In this case, the agent relies on the user to conclude the step manually.
+
+## 0.2.25
+
+- Fixed workflow output shape enforcing order. Before, the agent session was closed before shape
+  validation. Now it validates the shape before closing the session, allowing the agent to retry.
 
 ## 0.2.24
 

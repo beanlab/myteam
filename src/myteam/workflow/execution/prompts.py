@@ -30,6 +30,7 @@ def build_step_prompt(
         sections.extend([
             "Return the final workflow result by calling this command:",
             "Replace the placeholder values below with the real final result content.",
+            "If the command reports an output format mismatch, correct the payload and try again.",
             "",
             f"myteam workflow-result --session-nonce {session_nonce} <<'JSON'",
             json.dumps(output_template, indent=2),

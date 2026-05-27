@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -209,6 +210,7 @@ class AgentContext:
                 inactivity_timeout_seconds=self.timeout,
                 session_nonce=prepared.nonce,
             ),
+            payload_validator=_build_payload_validator(prepared.output_template),
         )
         if state.transcript:
             state.transcript = f"{state.transcript}\n{session_result.transcript}"

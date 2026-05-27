@@ -378,6 +378,7 @@ def test_agent_context_aggregates_usage_across_runs(monkeypatch, capsys):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -431,6 +432,7 @@ def test_run_agent_returns_completed_result(monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -487,6 +489,7 @@ def test_run_agent_marks_missing_usage_hook_as_not_implemented(monkeypatch, caps
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -630,6 +633,7 @@ def test_run_agent_preserves_literal_input(monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -662,6 +666,7 @@ def test_run_agent_passes_extra_args_to_build_argv(monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -791,6 +796,7 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -826,6 +832,7 @@ def test_run_agent_forks_session_and_discovers_new_session_id(monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -860,6 +867,7 @@ def test_run_agent_passes_interactive_false_to_build_argv(monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -1009,6 +1017,7 @@ def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -1054,6 +1063,7 @@ def test_run_agent_records_unavailable_usage_lookup(monkeypatch, capsys):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -1181,6 +1191,7 @@ def test_run_agent_launches_from_project_root_when_called_under_active_root(tmp_
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -1229,6 +1240,7 @@ def test_run_agent_resolves_project_root_from_requested_cwd(tmp_path, monkeypatc
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:
@@ -1277,6 +1289,7 @@ def test_run_agent_allows_launch_cwd_override(tmp_path, monkeypatch):
         argv: list[str],
         *,
         exit_input: bytes,
+        payload_validator=None,
         cwd,
         inactivity_timeout_seconds: int,
     ) -> TerminalSessionResult:

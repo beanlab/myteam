@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 import threading
+from typing import Any
 
 from .control_channel import ChildWorkflowRequest, ControlChannel
 from .pty_session import PtySession
@@ -23,12 +24,13 @@ def run_terminal_session(
     argv: list[str],
     *,
     exit_input: bytes,
+    payload_validator: Callable[[Any], str | None] | None = None,
     cwd: Path | str | None = None,
     inactivity_timeout_seconds: int = 300,
     session_nonce: str | None = None,
 ) -> TerminalSessionResult:
     recording = TerminalRecording()
-    with ResultChannel(session_nonce=session_nonce) as result_channel, ControlChannel(session_nonce=session_nonce) as control_channel:
+    with ResultChannel(session_nonce=session_nonce, payload_validator=payload_validator) as result_channel, ControlChannel(session_nonce=session_nonce) as control_channel:
         with PtySession(
             argv,
             env=None,
