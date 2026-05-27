@@ -8,17 +8,17 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Iterator
 
-from ..disclosure import (
+from ...disclosure import (
     PROJECT_ROOT_ENV_VAR,
     is_role_dir,
     is_skill_dir,
     load_definition_workflow_settings,
 )
-from ..paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir
-from .default_workflow import run_default_workflow
+from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir
+from ..definition.default_workflow import run_default_workflow
+from ..definition.models import StepResult
+from ..definition.parser import load_workflow
 from .engine import run_workflow
-from .models import StepResult
-from .parser import load_workflow
 
 
 @dataclass(frozen=True)

@@ -14,7 +14,7 @@ from myteam.workflow.agents.pi import get_session_info as get_pi_session_info
 from myteam.workflow.agents.agent_utils import estimate_usage_cost
 from myteam.workflow.agents.runtime import AgentSessionContext
 from myteam.workflow.agents.runtime import resolve_agent_runtime_config
-from myteam.workflow.parser import load_workflow
+from myteam.workflow.definition.parser import load_workflow
 
 
 def agent_session_context(

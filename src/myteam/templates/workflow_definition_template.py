@@ -3,7 +3,7 @@ This is a template for creating a workflow definition.
 Current scaffolding allows for starting an agent with included usage and cost tracking.
 """
 
-from myteam.workflow.steps import AgentContext
+from myteam.workflow.execution.steps import AgentContext
 
 AGENT = ""
 MODEL = ""

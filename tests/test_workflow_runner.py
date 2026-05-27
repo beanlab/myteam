@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.workflow.runner import run_named_workflow
+from myteam.workflow.execution.runner import run_named_workflow
 
 
 def test_python_child_workflow_main_return_value_becomes_output(initialized_project: Path, monkeypatch):
@@ -69,7 +69,7 @@ def test_python_child_workflow_exception_returns_structured_failure(initialized_
 def test_python_child_workflow_can_return_step_result(initialized_project: Path, monkeypatch):
     workflow_file = initialized_project / ".myteam" / "child.py"
     workflow_file.write_text(
-        "from myteam.workflow.models import StepResult\n"
+        "from myteam.workflow.definition.models import StepResult\n"
         "\n"
         "def main():\n"
         "    return StepResult(status='completed', output={'answer': 'ok'}, agent_name='codex')\n",

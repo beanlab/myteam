@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .agent_utils import resolve_session_path, iter_jsonl_reverse, estimate_usage_cost
 from .runtime import AgentSessionContext
-from ..models import UsageInfo
+from ..definition.models import UsageInfo
 
 EXEC = "codex"
 EXIT_COMMAND = "/quit"

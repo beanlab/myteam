@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..disclosure import WorkflowStepSettings
+from ...disclosure import WorkflowStepSettings
+from ..execution.steps import AgentContext
 from .models import StepResult
-from .steps import AgentContext
 
 
 def _workflow_settings_kwargs(workflow_settings: WorkflowStepSettings | None) -> dict[str, Any]:

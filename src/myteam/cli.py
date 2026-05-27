@@ -17,9 +17,8 @@ from .commands import (
     start,
     update_roster,
     version,
-    workflow_result,
-    workflow_start,
 )
+from .workflow.execution.cli_commands import workflow_result, workflow_start
 
 
 def main(argv: list[str] | None = None):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .models import WorkflowOutput
+from ..definition.models import WorkflowOutput
 
 
 def _resolve_reference_path(reference: str, prior_steps: WorkflowOutput) -> Any:

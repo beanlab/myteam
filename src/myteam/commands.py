@@ -29,11 +29,11 @@ from .paths import (
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
-from .workflow.default_workflow import run_default_workflow
-from .workflow.engine import run_workflow
-from .workflow.parser import load_workflow
-from .workflow.workflow_start import workflow_start as submit_workflow_start
-from .workflow.workflow_result import workflow_result as submit_workflow_result
+from .workflow.definition.default_workflow import run_default_workflow
+from .workflow.definition.parser import load_workflow
+from .workflow.execution.cli_commands import workflow_result as submit_workflow_result
+from .workflow.execution.cli_commands import workflow_start as submit_workflow_start
+from .workflow.execution.engine import run_workflow
 
 
 def ensure_dir(path: Path) -> None:

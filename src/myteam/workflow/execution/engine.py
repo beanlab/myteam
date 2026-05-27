@@ -5,8 +5,8 @@ from copy import deepcopy
 
 import yaml
 
-from .agents import DEFAULT_AGENT
-from .models import (
+from ..agents import DEFAULT_AGENT
+from ..definition.models import (
     CompletedStepState,
     StepDefinition,
     StepResult,
@@ -14,7 +14,7 @@ from .models import (
     WorkflowOutput,
     WorkflowRunResult,
 )
-from .reference_resolver import resolve_references
+from ..resolution.reference_resolver import resolve_references
 from .steps import run_agent
 
 

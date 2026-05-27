@@ -1,28 +1,28 @@
 from __future__ import annotations
 
 import inspect
-import json
-import os
 import uuid
 from pathlib import Path
 from typing import Any
 
 from pyparsing import Literal
 
-from .agents import resolve_agent_runtime_config
-from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from .config import load_project_workflow_defaults
-from .models import ProjectWorkflowDefaults, StepResult, UsageInfo, PreparedStep, RunState
+from ..agents import resolve_agent_runtime_config
+from ..agents.runtime import AgentRuntimeConfig, AgentSessionContext
+from ..definition.config import load_project_workflow_defaults
+from ..definition.models import ProjectWorkflowDefaults, StepResult, UsageInfo, PreparedStep, RunState
+from .errors import StepExecutionError
+from .prompts import build_child_resume_prompt, build_step_prompt
+from ..resolution.session_resolution import resolve_project_root, resolve_session_id
 from .usage import (
     print_aggregated_usage_summary,
     print_usage_summary,
     resolve_usage_session_path,
     resolve_usage_tracking,
 )
-from .validation.step_validation import validate_step_execution_args, validate_step_output
-from .terminal.session import TerminalSessionResult, run_terminal_session
-from .terminal.control_channel import ChildWorkflowRequest
-from ..disclosure import PROJECT_ROOT_ENV_VAR
+from ..validation import validate_step_execution_args, validate_step_output
+from ..terminal.session import TerminalSessionResult, run_terminal_session
+from ..terminal.control_channel import ChildWorkflowRequest
 
 _MISSING = object()
 
@@ -35,7 +35,7 @@ class AgentContext:
         inactivity_timeout_seconds: int | None = None,
     ) -> None:
         self.cwd = None if cwd is None else Path(cwd).resolve()
-        self.project_root = _resolve_project_root(cwd=self.cwd)
+        self.project_root = resolve_project_root(cwd=self.cwd)
         self.project_defaults: ProjectWorkflowDefaults | None = load_project_workflow_defaults(self.project_root)
         self.usage_logging = (
             usage_logging
@@ -166,7 +166,7 @@ class AgentContext:
         agent_config = self._resolve_agent_config(resolved_args["agent"])
         state.agent_config = agent_config
 
-        prompt_text = _build_step_prompt(
+        prompt_text = build_step_prompt(
             resolved_input=resolved_args["input"],
             objective_text=prompt,
             output_template=output_template,
@@ -252,7 +252,7 @@ class AgentContext:
         original_prompt: str,
         original_output_template: dict[str, Any],
     ) -> PreparedStep:
-        parent_session_id, session_path = _resolve_session_id(
+        parent_session_id, session_path = resolve_session_id(
             payload=None,
             session_id=prepared.session_id,
             fork=prepared.fork,
@@ -278,7 +278,7 @@ class AgentContext:
                 "failed_step_name": child_result.failed_step_name,
             }
 
-        resume_prompt = _build_child_resume_prompt(
+        resume_prompt = build_child_resume_prompt(
             child_workflow=request.workflow,
             child_result=child_payload,
             original_objective=original_prompt,
@@ -328,7 +328,7 @@ class AgentContext:
         except ValueError as exc:
             raise StepExecutionError("output_validation", str(exc)) from exc
 
-        discovered_session_id, session_path = _resolve_session_id(
+        discovered_session_id, session_path = resolve_session_id(
             payload=session_result.payload,
             session_id=prepared.session_id,
             fork=prepared.fork,
@@ -565,23 +565,6 @@ def run_agent(
             fork=fork,
             extra_args=extra_args,
         )
-
-
-def _resolve_project_root(cwd: Path | None = None) -> Path:
-    configured_agent_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
-    if configured_agent_root:
-        return Path(configured_agent_root).resolve().parent
-
-    if cwd is None:
-        cwd = Path.cwd()
-
-    cwd = cwd.resolve()
-    for candidate in (cwd, *cwd.parents):
-        if (candidate / ".myteam").is_dir():
-            return candidate
-    return cwd
-
-
 def _build_agent_argv(
     *,
     agent_config: AgentRuntimeConfig,
@@ -614,129 +597,3 @@ def _build_agent_argv(
         )
 
     return argv
-
-
-def _build_step_prompt(
-    *,
-    resolved_input: Any,
-    objective_text: str,
-    output_template: dict[str, Any] | None,
-    session_nonce: str | None,
-) -> str:
-    sections = [
-        "Complete the objective below.",
-        "",
-    ]
-    if output_template:
-        sections.extend([
-            "Return the final workflow result by calling this command:",
-            "Replace the placeholder values below with the real final result content.",
-            "",
-            "myteam workflow-result <<'JSON'",
-            json.dumps(output_template, indent=2),
-            "JSON",
-            "",
-            "Do not print result markers in the terminal.",
-        ])
-    if session_nonce is not None:
-        sections.append(f"Session nonce: {session_nonce}")
-    if resolved_input is not None:
-        sections.extend(
-            [
-                "",
-                "Input:",
-                json.dumps(resolved_input, indent=2),
-            ]
-        )
-    sections.extend(
-        [
-            "",
-            "Objective:",
-            objective_text,
-        ]
-    )
-    return "\n".join(sections)
-
-
-def _build_child_resume_prompt(
-    *,
-    child_workflow: str,
-    child_result: dict[str, Any],
-    original_objective: str,
-    output_template: dict[str, Any] | None,
-) -> str:
-    sections = [
-        f"Child workflow completed: {child_workflow}",
-        "",
-        "Child workflow result:",
-        json.dumps(child_result, indent=2),
-        "",
-        "Continue from the point where you requested the child workflow.",
-    ]
-    if output_template:
-        sections.extend(
-            [
-                "",
-                "Return the final workflow result by calling this command:",
-                "Replace the placeholder values below with the real final parent result content.",
-                "",
-                "myteam workflow-result <<'JSON'",
-                json.dumps(output_template, indent=2),
-                "JSON",
-                "",
-                "Do not print result markers in the terminal.",
-            ]
-        )
-    sections.extend(
-        [
-            "",
-            "Original objective:",
-            original_objective,
-        ]
-    )
-    return "\n".join(sections)
-
-
-def _resolve_session_id(
-    *,
-    payload: Any,
-    session_id: str | None,
-    fork: bool,
-    nonce: str | None,
-    agent_config: AgentRuntimeConfig,
-) -> tuple[str, Path | None] | None:
-    if nonce is None:
-        return None
-
-    session_lookup_error: LookupError | None = None
-    try:
-        session_info = agent_config.get_session_info(nonce)
-    except LookupError as exc:
-        session_lookup_error = exc
-        session_info = None
-
-    payload_session_id = _extract_session_id(payload)
-    if payload_session_id is not None:
-        return payload_session_id, None if session_info is None else session_info[1]
-    if session_id is not None and not fork:
-        return session_id, None if session_info is None else session_info[1]
-    if session_info is None:
-        assert session_lookup_error is not None
-        raise StepExecutionError("session_discovery", str(session_lookup_error)) from session_lookup_error
-    return session_info
-
-
-def _extract_session_id(output_value: Any) -> str | None:
-    if not isinstance(output_value, dict):
-        return None
-    value = output_value.get("session_id")
-    if isinstance(value, str) and value:
-        return value
-    return None
-
-
-class StepExecutionError(Exception):
-    def __init__(self, error_type: str, error_message: str) -> None:
-        super().__init__(error_message)
-        self.error_type = error_type
-        self.error_message = error_message

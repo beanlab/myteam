@@ -11,7 +11,7 @@ from types import ModuleType
 from typing import Any
 
 from .agent_utils import encode_input
-from ..models import UsageInfo
+from ..definition.models import UsageInfo
 
 
 @dataclass(frozen=True)

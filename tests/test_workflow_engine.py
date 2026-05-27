@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from myteam.workflow.engine import run_workflow
-from myteam.workflow.models import StepResult
+from myteam.workflow.execution.engine import run_workflow
+from myteam.workflow.definition.models import StepResult
 
 
 def test_run_workflow_executes_steps_in_authored_order(monkeypatch):
@@ -30,7 +30,7 @@ def test_run_workflow_executes_steps_in_authored_order(monkeypatch):
             agent_name=agent,
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     result = run_workflow(
         {
@@ -79,7 +79,7 @@ def test_run_workflow_stops_at_first_failed_step(monkeypatch):
             agent_name=agent,
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     result = run_workflow(
         {
@@ -148,7 +148,7 @@ def test_run_workflow_stores_completed_step_state_for_later_references(monkeypat
             agent_name=agent,
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     result = run_workflow(
         {
@@ -229,7 +229,7 @@ def test_run_workflow_injects_default_agent_before_execution(monkeypatch):
             agent_name=agent,
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     result = run_workflow(
         {
@@ -278,7 +278,7 @@ def test_run_workflow_passes_model_and_extra_args_to_agent(monkeypatch):
             agent_name=agent,
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     result = run_workflow(
         {
@@ -320,7 +320,7 @@ def test_run_workflow_rejects_completed_step_without_agent_name(monkeypatch):
             output={"value": prompt},
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     with pytest.raises(ValueError, match="missing agent_name"):
         run_workflow(
@@ -361,7 +361,7 @@ def test_run_workflow_stores_null_input_for_completed_steps(monkeypatch):
             agent_name=agent,
         )
 
-    monkeypatch.setattr("myteam.workflow.engine.run_agent", fake_run_agent)
+    monkeypatch.setattr("myteam.workflow.execution.engine.run_agent", fake_run_agent)
 
     result = run_workflow(
         {

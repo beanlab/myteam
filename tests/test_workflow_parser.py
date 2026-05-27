@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.parser import load_workflow
+from myteam.workflow.definition.parser import load_workflow
 
 
 def test_load_workflow_accepts_documented_workflow_shape(tmp_path: Path):

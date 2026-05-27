@@ -169,7 +169,7 @@ A custom Python workflow can then select the alias by passing the local config
 name as the `agent` value:
 
 ```python
-from myteam.workflow.steps import run_agent
+from myteam.workflow.execution.steps import run_agent
 
 
 result = run_agent(

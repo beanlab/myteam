@@ -20,22 +20,22 @@ This package is intentionally split into two layers:
 
 The workflow layer is further split so each file stays narrow:
 
-- `parser.py` loads authored YAML
-- `reference_resolver.py` resolves `$step.path` references
-- `validation/parser_validation.py` owns parser/schema validation for step definitions
-- `engine.py` handles multi-step orchestration
-- `steps.py` handles single-step execution and prompt/argv construction
-- `usage.py` owns usage tracking and reporting helpers
-- `validation/step_validation.py` owns execution-time step validation
+- `definition/parser.py` loads authored YAML
+- `resolution/reference_resolver.py` resolves `$step.path` references
+- `validation/__init__.py` owns parser/schema validation for step definitions
+- `execution/engine.py` handles multi-step orchestration
+- `execution/steps.py` handles single-step execution and prompt/argv construction
+- `execution/usage.py` owns usage tracking and reporting helpers
+- `validation/__init__.py` owns workflow schema validation and execution-time step validation
 
 ## Black-Box View
 
 From outside the package, the flow is:
 
 1. `commands.start(...)` resolves a workflow file path and either executes a Python workflow script or loads YAML.
-2. `workflow.parser.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation.parser_validation`.
-3. `workflow.engine.run_workflow(...)` executes steps in authored order.
-4. For each step, `workflow.steps.run_agent(...)`:
+2. `workflow.definition.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation`.
+3. `workflow.execution.run_workflow(...)` executes steps in authored order.
+4. For each step, `workflow.execution.run_agent(...)`:
    - receives the resolved step values from the engine
    - resolves the configured agent runtime config
    - builds the prompt
@@ -65,32 +65,38 @@ The terminal contract is:
 - [__init__.py](__init__.py)
   Exposes the main public workflow entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
 
-- [parser.py](parser.py)
+- [definition/parser.py](definition/parser.py)
   Owns workflow-file loading and top-level orchestration around workflow schema validation.
 
-- [validation/parser_validation.py](validation/parser_validation.py)
-  Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, and step-definition validation.
+- [validation/__init__.py](validation/__init__.py)
+  Owns workflow-step schema validation for authored YAML, including identifier checks, nested mapping checks, step-definition validation, and project default validation.
 
-- [models.py](models.py)
+- [definition/models.py](definition/models.py)
   Owns shared workflow types: authored step definitions, completed-step state, and run results.
 
-- [reference_resolver.py](reference_resolver.py)
+- [resolution/reference_resolver.py](resolution/reference_resolver.py)
   Owns `$step.path` reference resolution against prior completed steps.
 
-- [engine.py](engine.py)
+- [execution/engine.py](execution/engine.py)
   Owns multi-step orchestration, authored-order execution, fail-fast behavior, and completed-step storage.
 
-- [steps.py](steps.py)
+- [execution/steps.py](execution/steps.py)
   Owns single-step execution: accept resolved step values, resolve agent runtime config, build prompt, run, resume, or fork a session, validate result, discover session id, and return `StepResult`.
 
-- [usage.py](usage.py)
+- [execution/usage.py](execution/usage.py)
   Owns usage-tracking helpers and usage-summary formatting.
 
-- [validation/step_validation.py](validation/step_validation.py)
-  Owns runtime validation for step execution arguments and returned step output.
+- [execution/cli_commands.py](execution/cli_commands.py)
+  Owns the child-facing `myteam workflow-start` and `myteam workflow-result` command implementations.
 
-- [result_tool.py](workflow_result.py)
-  Owns the child-facing `myteam workflow-result` command implementation.
+- [execution/errors.py](execution/errors.py)
+  Owns workflow execution error types.
+
+- [execution/prompts.py](execution/prompts.py)
+  Owns prompt-building helpers for single-step execution and child-workflow resumes.
+
+- [resolution/session_resolution.py](resolution/session_resolution.py)
+  Owns session id and project-root resolution helpers.
 
 ### Agents
 

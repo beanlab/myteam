@@ -5,9 +5,9 @@ from typing import Any
 
 from myteam.disclosure import PROJECT_ROOT_ENV_VAR
 from myteam.workflow.agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from myteam.workflow.models import ProjectWorkflowDefaults, StepResult, UsageInfo
+from myteam.workflow.definition.models import ProjectWorkflowDefaults, StepResult, UsageInfo
 from myteam.workflow.terminal.control_channel import ChildWorkflowRequest
-from myteam.workflow.steps import AgentContext, run_agent
+from myteam.workflow.execution.steps import AgentContext, run_agent
 from myteam.workflow.terminal.session import TerminalSessionResult
 
 
@@ -99,7 +99,7 @@ def test_run_agent_wrapper_delegates_through_agent_context(monkeypatch, tmp_path
             seen["kwargs"] = kwargs
             return StepResult(status="completed", output={"summary": "done"}, agent_name="codex")
 
-    monkeypatch.setattr("myteam.workflow.steps.AgentContext", FakeAgentContext)
+    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext", FakeAgentContext)
 
     result = run_agent(
         agent="codex",
@@ -153,9 +153,9 @@ def test_agent_context_loads_project_defaults_once(monkeypatch, tmp_path):
             payload={"summary": "done"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", fake_load_project_workflow_defaults)
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", fake_load_project_workflow_defaults)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     with AgentContext(cwd=tmp_path) as ctx:
         for _ in range(2):
@@ -207,8 +207,8 @@ def test_run_agent_uses_project_defaults(monkeypatch, tmp_path):
         seen["agent_name"] = agent_name
         return recording_agent_config(seen)
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
 
     result = run_agent(
         cwd=tmp_path,
@@ -267,8 +267,8 @@ def test_run_agent_explicit_none_falls_back_to_project_defaults(monkeypatch, tmp
         seen["agent_name"] = agent_name
         return recording_agent_config(seen)
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
 
     result = run_agent(
         cwd=tmp_path,
@@ -313,8 +313,8 @@ def test_run_agent_defaults_missing_output_to_empty_mapping(monkeypatch, tmp_pat
             payload={},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         cwd=tmp_path,
@@ -400,8 +400,8 @@ def test_agent_context_aggregates_usage_across_runs(monkeypatch, capsys):
         source=config.source,
     )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     with AgentContext(usage_logging="verbose") as ctx:
         for _ in range(3):
@@ -423,7 +423,7 @@ def test_agent_context_aggregates_usage_across_runs(monkeypatch, capsys):
 
 
 def test_run_agent_returns_completed_result(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -443,8 +443,8 @@ def test_run_agent_returns_completed_result(monkeypatch):
             payload={"summary": "done"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -489,8 +489,8 @@ def test_run_agent_marks_missing_usage_hook_as_not_implemented(monkeypatch, caps
         source=config.source,
         get_usage_info=None,
     )
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -523,7 +523,7 @@ def test_run_agent_reports_missing_result(monkeypatch):
     def fake_get_usage_info(_session_path: Path) -> UsageInfo | None:
         return usage
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
     config = fake_agent_config()
     config = AgentRuntimeConfig(
         name=config.name,
@@ -534,7 +534,7 @@ def test_run_agent_reports_missing_result(monkeypatch):
         get_usage_info=fake_get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -576,8 +576,8 @@ def test_run_agent_does_not_print_step_usage_for_summary_logging_on_failure(monk
         source=config.source,
     )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     with AgentContext(usage_logging="summary") as ctx:
         result = ctx.run_agent(
@@ -594,7 +594,7 @@ def test_run_agent_does_not_print_step_usage_for_summary_logging_on_failure(monk
 
 
 def test_run_agent_requires_explicit_agent(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", lambda _project_root: None)
     result = run_agent(
         prompt="Write a summary.",
         output={"summary": "short summary"},
@@ -606,7 +606,7 @@ def test_run_agent_requires_explicit_agent(monkeypatch):
 
 
 def test_run_agent_preserves_literal_input(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -623,8 +623,8 @@ def test_run_agent_preserves_literal_input(monkeypatch):
             payload={"summary": "done"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -655,8 +655,8 @@ def test_run_agent_passes_extra_args_to_build_argv(monkeypatch):
             payload={"summary": "done"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -672,7 +672,7 @@ def test_run_agent_passes_extra_args_to_build_argv(monkeypatch):
 
 
 def test_run_agent_reports_invalid_extra_args(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -693,7 +693,7 @@ def test_run_agent_reports_invalid_model(monkeypatch):
         calls.append("called")
         return fake_agent_config()
 
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
 
     result = run_agent(
         agent="codex",
@@ -729,7 +729,7 @@ def test_run_agent_reports_build_argv_failure(monkeypatch):
         get_usage_info=config.get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -753,7 +753,7 @@ def test_run_agent_reports_invalid_argv_shape(monkeypatch):
         get_usage_info=config.get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -767,7 +767,7 @@ def test_run_agent_reports_invalid_argv_shape(monkeypatch):
 
 
 def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -784,8 +784,8 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
             payload={"summary": "done", "session_id": "thread-123"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -802,7 +802,7 @@ def test_run_agent_resumes_session_and_preserves_session_id(monkeypatch):
 
 
 def test_run_agent_forks_session_and_discovers_new_session_id(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.load_project_workflow_defaults", lambda _project_root: None)
+    monkeypatch.setattr("myteam.workflow.execution.steps.load_project_workflow_defaults", lambda _project_root: None)
     seen: dict[str, Any] = {}
 
     def fake_run_terminal_session(
@@ -819,8 +819,8 @@ def test_run_agent_forks_session_and_discovers_new_session_id(monkeypatch):
             payload={"summary": "done"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -853,8 +853,8 @@ def test_run_agent_passes_interactive_false_to_build_argv(monkeypatch):
             payload={"summary": "done"},
         )
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -868,7 +868,7 @@ def test_run_agent_passes_interactive_false_to_build_argv(monkeypatch):
 
 
 def test_run_agent_rejects_fork_without_session_id(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -883,7 +883,7 @@ def test_run_agent_rejects_fork_without_session_id(monkeypatch):
 
 
 def test_run_agent_rejects_invalid_interactive(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -898,7 +898,7 @@ def test_run_agent_rejects_invalid_interactive(monkeypatch):
 
 
 def test_run_agent_rejects_invalid_fork(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -913,7 +913,7 @@ def test_run_agent_rejects_invalid_fork(monkeypatch):
 
 
 def test_run_agent_rejects_empty_session_id(monkeypatch):
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: fake_agent_config())
 
     result = run_agent(
         agent="codex",
@@ -961,8 +961,8 @@ def test_run_agent_reports_session_discovery_failure(monkeypatch):
         get_usage_info=fake_get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -1014,8 +1014,8 @@ def test_run_agent_attaches_usage_and_prints_summary(monkeypatch, capsys):
         get_usage_info=fake_get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -1059,8 +1059,8 @@ def test_run_agent_records_unavailable_usage_lookup(monkeypatch, capsys):
         get_usage_info=failing_get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -1103,8 +1103,8 @@ def test_run_agent_attempts_usage_lookup_for_timeout(monkeypatch, capsys):
         get_usage_info=fake_get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -1137,7 +1137,7 @@ def test_run_agent_does_not_attempt_usage_lookup_before_launch(monkeypatch):
         get_usage_info=fake_get_usage_info,
         source=config.source,
     )
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
 
     result = run_agent(
         agent="codex",
@@ -1179,8 +1179,8 @@ def test_run_agent_launches_from_project_root_when_called_under_active_root(tmp_
         seen["session_context"] = kwargs["session_context"]
         return fake_agent_config()
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
 
     result = run_agent(
         agent="codex",
@@ -1227,8 +1227,8 @@ def test_run_agent_resolves_project_root_from_requested_cwd(tmp_path, monkeypatc
         seen["session_context"] = kwargs["session_context"]
         return fake_agent_config()
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
 
     result = run_agent(
         agent="codex",
@@ -1275,8 +1275,8 @@ def test_run_agent_allows_launch_cwd_override(tmp_path, monkeypatch):
         seen["session_context"] = kwargs["session_context"]
         return fake_agent_config()
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", fake_resolve_agent_runtime_config)
 
     result = run_agent(
         agent="codex",
@@ -1349,9 +1349,9 @@ def test_run_agent_runs_child_workflow_then_resumes_parent_session(monkeypatch, 
         seen["child"] = (workflow, input)
         return ChildResult()
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
-    monkeypatch.setattr("myteam.workflow.runner.run_named_workflow", fake_run_named_workflow)
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.runner.run_named_workflow", fake_run_named_workflow)
 
     result = run_agent(
         agent="codex",
@@ -1411,9 +1411,9 @@ def test_run_agent_resumes_parent_with_child_failure_details(monkeypatch, tmp_pa
         error_message = "child exploded"
         failed_step_name = "step1"
 
-    monkeypatch.setattr("myteam.workflow.steps.run_terminal_session", fake_run_terminal_session)
-    monkeypatch.setattr("myteam.workflow.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
-    monkeypatch.setattr("myteam.workflow.runner.run_named_workflow", lambda *_args, **_kwargs: ChildResult())
+    monkeypatch.setattr("myteam.workflow.execution.steps.run_terminal_session", fake_run_terminal_session)
+    monkeypatch.setattr("myteam.workflow.execution.steps.resolve_agent_runtime_config", lambda _agent, **_kwargs: config)
+    monkeypatch.setattr("myteam.workflow.execution.runner.run_named_workflow", lambda *_args, **_kwargs: ChildResult())
 
     result = run_agent(
         agent="codex",

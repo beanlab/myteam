@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.config import load_project_workflow_defaults
-from myteam.workflow.models import ProjectWorkflowDefaults
+from myteam.workflow.definition.config import load_project_workflow_defaults
+from myteam.workflow.definition.models import ProjectWorkflowDefaults
 
 
 def test_load_project_workflow_defaults_returns_none_when_missing(tmp_path: Path):

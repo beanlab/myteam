@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam.disclosure import WorkflowStepSettings
-from myteam.workflow.default_workflow import run_default_workflow
-from myteam.workflow.models import StepResult
+from myteam.workflow.definition.default_workflow import run_default_workflow
+from myteam.workflow.definition.models import StepResult
 
 
 def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_path: Path, monkeypatch):
@@ -24,7 +24,7 @@ def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_pat
             seen["run_agent_kwargs"] = kwargs
             return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.workflow.default_workflow.AgentContext", FakeAgentContext)
+    monkeypatch.setattr("myteam.workflow.definition.default_workflow.AgentContext", FakeAgentContext)
 
     result = run_default_workflow("Say 'Ready'", cwd=tmp_path)
 
@@ -66,7 +66,7 @@ def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeyp
             seen["run_agent_kwargs"] = kwargs
             return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.workflow.default_workflow.AgentContext", FakeAgentContext)
+    monkeypatch.setattr("myteam.workflow.definition.default_workflow.AgentContext", FakeAgentContext)
 
     result = run_default_workflow(
         "Summarize the release.",

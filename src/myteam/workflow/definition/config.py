@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 from .models import ProjectWorkflowDefaults
-from .validation.config_validation import validate_project_workflow_defaults
+from ..validation import validate_project_workflow_defaults
 
 
 CONFIG_FILENAME = ".config.yaml"

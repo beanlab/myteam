@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..models import AgentConfig
+from ..definition.models import AgentConfig
 from .runtime import AgentSessionContext, resolve_agent_runtime_config
 
 
