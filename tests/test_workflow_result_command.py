@@ -36,3 +36,11 @@ def test_workflow_result_reports_output_format_mismatch(run_myteam_inprocess, in
         assert "output format mismatch" in result.stderr
         assert "Required output format:" in result.stderr
         assert channel.wait(timeout=0.1) is None
+
+
+def test_workflow_result_help_shows_session_nonce_flag(run_myteam_inprocess, initialized_project: Path):
+    result = run_myteam_inprocess(initialized_project, "workflow-result", "--help")
+
+    assert result.exit_code == 0
+    assert "--session-nonce" in result.stdout
+    assert "--session_nonce" not in result.stdout

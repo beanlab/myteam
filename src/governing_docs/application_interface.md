@@ -268,6 +268,39 @@ Failure conditions that matter at the interface:
   steps, and exits with an error.
 - If a Python workflow exits non-zero, `myteam` exits with the same non-zero status.
 
+### `myteam workflow-start <workflow> --session-nonce <nonce> [--json <json> | --text <text>]`
+
+Starts a nested workflow request for the active step.
+
+Inputs:
+
+- `<workflow>` is the workflow name passed to the child workflow runner.
+- `--session-nonce <nonce>` identifies the active workflow step to submit to.
+- `--json <json>` passes the payload directly as JSON text.
+- `--text <text>` wraps plain text as `{"text": <text>}`.
+- If neither flag is provided, the command reads JSON from standard input.
+
+Expected outcome on success:
+
+- Resolves the workflow control socket path and token from the active session nonce.
+- Validates the provided payload input.
+- Sends the workflow request once to the parent workflow runner for the active step.
+- Prints a short confirmation message.
+
+User-visible result:
+
+- This command is primarily intended for workflow agents, not direct human operation.
+- Workflow prompts can instruct the agent to call `myteam workflow-start` exactly once when it needs to spawn a child workflow.
+
+Failure conditions that matter at the interface:
+
+- If both `--json` and `--text` are provided, the command exits with an error.
+- If no payload is provided and standard input is empty, the command exits with an error.
+- If the session nonce cannot be resolved to an active workflow session, the command exits with an
+  error.
+- If the parent runner rejects the payload or acknowledgement is invalid, the command exits with an
+  error.
+
 ### `myteam workflow-result --session-nonce <nonce> [--json <json> | --text <text>]`
 
 Submits the final structured result for the current workflow step.

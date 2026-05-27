@@ -38,3 +38,24 @@ def test_workflow_start_accepts_json_flag(run_myteam_inprocess, initialized_proj
         request = channel.wait(timeout=1)
         assert request is not None
         assert request.input == {"feature_request": "Build X"}
+
+
+def test_workflow_start_help_shows_session_nonce_flag(run_myteam_inprocess, initialized_project: Path):
+    result = run_myteam_inprocess(initialized_project, "workflow-start", "--help")
+
+    assert result.exit_code == 0
+    assert "--session-nonce" in result.stdout
+    assert "--session_nonce" not in result.stdout
+
+
+def test_workflow_start_rejects_underscore_session_nonce(run_myteam_inprocess, initialized_project: Path):
+    result = run_myteam_inprocess(
+        initialized_project,
+        "workflow-start",
+        "development",
+        "--session_nonce",
+        "session-nonce-123",
+    )
+
+    assert result.exit_code == 2
+    assert "--session-nonce" in result.stderr

@@ -52,7 +52,8 @@ The terminal contract is:
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
 - the child reports its final result over a private Unix socket keyed by the step's session nonce
-- `myteam workflow-result` and `myteam workflow-start` take `--session-nonce` so the agent can submit against the active step without relying on hidden env state
+- `myteam workflow-result` and `myteam workflow-start` take `--session-nonce` so the agent can 
+  submit against the active step without relying on hidden env state
 - Python workflow authors can pass `session_id` to `run_agent(...)` to resume, set `fork=True`
   to fork that session, and read `StepResult.session_id` from completed steps that return one
 - `run_agent(...)` launches agents from the detected project root by default; Python workflow
