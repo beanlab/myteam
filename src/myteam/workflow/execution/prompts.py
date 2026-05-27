@@ -24,7 +24,7 @@ def build_step_prompt(
                 "",
                 "If you are asked to launch a workflow, use this command:",
                 f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
-                "and pass any required input with `--json`, `--text`, or standard input",
+                "and pass any required input with `--json`",
                 "as needed.",
                 "Otherwise, perform the task yourself."
             ]
@@ -33,11 +33,6 @@ def build_step_prompt(
         sections.extend([
             "",
             "When you are ready to finish, use this command:",
-            f"`myteam workflow-result --session-nonce {session_nonce}`",
-            "The payload must match the output template shape shown below.",
-            "Pass the payload with `--json` or `--text`.",
-            "",
-            "Example payload:",
             f"`myteam workflow-result --session-nonce {session_nonce} --json '{json.dumps(output_template)}'`",
         ])
     if resolved_input is not None:
