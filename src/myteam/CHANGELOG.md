@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.2.27
+
+- Allow workflows to start nested workflows using `myteam workflow-start`.
+- Refactored workflow commands to rely on session nonce instead of environment variables to
+  allow for concurrency.
+- Refactored the structure of `src/myteam/workflow` to be more agent- and human-readable.
+
 ## 0.2.26
 
 - Expanded `myteam start` so it can resolve roles and skills in addition to Python and YAML 
