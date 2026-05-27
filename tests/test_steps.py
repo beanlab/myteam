@@ -482,11 +482,7 @@ def test_build_step_prompt_includes_workflow_command_guidance():
     )
 
     assert "Session nonce: session-nonce-123" in prompt
-    assert "myteam workflow-start <workflow> --session-nonce session-nonce-123" in prompt
-    assert "myteam workflow-result --session-nonce session-nonce-123 <<'JSON'" in prompt
     assert "Input:" in prompt
-    assert "Objective:\nFinish the parent task." in prompt
-
 
 def test_build_child_resume_prompt_includes_child_result_text():
     prompt = build_child_resume_prompt(

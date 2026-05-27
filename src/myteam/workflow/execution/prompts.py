@@ -35,14 +35,10 @@ def build_step_prompt(
             "When you are ready to finish, use this command:",
             f"`myteam workflow-result --session-nonce {session_nonce}`",
             "The payload must match the output template shape shown below.",
-            "Pass the payload with `--json`, `--text`, or standard input.",
+            "Pass the payload with `--json` or `--text`.",
             "",
             "Example payload:",
-            f"myteam workflow-result --session-nonce {session_nonce} <<'JSON'",
-            json.dumps(output_template, indent=2),
-            "JSON",
-            "",
-            "Do not print result markers in the terminal.",
+            f"`myteam workflow-result --session-nonce {session_nonce} --json '{json.dumps(output_template)}'`",
         ])
     if resolved_input is not None:
         sections.extend(
