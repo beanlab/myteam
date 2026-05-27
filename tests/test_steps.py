@@ -483,7 +483,6 @@ def test_build_step_prompt_includes_workflow_command_guidance():
 
     assert "Session nonce: session-nonce-123" in prompt
     assert "myteam workflow-start <workflow> --session-nonce session-nonce-123" in prompt
-    assert "myteam workflow-result --session-nonce session-nonce-123" in prompt
     assert "myteam workflow-result --session-nonce session-nonce-123 <<'JSON'" in prompt
     assert "Input:" in prompt
     assert "Objective:\nFinish the parent task." in prompt
@@ -495,7 +494,9 @@ def test_build_child_resume_prompt_includes_child_result_text():
         child_result={"status": "completed", "output": {"summary": "done"}},
     )
 
-    assert "child-workflow result:" in prompt
+    assert prompt.startswith("child-workflow result:")
+    assert '"status": "completed"' in prompt
+    assert '"summary": "done"' in prompt
 
 
 def test_run_agent_reuses_nonce_after_child_workflow_request(monkeypatch, tmp_path):

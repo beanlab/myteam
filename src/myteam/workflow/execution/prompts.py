@@ -22,18 +22,22 @@ def build_step_prompt(
                 "",
                 "Use this nonce with both workflow commands.",
                 "",
-                "If you are asked to launch a workflow, run",
+                "If you are asked to launch a workflow, use this command:",
                 f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
-                "and pass required input with `--json`, `--text`, or standard input.",
+                "and pass any required input with `--json`, `--text`, or standard input",
+                "as needed.",
                 "Otherwise, perform the task yourself."
             ]
         )
     if output_template:
         sections.extend([
             "",
-            "Return the final workflow result by calling this command:",
-            "Replace the placeholder values below with the real final result content.",
+            "When you are ready to finish, use this command:",
+            f"`myteam workflow-result --session-nonce {session_nonce}`",
+            "The payload must match the output template shape shown below.",
+            "Pass the payload with `--json`, `--text`, or standard input.",
             "",
+            "Example payload:",
             f"myteam workflow-result --session-nonce {session_nonce} <<'JSON'",
             json.dumps(output_template, indent=2),
             "JSON",
@@ -69,7 +73,7 @@ def build_child_resume_prompt(
             "Error:",
             f"{err}",
             "",
-            "Correct the error and try again"
+            "Correct the error and try again with updated input if needed.",
         ])
     else:
         sections.extend([
@@ -77,6 +81,6 @@ def build_child_resume_prompt(
             "",
             "Continue your objective or summarize the result for the user if there",
             "is no clear next step. Do not call workflow-result unless your objective",
-            "has been met."
+            "has been met.",
         ])
     return "\n".join(sections)
