@@ -147,6 +147,7 @@ def test_agent_context_loads_project_defaults_once(monkeypatch, tmp_path):
         exit_input: bytes,
         cwd,
         inactivity_timeout_seconds: int,
+        payload_validator=None,
     ) -> TerminalSessionResult:
         return TerminalSessionResult(
             exit_code=0,
@@ -195,6 +196,7 @@ def test_run_agent_uses_project_defaults(monkeypatch, tmp_path):
         exit_input: bytes,
         cwd,
         inactivity_timeout_seconds: int,
+        payload_validator=None,
     ) -> TerminalSessionResult:
         seen["argv"] = argv
         seen["cwd"] = cwd
@@ -256,6 +258,7 @@ def test_run_agent_explicit_none_falls_back_to_project_defaults(monkeypatch, tmp
         exit_input: bytes,
         cwd,
         inactivity_timeout_seconds: int,
+        payload_validator=None,
     ) -> TerminalSessionResult:
         seen["argv"] = argv
         return TerminalSessionResult(
@@ -307,6 +310,7 @@ def test_run_agent_defaults_missing_output_to_empty_mapping(monkeypatch, tmp_pat
         exit_input: bytes,
         cwd,
         inactivity_timeout_seconds: int,
+        payload_validator=None,
     ) -> TerminalSessionResult:
         return TerminalSessionResult(
             exit_code=0,
@@ -1351,6 +1355,7 @@ def test_run_agent_runs_child_workflow_then_resumes_parent_session(monkeypatch, 
         exit_input: bytes,
         cwd,
         inactivity_timeout_seconds: int,
+        payload_validator=None,
     ) -> TerminalSessionResult:
         seen["terminal_calls"].append(argv)
         if len(seen["terminal_calls"]) == 1:
@@ -1420,6 +1425,7 @@ def test_run_agent_resumes_parent_with_child_failure_details(monkeypatch, tmp_pa
         exit_input: bytes,
         cwd,
         inactivity_timeout_seconds: int,
+        payload_validator=None,
     ) -> TerminalSessionResult:
         seen.setdefault("prompts", []).append(argv[-1])
         if len(seen["prompts"]) == 1:
