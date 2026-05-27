@@ -204,7 +204,7 @@ def _run_python_child_workflow(
 
 
 def _load_prompt(name_dir: Path, name: str | None, *, dir_type: str, project_root: Path) -> str:
-    from ..commands import _run_load_py
+    from ...commands import _run_load_py
 
     result = _run_load_py(dir_type, name_dir, name, project_root=project_root)
     if result.returncode != 0:
