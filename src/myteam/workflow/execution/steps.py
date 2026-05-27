@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -579,3 +580,15 @@ def _build_agent_argv(
         )
 
     return argv
+
+def _build_payload_validator(output_template: dict[str, Any]) -> Callable[[Any], str | None]:
+    expected_output = json.dumps(output_template, indent=2)
+
+    def validate(payload: Any) -> str | None:
+        try:
+            validate_step_output(output_template, payload)
+        except ValueError:
+            return "output format mismatch\nRequired output format:\n" + expected_output
+        return None
+
+    return validate
