@@ -217,11 +217,6 @@ def _validate_workflow_settings(
     *,
     source_path: Path,
 ) -> WorkflowStepSettings:
-    if "input" in loaded:
-        raise ValueError(
-            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.input' is not supported."
-        )
-
     allowed_keys = {
         "agent",
         "model",
@@ -245,6 +240,11 @@ def _validate_workflow_settings(
     if output_value is not None and not isinstance(output_value, dict):
         raise ValueError(
             f"Workflow definition file {source_path} frontmatter field 'workflow-settings.output' must be a mapping."
+        )
+    input_value = loaded.get("input")
+    if input_value is not None and not isinstance(input_value, dict):
+        raise ValueError(
+            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.input' must be a mapping."
         )
 
     fork = _load_optional_bool(loaded, "fork", source_path=source_path)
