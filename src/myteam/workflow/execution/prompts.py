@@ -75,8 +75,8 @@ def build_child_resume_prompt(
         sections.extend([
             json.dumps(child_result, indent=2),
             "",
-            "This is an intermediate workflow result, **not** the final result.",
             "Continue your objective or summarize the result for the user if there",
-            "is no clear next step."
+            "is no clear next step. Do not call workflow-result unless your objective",
+            "has been met."
         ])
     return "\n".join(sections)
