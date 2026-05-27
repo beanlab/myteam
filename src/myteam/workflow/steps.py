@@ -244,41 +244,18 @@ class AgentContext:
         state: RunState,
         exc: Exception,
     ) -> StepResult:
+        collect_usage = False
         if isinstance(exc, StepExecutionError):
-            if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
-                self._collect_usage_after_failure(state=state)
-                self._print_usage(state)
-            return StepResult(
-                status="failed",
-                error_type=exc.error_type,
-                error_message=exc.error_message,
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = exc.error_type
+            error_message = exc.error_message
+            collect_usage = error_type in {"completion_missing", "output_validation", "session_discovery"}
         if isinstance(exc, ValidationError):
-            return StepResult(
-                status="failed",
-                error_type="argument_validation",
-                error_message=str(exc),
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = "argument_validation"
+            error_message = str(exc)
         if isinstance(exc, TimeoutError):
-            self._collect_usage_after_failure(state=state)
-            self._print_usage(state)
-            return StepResult(
-                status="failed",
-                error_type="timeout",
-                error_message=str(exc),
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = "timeout"
+            error_message = str(exc)
+            collect_usage = True
         if isinstance(exc, OSError):
             return StepResult(
                 status="failed",
@@ -287,6 +264,18 @@ class AgentContext:
                 transcript=state.transcript,
                 usage_state="not_attempted",
             )
+        if collect_usage:
+            self._collect_usage_after_failure(state=state)
+            self._print_usage(state)
+        return StepResult(
+            status="failed",
+            error_type=error_type,
+            error_message=error_message,
+            transcript=state.transcript,
+            usage=state.usage,
+            usage_state=state.usage_state,
+            usage_error_message=state.usage_error_message,
+        )
         raise exc
 
     def _resolve_agent_config(self, agent_name: str) -> AgentRuntimeConfig:
