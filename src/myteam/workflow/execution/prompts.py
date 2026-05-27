@@ -21,7 +21,7 @@ def build_step_prompt(
                 f"Session nonce: {session_nonce}",
                 "",
                 "Use this nonce with both workflow commands.",
-                "If you are asked to launch a workflow, run",
+                "If asked to launch a workflow, run",
                 f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
                 "and pass required input with `--json`, `--text`, or standard input.",
             ]
