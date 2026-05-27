@@ -38,9 +38,6 @@ def test_control_channel_rejects_duplicate_request():
             submit_child_workflow_request("other", socket_path=channel.socket_path, token=channel.token)
 
 
-def test_submit_child_workflow_request_requires_connection_details(monkeypatch):
-    monkeypatch.delenv("MYTEAM_CONTROL_SOCKET", raising=False)
-    monkeypatch.delenv("MYTEAM_CONTROL_TOKEN", raising=False)
-
-    with pytest.raises(ValueError, match="Missing session nonce or MYTEAM_CONTROL_SOCKET or MYTEAM_CONTROL_TOKEN"):
+def test_submit_child_workflow_request_requires_connection_details():
+    with pytest.raises(ValueError, match="Missing session nonce"):
         submit_child_workflow_request("demo")

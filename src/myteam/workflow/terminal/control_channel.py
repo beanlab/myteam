@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-import os
 import secrets
 import socket
 import tempfile
@@ -132,16 +131,15 @@ def submit_child_workflow_request(
 ) -> None:
     if session_nonce is not None:
         resolved_socket, resolved_token = _resolve_channel_details(session_nonce, kind="control")
+        if socket_path is not None:
+            resolved_socket = socket_path
+        if token is not None:
+            resolved_token = token
     else:
-        resolved_socket = socket_path or os.environ.get(CONTROL_SOCKET_ENV)
-        resolved_token = token or os.environ.get(CONTROL_TOKEN_ENV)
-        if not resolved_socket or not resolved_token:
-            raise ValueError("Missing session nonce or MYTEAM_CONTROL_SOCKET or MYTEAM_CONTROL_TOKEN.")
-
-    if socket_path is not None:
         resolved_socket = socket_path
-    if token is not None:
         resolved_token = token
+        if not resolved_socket or not resolved_token:
+            raise ValueError("Missing session nonce.")
 
     message = {
         "version": 1,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import json
-import os
 import secrets
 import socket
 import tempfile
@@ -120,16 +119,15 @@ def submit_result_payload(
 ) -> None:
     if session_nonce is not None:
         resolved_socket, resolved_token = load_channel_details(session_nonce, "result")
+        if socket_path is not None:
+            resolved_socket = socket_path
+        if token is not None:
+            resolved_token = token
     else:
-        resolved_socket = socket_path or os.environ.get(RESULT_SOCKET_ENV)
-        resolved_token = token or os.environ.get(RESULT_TOKEN_ENV)
-        if not resolved_socket or not resolved_token:
-            raise ValueError("Missing session nonce or MYTEAM_RESULT_SOCKET or MYTEAM_RESULT_TOKEN.")
-
-    if socket_path is not None:
         resolved_socket = socket_path
-    if token is not None:
         resolved_token = token
+        if not resolved_socket or not resolved_token:
+            raise ValueError("Missing session nonce.")
 
     message = {
         "version": 1,
