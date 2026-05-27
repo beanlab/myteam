@@ -32,6 +32,7 @@ class AgentContext:
         usage_logging: Literal["none","summary","per_model","verbose"] = "summary",
         cwd: Path | str | None = None,
         inactivity_timeout_seconds: int = 300,
+        # TODO: allow passing in default settings
     ) -> None:
         self.usage_logging = usage_logging
         self.cwd = None if cwd is None else Path(cwd).resolve()
@@ -128,6 +129,7 @@ class AgentContext:
         )
 
         try:
+            # TODO: change agent_name to agent and then just unpack it
             validate_step_execution_args(
                 agent_name=resolved_args["agent"],
                 interactive=resolved_args["interactive"],

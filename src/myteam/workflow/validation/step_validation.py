@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-
+# TODO: change all validation to use pydantic as much as possible (or .get())
 def validate_step_execution_args(
     *,
     agent_name: str,
