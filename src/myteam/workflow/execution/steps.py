@@ -24,8 +24,6 @@ from ..validation import validate_step_execution_args, validate_step_output
 from ..terminal.session import TerminalSessionResult, run_terminal_session
 from ..terminal.control_channel import ChildWorkflowRequest
 
-_MISSING = object()
-
 class AgentContext:
     def __init__(
         self,
@@ -76,9 +74,9 @@ class AgentContext:
         input: Any = None,
         agent: str | None = None,
         model: str | None = None,
-        interactive: Any = _MISSING,
+        interactive: bool | None = None,
         session_id: str | None = None,
-        fork: Any = _MISSING,
+        fork: bool | None = None,
         extra_args: Any = None,
     ) -> StepResult:
         state = RunState()
@@ -133,9 +131,9 @@ class AgentContext:
         input: Any,
         agent: str | None,
         model: str | None,
-        interactive: Any,
+        interactive: bool | None,
         session_id: str | None,
-        fork: Any,
+        fork: bool | None,
         extra_args: Any,
     ) -> PreparedStep:
         nonce = str(uuid.uuid4())
@@ -423,50 +421,32 @@ class AgentContext:
         input: Any,
         agent: str | None,
         model: str | None,
-        interactive: Any,
+        interactive: bool | None,
         session_id: str | None,
-        fork: Any,
+        fork: bool | None,
         extra_args: Any,
     ) -> dict[str, Any]:
-        resolved: dict[str, Any] = {
-            "input": None,
-            "agent": None,
-            "model": None,
-            "interactive": True,
-            "session_id": None,
-            "fork": False,
-            "extra_args": None,
-        }
         defaults = self.project_defaults
-        if defaults is not None:
-            if defaults.agent is not None:
-                resolved["agent"] = defaults.agent
-            if defaults.model is not None:
-                resolved["model"] = defaults.model
-            if defaults.interactive is not None:
-                resolved["interactive"] = defaults.interactive
-            if defaults.session_id is not None:
-                resolved["session_id"] = defaults.session_id
-            if defaults.fork is not None:
-                resolved["fork"] = defaults.fork
-            if defaults.extra_args is not None:
-                resolved["extra_args"] = list(defaults.extra_args)
+        default_agent = defaults.agent if defaults is not None and defaults.agent is not None else None
+        default_model = defaults.model if defaults is not None and defaults.model is not None else None
+        default_interactive = (
+            defaults.interactive if defaults is not None and defaults.interactive is not None else True
+        )
+        default_session_id = defaults.session_id if defaults is not None and defaults.session_id is not None else None
+        default_fork = defaults.fork if defaults is not None and defaults.fork is not None else False
+        default_extra_args = (
+            list(defaults.extra_args) if defaults is not None and defaults.extra_args is not None else None
+        )
 
-        if input is not None:
-            resolved["input"] = input
-        if agent is not None:
-            resolved["agent"] = agent
-        if model is not None:
-            resolved["model"] = model
-        if interactive is not _MISSING and interactive is not None:
-            resolved["interactive"] = interactive
-        if session_id is not None:
-            resolved["session_id"] = session_id
-        if fork is not _MISSING and fork is not None:
-            resolved["fork"] = fork
-        if extra_args is not None:
-            resolved["extra_args"] = extra_args
-        return resolved
+        return {
+            "input": input,
+            "agent": agent if agent is not None else default_agent,
+            "model": model if model is not None else default_model,
+            "interactive": interactive if interactive is not None else default_interactive,
+            "session_id": session_id if session_id is not None else default_session_id,
+            "fork": fork if fork is not None else default_fork,
+            "extra_args": extra_args if extra_args is not None else default_extra_args,
+        }
 
     def _collect_usage_after_failure(
         self,
@@ -532,9 +512,9 @@ def run_agent(
     input: Any = None,
     agent: str | None = None,
     model: str | None = None,
-    interactive: Any = _MISSING,
+    interactive: bool | None = None,
     session_id: str | None = None,
-    fork: Any = _MISSING,
+    fork: bool | None = None,
     extra_args: Any = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
