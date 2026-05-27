@@ -21,16 +21,15 @@ def build_step_prompt(
                 f"Session nonce: {session_nonce}",
                 "",
                 "Use this nonce with both workflow commands.",
-                "If you are asked to launch a child workflow, call",
+                "If you are asked to launch a workflow, run",
                 f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
-                "and pass the child input with `--json`, `--text`, or standard input.",
+                "and pass required input with `--json`, `--text`, or standard input.",
             ]
         )
     if output_template:
         sections.extend([
             "Return the final workflow result by calling this command:",
             "Replace the placeholder values below with the real final result content.",
-            "If the command reports an output format mismatch, correct the payload and try again.",
             "",
             f"myteam workflow-result --session-nonce {session_nonce} <<'JSON'",
             json.dumps(output_template, indent=2),
@@ -61,12 +60,18 @@ def build_child_resume_prompt(
     child_workflow: str,
     child_result: dict[str, Any],
 ) -> str:
-    sections = [
-        f"Child workflow completed: {child_workflow}",
-        "",
-        "Child workflow result:",
-        json.dumps(child_result, indent=2),
-        "",
-        "Continue from the point where you requested the child workflow.",
-    ]
+    sections = [f"{child_workflow} result:"]
+    if (err := child_result.get("error_message")) is not None:
+        sections.extend([
+            "Error:",
+            f"{err}",
+            "",
+            "Correct the error and try again"
+        ])
+    else:
+        sections.extend([
+            json.dumps(child_result, indent=2),
+            "",
+            "Continue from the point where you requested the child workflow.",
+        ])
     return "\n".join(sections)

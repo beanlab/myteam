@@ -81,3 +81,29 @@ def test_python_child_workflow_can_return_step_result(initialized_project: Path,
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
+
+
+def test_role_child_workflow_reports_missing_required_input(initialized_project: Path, monkeypatch):
+    role_dir = initialized_project / ".myteam" / "role-as-workflow"
+    role_dir.mkdir()
+    (role_dir / "role.md").write_text(
+        "---\n"
+        "workflow-settings:\n"
+        "  input:\n"
+        "    file: absolute path to the file to review\n"
+        "---\n\n"
+        "Please review {file}.\n",
+        encoding="utf-8",
+    )
+    (role_dir / "load.py").write_text("print('ROLE PROMPT')\n", encoding="utf-8")
+    monkeypatch.chdir(initialized_project)
+
+    result = run_named_workflow("role-as-workflow")
+
+    assert result.status == "failed"
+    assert result.error_message is not None
+    assert "input contract mismatch" in result.error_message
+    assert "Required input shape:" in result.error_message
+    assert "file: absolute path to the file to review" in result.error_message
+    assert "Received: <none>." in result.error_message
+    assert "Missing keys: file (absolute path to the file to review)." in result.error_message

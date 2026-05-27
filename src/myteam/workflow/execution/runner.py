@@ -221,13 +221,75 @@ def _validate_input(
 ) -> Any:
     if required_input is None:
         return input_value
-    if not isinstance(input_value, dict):
-        raise ValueError(f"Input for {dir_type} '{workflow}' must be a mapping.")
+    if input_value is None or not isinstance(input_value, dict):
+        _raise_input_contract_mismatch(
+            required_input,
+            input_value,
+            workflow=workflow,
+            dir_type=dir_type,
+        )
     missing = [key for key in required_input if key not in input_value]
     if missing:
-        missing_text = ", ".join(str(key) for key in missing)
-        raise ValueError(f"Input for {dir_type} '{workflow}' is missing required keys: {missing_text}.")
+        _raise_input_contract_mismatch(
+            required_input,
+            input_value,
+            workflow=workflow,
+            dir_type=dir_type,
+        )
     return input_value
+
+
+def _raise_input_contract_mismatch(
+    required_input: dict[str, Any],
+    input_value: Any,
+    *,
+    workflow: str,
+    dir_type: str,
+) -> None:
+    received = "<none>" if input_value is None else repr(input_value)
+    required = _format_required_input(required_input)
+    missing = _format_required_input(
+        {
+            key: required_input[key]
+            for key in required_input
+            if not isinstance(input_value, dict) or key not in input_value
+        }
+    )
+    unexpected = "<none>"
+    if isinstance(input_value, dict):
+        unexpected = _format_input_keys({key: input_value[key] for key in input_value if key not in required_input}) or "<none>"
+    raise ValueError(
+        f"Workflow settings for {dir_type} '{workflow}' input contract mismatch.\n"
+        f"{_format_required_input_shape(required_input)}\n"
+        f"Received: {received}.\n"
+        f"Missing keys: {missing}.\n"
+        f"Unexpected keys: {unexpected}."
+    )
+
+
+def _format_required_input(required_input: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for key, description in required_input.items():
+        if isinstance(description, str) and description.strip():
+            parts.append(f"{key} ({description.strip()})")
+        else:
+            parts.append(str(key))
+    return ", ".join(parts)
+
+
+def _format_required_input_shape(required_input: dict[str, Any]) -> str:
+    lines = ["Required input shape:"]
+    for key, description in required_input.items():
+        if isinstance(description, str) and description.strip():
+            lines.append(f"  {key}: {description.strip()}")
+        else:
+            lines.append(f"  {key}: <required>")
+    return "\n".join(lines)
+
+
+def _format_input_keys(input_value: dict[str, Any]) -> str:
+    keys = sorted(str(key) for key in input_value)
+    return ", ".join(keys)
 
 
 def _format_prompt(prompt: str, input_value: dict[str, Any]) -> str:
