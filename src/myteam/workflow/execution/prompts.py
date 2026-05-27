@@ -57,6 +57,7 @@ def build_step_prompt(
 
 def build_child_resume_prompt(
     *,
+    session_nonce: str | None,
     child_workflow: str,
     child_result: dict[str, Any],
 ) -> str:
@@ -73,5 +74,6 @@ def build_child_resume_prompt(
             json.dumps(child_result, indent=2),
             "",
             "Continue from the point where you requested the child workflow.",
+            f"DEBUG: Your nonce is {session_nonce}"
         ])
     return "\n".join(sections)

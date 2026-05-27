@@ -185,6 +185,7 @@ class AgentContext:
             nonce=nonce,
             agent_config=agent_config,
             prompt_text=prompt_text,
+            objective_text=prompt,
             argv=argv,
             resolved_input=resolved_args["input"],
             output_template=output_template,
@@ -277,7 +278,12 @@ class AgentContext:
                 "failed_step_name": child_result.failed_step_name,
             }
 
+        resume_nonce = str(uuid.uuid4())
         resume_prompt = build_child_resume_prompt(
+            session_nonce=resume_nonce,
+            objective_text=prepared.objective_text,
+            resolved_input=prepared.resolved_input,
+            output_template=original_output_template,
             child_workflow=request.workflow,
             child_result=child_payload,
         )
@@ -292,9 +298,10 @@ class AgentContext:
         )
 
         return PreparedStep(
-            nonce=str(uuid.uuid4()),
+            nonce=resume_nonce,
             agent_config=prepared.agent_config,
             prompt_text=resume_prompt,
+            objective_text=prepared.objective_text,
             argv=argv,
             resolved_input=prepared.resolved_input,
             output_template=original_output_template,

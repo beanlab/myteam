@@ -62,6 +62,7 @@ class PreparedStep:
     nonce: str
     agent_config: "AgentRuntimeConfig"
     prompt_text: str
+    objective_text: str
     argv: list[str]
     resolved_input: Any
     output_template: dict[str, Any]

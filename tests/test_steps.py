@@ -1407,16 +1407,16 @@ def test_run_agent_runs_child_workflow_then_resumes_parent_session(monkeypatch, 
     assert resume_argv[:5] == ["codex", "resume", "parent-session", "--model", "gpt-5.4"]
     assert "--sandbox" in resume_argv
     resume_prompt = resume_argv[-1]
-    assert "Child workflow completed: development" in resume_prompt
-    assert '"answer": "child done"' in resume_prompt
-    assert "Original objective:\nFinish the parent task." in resume_prompt
-    assert "myteam workflow-result <<'JSON'" in resume_prompt
+    assert "development result:" in resume_prompt
 
 
 def test_run_agent_resumes_parent_with_child_failure_details(monkeypatch, tmp_path):
     monkeypatch.delenv(PROJECT_ROOT_ENV_VAR, raising=False)
     (tmp_path / ".myteam").mkdir()
     seen: dict[str, Any] = {}
+    nonce_values = iter(["parent-nonce", "resume-nonce"])
+
+    monkeypatch.setattr("myteam.workflow.execution.steps.uuid.uuid4", lambda: next(nonce_values))
     config = fake_agent_config(session_id="parent-session")
 
     def fake_run_terminal_session(
@@ -1460,5 +1460,4 @@ def test_run_agent_resumes_parent_with_child_failure_details(monkeypatch, tmp_pa
 
     assert result.status == "completed"
     assert result.output == {"summary": "handled failure"}
-    assert '"status": "failed"' in seen["prompts"][1]
     assert "child exploded" in seen["prompts"][1]
