@@ -42,7 +42,7 @@ class AgentContext:
         *,
         usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None,
         cwd: Path | str | None = None,
-        inactivity_timeout_seconds: int | None = None,
+        timeout: int | None = None,
         project_defaults: ProjectWorkflowDefaults | None = None,
     ) -> None:
         self.cwd = None if cwd is None else Path(cwd).resolve()
@@ -59,11 +59,11 @@ class AgentContext:
             else (self.project_defaults.usage_logging if self.project_defaults and self.project_defaults.usage_logging is not None else "summary")
         )
         self.timeout = (
-            inactivity_timeout_seconds
-            if inactivity_timeout_seconds is not None
+            timeout
+            if timeout is not None
             else (
-                self.project_defaults.inactivity_timeout_seconds
-                if self.project_defaults and self.project_defaults.inactivity_timeout_seconds is not None
+                self.project_defaults.timeout
+                if self.project_defaults and self.project_defaults.timeout is not None
                 else 300
             )
         )
@@ -209,7 +209,7 @@ class AgentContext:
             **self._terminal_session_kwargs(
                 exit_input=prepared.agent_config.exit_sequence,
                 cwd=self.launch_cwd,
-                inactivity_timeout_seconds=self.timeout,
+                timeout=self.timeout,
                 session_nonce=prepared.nonce,
             ),
             payload_validator=_build_payload_validator(prepared.output_template),
@@ -225,13 +225,13 @@ class AgentContext:
         *,
         exit_input: bytes,
         cwd: Path | str | None,
-        inactivity_timeout_seconds: int,
+        timeout: int,
         session_nonce: str | None,
     ) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
             "exit_input": exit_input,
             "cwd": cwd,
-            "inactivity_timeout_seconds": inactivity_timeout_seconds,
+            "timeout": timeout,
         }
         if session_nonce is None:
             return kwargs

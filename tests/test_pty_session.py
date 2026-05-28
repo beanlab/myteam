@@ -20,7 +20,7 @@ def _helper_argv(mode: str, *args: str) -> list[str]:
 def test_pty_session_events_yield_output_and_support_enqueued_input(capfd: pytest.CaptureFixture[str]):
     recording = TerminalRecording()
 
-    with PtySession(_helper_argv("wait_for_quit"), inactivity_timeout_seconds=1) as session:
+    with PtySession(_helper_argv("wait_for_quit"), timeout=1) as session:
         events = session.events()
         while True:
             try:
@@ -41,7 +41,7 @@ def test_pty_session_events_yield_output_and_support_enqueued_input(capfd: pytes
 def test_pty_session_exit_input_preserves_backend_submit_sequence(capfd: pytest.CaptureFixture[str]):
     recording = TerminalRecording()
 
-    with PtySession(_helper_argv("require_submit_sequence"), inactivity_timeout_seconds=1) as session:
+    with PtySession(_helper_argv("require_submit_sequence"), timeout=1) as session:
         events = session.events()
         while True:
             try:
@@ -63,7 +63,7 @@ def test_pty_session_exit_input_preserves_backend_submit_sequence(capfd: pytest.
 def test_pty_session_gives_child_a_controlling_terminal(capfd: pytest.CaptureFixture[str]):
     recording = TerminalRecording()
 
-    with PtySession(_helper_argv("controlling_tty"), inactivity_timeout_seconds=1) as session:
+    with PtySession(_helper_argv("controlling_tty"), timeout=1) as session:
         events = session.events()
         while True:
             try:
@@ -80,7 +80,7 @@ def test_pty_session_gives_child_a_controlling_terminal(capfd: pytest.CaptureFix
 
 
 def test_pty_session_times_out_after_inactivity():
-    with PtySession(_helper_argv("silent"), inactivity_timeout_seconds=1) as session:
+    with PtySession(_helper_argv("silent"), timeout=1) as session:
         with pytest.raises(TimeoutError, match="became inactive for 1 seconds"):
             events = session.events()
             next(events)

@@ -46,7 +46,7 @@ class ProjectWorkflowDefaults(BaseModel):
     fork: Optional[bool] = Field(default=None)
     extra_args: Optional[list[str]] = Field(default=None)
     usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
-    inactivity_timeout_seconds: Optional[PositiveInt] = Field(default=None)
+    timeout: Optional[PositiveInt] = Field(default=None)
 
 
 class StepDefinitionModel(BaseModel):

@@ -33,7 +33,7 @@ def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_pat
     assert seen["context_kwargs"] == {
         "cwd": tmp_path,
         "usage_logging": None,
-        "inactivity_timeout_seconds": None,
+        "timeout": None,
     }
     assert isinstance(seen["run_agent_kwargs"]["prompt"], str)
     assert seen["run_agent_kwargs"]["prompt"]
@@ -52,7 +52,7 @@ def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeyp
         fork=False,
         extra_args=("--sandbox", "workspace-write"),
         usage_logging="verbose",
-        inactivity_timeout_seconds=77,
+        timeout=77,
     )
 
     class FakeAgentContext:
@@ -81,7 +81,7 @@ def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeyp
     assert seen["context_kwargs"] == {
         "cwd": tmp_path,
         "usage_logging": "verbose",
-        "inactivity_timeout_seconds": 77,
+        "timeout": 77,
     }
     assert seen["run_agent_kwargs"]["prompt"]
     assert seen["run_agent_kwargs"]["agent"] == "codex"

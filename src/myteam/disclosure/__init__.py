@@ -24,7 +24,7 @@ class WorkflowStepSettings:
     fork: bool | None = None
     extra_args: tuple[str, ...] | None = None
     usage_logging: str | None = None
-    inactivity_timeout_seconds: int | None = None
+    timeout: int | None = None
 
 PROJECT_ROOT_ENV_VAR = "MYTEAM_PROJECT_ROOT"
 
@@ -227,7 +227,7 @@ def _validate_workflow_settings(
         "fork",
         "extra_args",
         "usage_logging",
-        "inactivity_timeout_seconds",
+        "timeout",
     }
     unknown_keys = sorted(set(loaded) - allowed_keys)
     if unknown_keys:
@@ -264,9 +264,9 @@ def _validate_workflow_settings(
         fork=fork,
         extra_args=_load_optional_string_list(loaded, "extra_args", source_path=source_path),
         usage_logging=_load_optional_usage_logging(loaded, source_path=source_path),
-        inactivity_timeout_seconds=_load_optional_positive_int(
+        timeout=_load_optional_positive_int(
             loaded,
-            "inactivity_timeout_seconds",
+            "timeout",
             source_path=source_path,
         ),
     )

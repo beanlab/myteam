@@ -26,7 +26,7 @@ def run_terminal_session(
     exit_input: bytes,
     payload_validator: Callable[[Any], str | None] | None = None,
     cwd: Path | str | None = None,
-    inactivity_timeout_seconds: int = 300,
+    timeout: int = 300,
     session_nonce: str | None = None,
 ) -> TerminalSessionResult:
     recording = TerminalRecording()
@@ -35,7 +35,7 @@ def run_terminal_session(
             argv,
             env=None,
             cwd=cwd,
-            inactivity_timeout_seconds=inactivity_timeout_seconds,
+            timeout=timeout,
         ) as session:
             _start_result_watcher(
                 session,

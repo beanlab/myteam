@@ -14,7 +14,7 @@ _ALLOWED_KEYS = {
     "fork",
     "extra_args",
     "usage_logging",
-    "inactivity_timeout_seconds",
+    "timeout",
 }
 _REQUIRED_STEP_KEYS = {"prompt"}
 _OPTIONAL_STEP_KEYS = {
@@ -211,9 +211,9 @@ def validate_project_workflow_defaults(
         fork=_load_optional_bool(defaults, "fork", config_path),
         extra_args=_load_optional_string_list(defaults, "extra_args", config_path),
         usage_logging=_load_optional_usage_logging(defaults, config_path),
-        inactivity_timeout_seconds=_load_optional_positive_int(
+        timeout=_load_optional_positive_int(
             defaults,
-            "inactivity_timeout_seconds",
+            "timeout",
             config_path,
         ),
     )

@@ -24,14 +24,14 @@ class PtySession:
         *,
         env: Mapping[str, str] | None = None,
         cwd: Path | str | None = None,
-        inactivity_timeout_seconds: int = 600,
+        timeout: int = 600,
         mirror_stdout: bool = True,
         forward_stdin: bool = True,
     ) -> None:
         self.argv = argv
         self.env = None if env is None else dict(env)
         self.cwd = None if cwd is None else Path(cwd)
-        self.inactivity_timeout_seconds = inactivity_timeout_seconds
+        self.timeout = timeout
         self.mirror_stdout = mirror_stdout
         self.forward_stdin = forward_stdin
         self.process: subprocess.Popen[bytes] | None = None
@@ -112,7 +112,7 @@ class PtySession:
                     continue
                 return self.process.wait()
 
-            timeout = max(0.0, self.inactivity_timeout_seconds - (time.monotonic() - last_output_at))
+            timeout = max(0.0, self.timeout - (time.monotonic() - last_output_at))
             read_fds = [self._master_fd, self._wakeup_r]
             if self._stdin_fd is not None and not self._stdin_closed:
                 read_fds.append(self._stdin_fd)
@@ -120,7 +120,7 @@ class PtySession:
             ready, _, _ = select.select(read_fds, [], [], timeout)
             if not ready:
                 raise TimeoutError(
-                    f"PTY session became inactive for {self.inactivity_timeout_seconds} seconds."
+                    f"PTY session became inactive for {self.timeout} seconds."
                 )
 
             if self._wakeup_r in ready:
