@@ -5,22 +5,34 @@ import os
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pyparsing import Literal
+from pydantic import ValidationError
 
 from .agents import resolve_agent_runtime_config
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from .models import StepResult, UsageInfo, PreparedStep, RunState
+from .config import load_project_workflow_defaults
+from .models import ProjectWorkflowDefaults, StepExecutionArgs, StepResult, UsageInfo, PreparedStep, RunState
 from .usage import (
     print_aggregated_usage_summary,
     print_usage_summary,
     resolve_usage_session_path,
     resolve_usage_tracking,
 )
-from .validation.step_validation import validate_step_execution_args, validate_step_output
 from .terminal.session import TerminalSessionResult, run_terminal_session
 from ..disclosure import PROJECT_ROOT_ENV_VAR
+
+
+def _validate_output_node(template: Any, value: Any, *, path: str) -> None:
+    if not isinstance(template, dict):
+        return
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must be a mapping.")
+    for key, nested in template.items():
+        if key not in value:
+            raise ValueError(f"{path}.{key} is missing.")
+        _validate_output_node(nested, value[key], path=f"{path}.{key}")
+
 
 class AgentContext:
     def __init__(
@@ -29,12 +41,18 @@ class AgentContext:
         usage_logging: Literal["none","summary","per_model","verbose"] = "summary",
         cwd: Path | str | None = None,
         inactivity_timeout_seconds: int = 300,
+        project_defaults: ProjectWorkflowDefaults | None = None,
     ) -> None:
         self.usage_logging = usage_logging
         self.cwd = None if cwd is None else Path(cwd).resolve()
         self.project_root = _resolve_project_root(cwd=self.cwd)
         self.timeout = inactivity_timeout_seconds
         self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
+        self.project_defaults = (
+            project_defaults
+            or load_project_workflow_defaults(self.project_root)
+            or ProjectWorkflowDefaults()
+        )
         self.session_context = AgentSessionContext(
             home=Path.home().resolve(),
             project_root=self.project_root,
@@ -49,27 +67,36 @@ class AgentContext:
     def __exit__(self, exc_type, exc, tb) -> None:
         if not self._usage_totals_by_model or self.usage_logging == "none":
             return
-        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
+        self.print_usage()
 
     def run_agent(
         self,
         *,
         prompt: str,
-        output: dict[str, Any],
+        output: dict[str, Any] | None = None,
         input: Any = None,
         agent: str | None = None,
         model: str | None = None,
-        interactive: bool = True,
+        interactive: bool | None = None,
         session_id: str | None = None,
-        fork: bool = False,
-        extra_args: list[str] | None = None,
+        fork: bool | None = None,
+        extra_args: Any = None,
     ) -> StepResult:
         state = RunState()
         try:
+            if output is None:
+                output_template: dict[str, Any] = {}
+            elif isinstance(output, dict):
+                output_template = output
+            else:
+                raise StepExecutionError(
+                    "argument_validation",
+                    "Step definition field 'output' must be a mapping when provided.",
+                )
             prepared = self._prepare_step(
                 state=state,
                 prompt=prompt,
-                output_template=output,
+                output_template=output_template,
                 input=input,
                 agent=agent,
                 model=model,
@@ -96,31 +123,29 @@ class AgentContext:
         input: Any,
         agent: str | None,
         model: str | None,
-        interactive: bool,
+        interactive: bool | None,
         session_id: str | None,
-        fork: bool,
-        extra_args: list[str] | None,
+        fork: bool | None,
+        extra_args: Any,
     ) -> PreparedStep:
         nonce = str(uuid.uuid4())
         state.nonce = nonce
 
-        try:
-            validate_step_execution_args(
-                agent_name=agent,
-                interactive=interactive,
-                session_id=session_id,
-                fork=fork,
-                extra_args=extra_args,
-                model=model,
-            )
-        except ValueError as exc:
-            raise StepExecutionError("argument_validation", str(exc)) from exc
+        resolved_args = self._resolve_run_agent_args(
+            input=input,
+            agent=agent,
+            model=model,
+            interactive=interactive,
+            session_id=session_id,
+            fork=fork,
+            extra_args=extra_args,
+        )
 
-        agent_config = self._resolve_agent_config(agent)
+        agent_config = self._resolve_agent_config(resolved_args.agent)
         state.agent_config = agent_config
 
         prompt_text = _build_step_prompt(
-            resolved_input=input,
+            resolved_input=resolved_args.input,
             objective_text=prompt,
             output_template=output_template,
             session_nonce=nonce,
@@ -128,11 +153,11 @@ class AgentContext:
         argv = _build_agent_argv(
             agent_config=agent_config,
             prompt_text=prompt_text,
-            interactive=interactive,
-            session_id=session_id,
-            fork=fork,
-            model=model,
-            extra_args=extra_args,
+            interactive=resolved_args.interactive,
+            session_id=resolved_args.session_id,
+            fork=resolved_args.fork,
+            model=resolved_args.model,
+            extra_args=resolved_args.extra_args,
         )
 
         return PreparedStep(
@@ -140,11 +165,11 @@ class AgentContext:
             agent_config=agent_config,
             prompt_text=prompt_text,
             argv=argv,
-            resolved_input=input,
+            resolved_input=resolved_args.input,
             output_template=output_template,
-            agent_name=agent,
-            session_id=session_id,
-            fork=fork,
+            agent_name=resolved_args.agent,
+            session_id=resolved_args.session_id,
+            fork=resolved_args.fork,
         )
 
     def _run_prepared_step(
@@ -156,9 +181,9 @@ class AgentContext:
         session_result = run_terminal_session(
             prepared.argv,
             exit_input=prepared.agent_config.exit_sequence,
-            payload_validator=_build_payload_validator(prepared.output_template),
             cwd=self.launch_cwd,
             inactivity_timeout_seconds=self.timeout,
+            payload_validator=_build_payload_validator(prepared.output_template),
         )
         state.transcript = session_result.transcript
         return session_result
@@ -178,7 +203,7 @@ class AgentContext:
             )
 
         try:
-            validate_step_output(prepared.output_template, session_result.payload)
+            _validate_output_node(prepared.output_template, session_result.payload, path="output")
         except ValueError as exc:
             raise StepExecutionError("output_validation", str(exc)) from exc
 
@@ -221,31 +246,18 @@ class AgentContext:
         state: RunState,
         exc: Exception,
     ) -> StepResult:
+        collect_usage = False
         if isinstance(exc, StepExecutionError):
-            if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
-                self._collect_usage_after_failure(state=state)
-                self._print_usage(state)
-            return StepResult(
-                status="failed",
-                error_type=exc.error_type,
-                error_message=exc.error_message,
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = exc.error_type
+            error_message = exc.error_message
+            collect_usage = error_type in {"completion_missing", "output_validation", "session_discovery"}
+        if isinstance(exc, ValidationError):
+            error_type = "argument_validation"
+            error_message = str(exc)
         if isinstance(exc, TimeoutError):
-            self._collect_usage_after_failure(state=state)
-            self._print_usage(state)
-            return StepResult(
-                status="failed",
-                error_type="timeout",
-                error_message=str(exc),
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = "timeout"
+            error_message = str(exc)
+            collect_usage = True
         if isinstance(exc, OSError):
             return StepResult(
                 status="failed",
@@ -254,6 +266,18 @@ class AgentContext:
                 transcript=state.transcript,
                 usage_state="not_attempted",
             )
+        if collect_usage:
+            self._collect_usage_after_failure(state=state)
+            self._print_usage(state)
+        return StepResult(
+            status="failed",
+            error_type=error_type,
+            error_message=error_message,
+            transcript=state.transcript,
+            usage=state.usage,
+            usage_state=state.usage_state,
+            usage_error_message=state.usage_error_message,
+        )
         raise exc
 
     def _resolve_agent_config(self, agent_name: str) -> AgentRuntimeConfig:
@@ -270,6 +294,34 @@ class AgentContext:
             raise StepExecutionError("agent_resolution", str(exc)) from exc
         self._agent_configs[agent_name] = config
         return config
+
+    def _resolve_run_agent_args(
+        self,
+        *,
+        input: Any,
+        agent: str | None,
+        model: str | None,
+        interactive: bool | None,
+        session_id: str | None,
+        fork: bool | None,
+        extra_args: Any,
+    ) -> StepExecutionArgs:
+        defaults = self.project_defaults.model_dump(
+            exclude_none=True,
+            include={"agent", "model", "interactive", "session_id", "fork", "extra_args"},
+        )
+        return StepExecutionArgs.model_validate({
+            "input": input,
+            **defaults,
+            **{key: value for key, value in {
+                "agent": agent,
+                "model": model,
+                "interactive": interactive,
+                "session_id": session_id,
+                "fork": fork,
+                "extra_args": extra_args,
+            }.items() if value is not None},
+        })
 
     def _collect_usage_after_failure(
         self,
@@ -324,18 +376,21 @@ class AgentContext:
             return
         print_usage_summary(" Step Usage ".center(25, "-"), state.usage)
 
+    def print_usage(self) -> None:
+        print_aggregated_usage_summary(self._usage_totals_by_model, self.usage_logging)
+
 
 def run_agent(
     *,
     prompt: str,
-    output: dict[str, Any],
+    output: dict[str, Any] | None = None,
     input: Any = None,
     agent: str | None = None,
     model: str | None = None,
-    interactive: bool = True,
+    interactive: bool | None = None,
     session_id: str | None = None,
-    fork: bool = False,
-    extra_args: list[str] | None = None,
+    fork: bool | None = None,
+    extra_args: Any = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
     """
@@ -353,7 +408,7 @@ def run_agent(
         extra_args: Optional additional argv items passed to the agent adapter.
         cwd: Optional working directory for launching the agent process.
     """
-    with AgentContext(cwd=cwd, inactivity_timeout_seconds=300) as ctx:
+    with AgentContext(cwd=cwd) as ctx:
         return ctx.run_agent(
             prompt=prompt,
             output=output,
@@ -420,7 +475,7 @@ def _build_step_prompt(
     *,
     resolved_input: Any,
     objective_text: str,
-    output_template: dict[str, Any],
+    output_template: dict[str, Any] | None,
     session_nonce: str | None,
 ) -> str:
     sections = [
@@ -461,7 +516,7 @@ def _build_step_prompt(
 
 def _resolve_session_id(
     *,
-    payload: Any,
+    payload: dict,
     session_id: str | None,
     fork: bool,
     nonce: str | None,
@@ -469,42 +524,27 @@ def _resolve_session_id(
 ) -> tuple[str, Path | None] | None:
     if nonce is None:
         return None
-
-    session_lookup_error: LookupError | None = None
     try:
         session_info = agent_config.get_session_info(nonce)
     except LookupError as exc:
-        session_lookup_error = exc
         session_info = None
-
-    payload_session_id = _extract_session_id(payload)
-    if payload_session_id is not None:
-        return payload_session_id, None if session_info is None else session_info[1]
-    if session_id is not None and not fork:
-        return session_id, None if session_info is None else session_info[1]
+        session_lookup_error = exc
+    discovered_session_id = payload.get("session_id")
+    if discovered_session_id is None and session_id is not None and not fork:
+        discovered_session_id = session_id
+    if discovered_session_id is not None:
+        return discovered_session_id, None if session_info is None else session_info[1]
     if session_info is None:
-        assert session_lookup_error is not None
         raise StepExecutionError("session_discovery", str(session_lookup_error)) from session_lookup_error
     return session_info
 
 
-def _extract_session_id(output_value: Any) -> str | None:
-    if not isinstance(output_value, dict):
-        return None
-    value = output_value.get("session_id")
-    if isinstance(value, str) and value:
-        return value
-    return None
-
-
 def _build_payload_validator(output_template: dict[str, Any]) -> Callable[[Any], str | None]:
-    expected_output = json.dumps(output_template, indent=2)
-
     def validate(payload: Any) -> str | None:
         try:
-            validate_step_output(output_template, payload)
+            _validate_output_node(output_template, payload, path="output")
         except ValueError:
-            return "output format mismatch\nRequired output format:\n" + expected_output
+            return "output format mismatch"
         return None
 
     return validate
