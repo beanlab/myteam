@@ -142,97 +142,21 @@ def _parse_yaml_frontmatter_text(text: str) -> dict[str, str]:
     return data
 
 
-def _parse_yaml_frontmatter_text_raw(text: str, *, source_path: Path) -> dict[str, Any] | None:
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return None
-
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
-    if end is None:
-        raise ValueError(f"Workflow definition file {source_path} has malformed YAML frontmatter.")
-
-    frontmatter = "\n".join(lines[1:end])
-    try:
-        loaded = yaml.safe_load(frontmatter)
-    except yaml.YAMLError as exc:
-        raise ValueError(f"Workflow definition file {source_path} has malformed YAML frontmatter: {exc}") from exc
-
-    if loaded is None:
-        return {}
-    if not isinstance(loaded, dict):
-        raise ValueError(f"Workflow definition file {source_path} frontmatter must be a mapping.")
-    return loaded
-
-
-def _validate_workflow_settings(
-    loaded: dict[str, Any],
-    *,
-    source_path: Path,
-) -> WorkflowStepSettings:
-    allowed_keys = {
-        "agent",
-        "model",
-        "input",
-        "output",
-        "interactive",
-        "session_id",
-        "fork",
-        "extra_args",
-        "usage_logging",
-        "timeout",
-    }
-    unknown_keys = sorted(set(loaded) - allowed_keys)
-    if unknown_keys:
-        joined = ", ".join(unknown_keys)
-        raise ValueError(
-            f"Workflow definition file {source_path} frontmatter contains unknown workflow-settings keys: {joined}"
-        )
-
-    output_value = loaded.get("output")
-    if output_value is not None and not isinstance(output_value, dict):
-        raise ValueError(
-            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.output' must be a mapping."
-        )
-    input_value = loaded.get("input")
-    if input_value is not None and not isinstance(input_value, dict):
-        raise ValueError(
-            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.input' must be a mapping."
-        )
-
-    try:
-        return WorkflowStepSettings.model_validate(
-            {
-                **loaded,
-                "input": input_value,
-                "output": output_value,
-            }
-        )
-    except ValidationError as exc:
-        raise ValueError(f"Workflow definition file {source_path} frontmatter workflow-settings is invalid: {exc}") from exc
-
-
 def load_definition_workflow_settings(folder: Path, definition_stem: str) -> WorkflowStepSettings | None:
     definition_file = _get_definition_file(folder, definition_stem)
     if definition_file is None:
         return None
 
-    frontmatter = _parse_yaml_frontmatter_text_raw(definition_file.read_text(encoding="utf-8"), source_path=definition_file)
+    frontmatter = _parse_yaml_frontmatter_text(definition_file.read_text(encoding="utf-8"))
     if not frontmatter:
         return None
 
-    workflow_settings = frontmatter.get("workflow-settings")
-    if workflow_settings is None:
-        return None
-    if not isinstance(workflow_settings, dict):
+    workflow_settings = {k: v for k, v in frontmatter.items() if k not in ("name", "description")}
+    try:
+        return WorkflowStepSettings.model_validate(workflow_settings)
+    except ValidationError as exc:
         raise ValueError(
-            f"Workflow definition file {definition_file} frontmatter field 'workflow-settings' must be a mapping."
-        )
-
-    return _validate_workflow_settings(workflow_settings, source_path=definition_file)
+            f"Workflow definition file {folder} frontmatter workflow-settings is invalid: {exc}") from exc
 
 
 def _format_frontmatter_info(frontmatter: dict[str, str]) -> str:
