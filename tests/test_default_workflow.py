@@ -91,4 +91,4 @@ def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeyp
     assert seen["run_agent_kwargs"]["interactive"] is False
     assert seen["run_agent_kwargs"]["session_id"] == "session-123"
     assert seen["run_agent_kwargs"]["fork"] is False
-    assert seen["run_agent_kwargs"]["extra_args"] == ["--sandbox", "workspace-write"]
+    assert seen["run_agent_kwargs"]["extra_args"] == ("--sandbox", "workspace-write")

@@ -21,7 +21,7 @@ def build_argv(
     session_id: str | None = None,
     fork: bool = False,
     model: str | None = None,
-    extra_args: list[str] | None = None,
+    extra_args: tuple[str, ...] | None = None,
 ) -> list[str]:
     extras = extra_args or []
     if model is not None:

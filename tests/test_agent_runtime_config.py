@@ -290,26 +290,26 @@ def test_codex_build_argv_supports_session_modes():
         "resume-session",
         "prompt",
     ]
-    assert build_codex_argv("prompt", True, None, False, None, ["--search"]) == [
+    assert build_codex_argv("prompt", True, None, False, None, ("--search",)) == [
         "codex",
         "--search",
         "prompt",
     ]
-    assert build_codex_argv("prompt", False, None, False, None, ["--sandbox", "workspace-write"]) == [
+    assert build_codex_argv("prompt", False, None, False, None, ("--sandbox", "workspace-write")) == [
         "codex",
         "exec",
         "--sandbox",
         "workspace-write",
         "prompt",
     ]
-    assert build_codex_argv("prompt", True, "resume-session", False, None, ["--search"]) == [
+    assert build_codex_argv("prompt", True, "resume-session", False, None, ("--search",)) == [
         "codex",
         "resume",
         "resume-session",
         "--search",
         "prompt",
     ]
-    assert build_codex_argv("prompt", True, "fork-session", True, None, ["--search"]) == [
+    assert build_codex_argv("prompt", True, "fork-session", True, None, ("--search",)) == [
         "codex",
         "fork",
         "fork-session",

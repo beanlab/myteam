@@ -20,7 +20,7 @@ def _workflow_settings_kwargs(workflow_settings: WorkflowStepSettings | None) ->
         "interactive": workflow_settings.interactive,
         "session_id": workflow_settings.session_id,
         "fork": workflow_settings.fork,
-        "extra_args": list(workflow_settings.extra_args) if workflow_settings.extra_args is not None else None,
+        "extra_args": workflow_settings.extra_args,
     }
     return {key: value for key, value in kwargs.items() if value is not None}
 

@@ -94,7 +94,7 @@ class AgentContext:
         interactive: bool | None = None,
         session_id: str | None = None,
         fork: bool | None = None,
-        extra_args: Any = None,
+        extra_args: tuple[str, ...] | None = None,
     ) -> StepResult:
         state = RunState()
         try:
@@ -425,7 +425,7 @@ class AgentContext:
         interactive: bool | None,
         session_id: str | None,
         fork: bool | None,
-        extra_args: Any,
+        extra_args: tuple[str, ...] | None,
     ) -> StepExecutionArgs:
         defaults = self.project_defaults.model_dump(
             exclude_none=True,
@@ -511,7 +511,7 @@ def run_agent(
     interactive: bool | None = None,
     session_id: str | None = None,
     fork: bool | None = None,
-    extra_args: Any = None,
+    extra_args: tuple[str, ...] | None = None,
     cwd: Path | str | None = None,
 ) -> StepResult:
     """
@@ -549,7 +549,7 @@ def _build_agent_argv(
     session_id: str | None,
     fork: bool,
     model: str | None,
-    extra_args: list[str] | None,
+    extra_args: tuple[str, ...] | None,
 ) -> list[str]:
     try:
         argv = agent_config.build_argv(

@@ -2,29 +2,41 @@ from __future__ import annotations
 
 import os
 import subprocess
-from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from ..paths import BUILTIN_ROOT_NAME, builtin_agents_root
 from ..templates import get_template
 
 
-@dataclass(frozen=True)
-class WorkflowStepSettings:
-    agent: str | None = None
-    model: str | None = None
+class WorkflowStepSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    agent: str | None = Field(default=None, min_length=1)
+    model: str | None = Field(default=None, min_length=1)
     input: Any | None = None
     output: dict[str, Any] | None = None
     interactive: bool | None = None
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, min_length=1)
     fork: bool | None = None
     extra_args: tuple[str, ...] | None = None
-    usage_logging: str | None = None
-    timeout: int | None = None
+    usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None
+    timeout: int | None = Field(default=None, gt=0)
+
+    @field_validator("extra_args", mode="before")
+    @classmethod
+    def _coerce_extra_args(cls, value: Any) -> tuple[str, ...] | None:
+        if value is None:
+            return None
+        if isinstance(value, tuple):
+            return value
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
 PROJECT_ROOT_ENV_VAR = "MYTEAM_PROJECT_ROOT"
 
@@ -156,62 +168,6 @@ def _parse_yaml_frontmatter_text_raw(text: str, *, source_path: Path) -> dict[st
     return loaded
 
 
-def _load_optional_string(loaded: dict[str, Any], key: str, *, source_path: Path) -> str | None:
-    value = loaded.get(key)
-    if value is None:
-        return None
-    if isinstance(value, str) and value:
-        return value
-    raise ValueError(
-        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a non-empty string."
-    )
-
-
-def _load_optional_bool(loaded: dict[str, Any], key: str, *, source_path: Path) -> bool | None:
-    value = loaded.get(key)
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    raise ValueError(
-        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a boolean."
-    )
-
-
-def _load_optional_string_list(loaded: dict[str, Any], key: str, *, source_path: Path) -> tuple[str, ...] | None:
-    value = loaded.get(key)
-    if value is None:
-        return None
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        return tuple(value)
-    raise ValueError(
-        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a list of strings."
-    )
-
-
-def _load_optional_usage_logging(loaded: dict[str, Any], *, source_path: Path) -> str | None:
-    value = loaded.get("usage_logging")
-    if value is None:
-        return None
-    if value in {"none", "summary", "per_model", "verbose"}:
-        return value
-    raise ValueError(
-        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.usage_logging' must be one of: "
-        "none, summary, per_model, verbose."
-    )
-
-
-def _load_optional_positive_int(loaded: dict[str, Any], key: str, *, source_path: Path) -> int | None:
-    value = loaded.get(key)
-    if value is None:
-        return None
-    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-        return value
-    raise ValueError(
-        f"Workflow definition file {source_path} frontmatter field 'workflow-settings.{key}' must be a positive integer."
-    )
-
-
 def _validate_workflow_settings(
     loaded: dict[str, Any],
     *,
@@ -247,29 +203,16 @@ def _validate_workflow_settings(
             f"Workflow definition file {source_path} frontmatter field 'workflow-settings.input' must be a mapping."
         )
 
-    fork = _load_optional_bool(loaded, "fork", source_path=source_path)
-    session_id = _load_optional_string(loaded, "session_id", source_path=source_path)
-    if fork and session_id is None:
-        raise ValueError(
-            f"Workflow definition file {source_path} frontmatter field 'workflow-settings.session_id' is required when 'fork' is true."
+    try:
+        return WorkflowStepSettings.model_validate(
+            {
+                **loaded,
+                "input": input_value,
+                "output": output_value,
+            }
         )
-
-    return WorkflowStepSettings(
-        agent=_load_optional_string(loaded, "agent", source_path=source_path),
-        model=_load_optional_string(loaded, "model", source_path=source_path),
-        input=input_value,
-        output=output_value,
-        interactive=_load_optional_bool(loaded, "interactive", source_path=source_path),
-        session_id=session_id,
-        fork=fork,
-        extra_args=_load_optional_string_list(loaded, "extra_args", source_path=source_path),
-        usage_logging=_load_optional_usage_logging(loaded, source_path=source_path),
-        timeout=_load_optional_positive_int(
-            loaded,
-            "timeout",
-            source_path=source_path,
-        ),
-    )
+    except ValidationError as exc:
+        raise ValueError(f"Workflow definition file {source_path} frontmatter workflow-settings is invalid: {exc}") from exc
 
 
 def load_definition_workflow_settings(folder: Path, definition_stem: str) -> WorkflowStepSettings | None:

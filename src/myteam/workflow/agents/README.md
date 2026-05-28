@@ -41,7 +41,7 @@ def build_argv(
         interactive: bool = True,
         session_id: str | None = None,
         fork: bool = False,
-        extra_args: list[str] | None = None,
+        extra_args: tuple[str, ...] | None = None,
 ) -> list[str]:
     ...
 ```
@@ -73,7 +73,7 @@ def build_argv(
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
-    extra_args: list[str] | None = None,
+    extra_args: tuple[str, ...] | None = None,
 ) -> list[str]:
     extras = extra_args or []
     if session_id is not None and fork:
@@ -152,7 +152,7 @@ def build_argv(
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
-    extra_args: list[str] | None = None,
+    extra_args: tuple[str, ...] | None = None,
 ) -> list[str]:
     argv = build_codex_argv(
         prompt_text,

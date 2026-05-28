@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, RootModel, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, RootModel, field_validator, model_validator
 
 
 class AgentConfig(TypedDict):
@@ -17,7 +17,7 @@ class StepDefinition(TypedDict, total=False):
     input: Any
     agent: str
     model: str
-    extra_args: list[str]
+    extra_args: tuple[str, ...]
     interactive: bool
     session_id: str
     fork: bool
@@ -44,9 +44,20 @@ class ProjectWorkflowDefaults(BaseModel):
     interactive: Optional[bool] = None
     session_id: Optional[str] = Field(default=None, min_length=1)
     fork: Optional[bool] = Field(default=None)
-    extra_args: Optional[list[str]] = Field(default=None)
+    extra_args: Optional[tuple[str, ...]] = Field(default=None)
     usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
     timeout: Optional[PositiveInt] = Field(default=None)
+
+    @field_validator("extra_args", mode="before")
+    @classmethod
+    def _coerce_extra_args(cls, value: Any) -> tuple[str, ...] | None:
+        if value is None:
+            return None
+        if isinstance(value, tuple):
+            return value
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
 
 class StepDefinitionModel(BaseModel):
@@ -57,10 +68,21 @@ class StepDefinitionModel(BaseModel):
     input: Any = None
     agent: Optional[str] = Field(default=None, min_length=1)
     model: Optional[str] = Field(default=None, min_length=1)
-    extra_args: list[str] | None = None
+    extra_args: tuple[str, ...] | None = None
     interactive: bool | None = None
     session_id: Optional[str] = Field(default=None, min_length=1)
     fork: bool | None = None
+
+    @field_validator("extra_args", mode="before")
+    @classmethod
+    def _coerce_extra_args(cls, value: Any) -> tuple[str, ...] | None:
+        if value is None:
+            return None
+        if isinstance(value, tuple):
+            return value
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
     @model_validator(mode="after")
     def _fork_requires_session(self) -> "StepDefinitionModel":
@@ -92,8 +114,19 @@ class StepExecutionArgs(BaseModel):
     interactive: bool = True
     session_id: Optional[str] = Field(default=None, min_length=1)
     fork: bool = False
-    extra_args: list[str] | None = None
+    extra_args: tuple[str, ...] | None = None
     model: Optional[str] = Field(default=None, min_length=1)
+
+    @field_validator("extra_args", mode="before")
+    @classmethod
+    def _coerce_extra_args(cls, value: Any) -> tuple[str, ...] | None:
+        if value is None:
+            return None
+        if isinstance(value, tuple):
+            return value
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
     @model_validator(mode="after")
     def validate_fork_requires_session(self) -> "StepExecutionArgs":
@@ -127,7 +160,7 @@ class PreparedStep:
     interactive: bool
     session_id: str | None
     fork: bool
-    extra_args: list[str] | None
+    extra_args: tuple[str, ...] | None
 
 
 @dataclass

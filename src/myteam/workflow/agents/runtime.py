@@ -226,7 +226,7 @@ def _require_positional_parameter_count(
 
 
 def _build_argv_callable(module: ModuleType) -> Callable[
-    [str, bool, str | None, bool, str | None, list[str] | None],
+    [str, bool, str | None, bool, str | None, tuple[str, ...] | None],
     list[str],
 ]:
     if hasattr(module, "build_argv"):
