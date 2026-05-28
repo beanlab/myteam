@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+from pydantic import ValidationError
 
 from .models import ProjectWorkflowDefaults
-from ..validation import validate_project_workflow_defaults
 
 
 CONFIG_FILENAME = ".config.yaml"
@@ -22,4 +22,7 @@ def load_project_workflow_defaults(project_root: Path) -> ProjectWorkflowDefault
     except yaml.YAMLError as exc:
         raise ValueError(f"Failed to parse workflow project config at {config_path}: {exc}") from exc
 
-    return validate_project_workflow_defaults(loaded, config_path=config_path)
+    try:
+        return ProjectWorkflowDefaults.model_validate(loaded)
+    except ValidationError as exc:
+        raise ValueError(f"Workflow project config at {config_path} is invalid: {exc}") from exc

@@ -232,6 +232,8 @@ Inputs:
 - The command resolves that path relative to the selected local root.
 - The command accepts any standard YAML workflow file extension for the resolved file, including
   `.yaml` and `.yml`, plus Python workflow files ending in `.py`.
+- If `.myteam/.config.yaml` defines workflow defaults, the workflow executor uses those settings as
+  project defaults for authored steps.
 - `--verbose` enables workflow lifecycle logging on standard error.
 - `--input` supplies structured caller input for role/skill fallback execution when the selected
   role or skill declares required frontmatter input keys.

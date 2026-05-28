@@ -5,14 +5,14 @@ import json
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pyparsing import Literal
+from pydantic import ValidationError
 
 from ..agents import resolve_agent_runtime_config
 from ..agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from ..definition.config import load_project_workflow_defaults
-from ..definition.models import ProjectWorkflowDefaults, StepResult, UsageInfo, PreparedStep, RunState
+from ..definition.models import ProjectWorkflowDefaults, StepExecutionArgs, StepResult, UsageInfo, PreparedStep, RunState
 from .errors import StepExecutionError
 from .prompts import build_child_resume_prompt, build_step_prompt
 from ..resolution.session_resolution import resolve_project_root, resolve_session_id
@@ -22,9 +22,19 @@ from .usage import (
     resolve_usage_session_path,
     resolve_usage_tracking,
 )
-from ..validation import validate_step_execution_args, validate_step_output
 from ..terminal.session import TerminalSessionResult, run_terminal_session
 from ..terminal.control_channel import ChildWorkflowRequest
+
+
+def _validate_output_node(template: Any, value: Any, *, path: str) -> None:
+    if not isinstance(template, dict):
+        return
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must be a mapping.")
+    for key, nested in template.items():
+        if key not in value:
+            raise ValueError(f"{path}.{key} is missing.")
+        _validate_output_node(nested, value[key], path=f"{path}.{key}")
 
 class AgentContext:
     def __init__(
@@ -33,10 +43,16 @@ class AgentContext:
         usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None,
         cwd: Path | str | None = None,
         inactivity_timeout_seconds: int | None = None,
+        project_defaults: ProjectWorkflowDefaults | None = None,
     ) -> None:
         self.cwd = None if cwd is None else Path(cwd).resolve()
         self.project_root = resolve_project_root(cwd=self.cwd)
-        self.project_defaults: ProjectWorkflowDefaults | None = load_project_workflow_defaults(self.project_root)
+        self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
+        self.project_defaults = (
+            project_defaults
+            or load_project_workflow_defaults(self.project_root)
+            or ProjectWorkflowDefaults()
+        )
         self.usage_logging = (
             usage_logging
             if usage_logging is not None
@@ -51,7 +67,6 @@ class AgentContext:
                 else 300
             )
         )
-        self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
         self.session_context = AgentSessionContext(
             home=Path.home().resolve(),
             project_root=self.project_root,
@@ -82,8 +97,6 @@ class AgentContext:
         extra_args: Any = None,
     ) -> StepResult:
         state = RunState()
-        if output is None:
-            output = {}
         try:
             if output is None:
                 output_template: dict[str, Any] = {}
@@ -150,23 +163,11 @@ class AgentContext:
             extra_args=extra_args,
         )
 
-        try:
-            validate_step_execution_args(
-                agent_name=resolved_args["agent"],
-                interactive=resolved_args["interactive"],
-                session_id=resolved_args["session_id"],
-                fork=resolved_args["fork"],
-                extra_args=resolved_args["extra_args"],
-                model=resolved_args["model"],
-            )
-        except ValueError as exc:
-            raise StepExecutionError("argument_validation", str(exc)) from exc
-
-        agent_config = self._resolve_agent_config(resolved_args["agent"])
+        agent_config = self._resolve_agent_config(resolved_args.agent)
         state.agent_config = agent_config
 
         prompt_text = build_step_prompt(
-            resolved_input=resolved_args["input"],
+            resolved_input=resolved_args.input,
             objective_text=prompt,
             output_template=output_template,
             session_nonce=nonce,
@@ -174,11 +175,11 @@ class AgentContext:
         argv = _build_agent_argv(
             agent_config=agent_config,
             prompt_text=prompt_text,
-            interactive=resolved_args["interactive"],
-            session_id=resolved_args["session_id"],
-            fork=resolved_args["fork"],
-            model=resolved_args["model"],
-            extra_args=resolved_args["extra_args"],
+            interactive=resolved_args.interactive,
+            session_id=resolved_args.session_id,
+            fork=resolved_args.fork,
+            model=resolved_args.model,
+            extra_args=resolved_args.extra_args,
         )
 
         return PreparedStep(
@@ -187,14 +188,14 @@ class AgentContext:
             prompt_text=prompt_text,
             objective_text=prompt,
             argv=argv,
-            resolved_input=resolved_args["input"],
+            resolved_input=resolved_args.input,
             output_template=output_template,
-            agent_name=resolved_args["agent"],
-            model=resolved_args["model"],
-            interactive=resolved_args["interactive"],
-            session_id=resolved_args["session_id"],
-            fork=resolved_args["fork"],
-            extra_args=resolved_args["extra_args"],
+            agent_name=resolved_args.agent,
+            model=resolved_args.model,
+            interactive=resolved_args.interactive,
+            session_id=resolved_args.session_id,
+            fork=resolved_args.fork,
+            extra_args=resolved_args.extra_args,
         )
 
     def _run_prepared_step(
@@ -323,7 +324,7 @@ class AgentContext:
             )
 
         try:
-            validate_step_output(prepared.output_template, session_result.payload)
+            _validate_output_node(prepared.output_template, session_result.payload, path="output")
         except ValueError as exc:
             raise StepExecutionError("output_validation", str(exc)) from exc
 
@@ -366,31 +367,18 @@ class AgentContext:
         state: RunState,
         exc: Exception,
     ) -> StepResult:
+        collect_usage = False
         if isinstance(exc, StepExecutionError):
-            if exc.error_type in {"completion_missing", "output_validation", "session_discovery"}:
-                self._collect_usage_after_failure(state=state)
-                self._print_usage(state)
-            return StepResult(
-                status="failed",
-                error_type=exc.error_type,
-                error_message=exc.error_message,
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = exc.error_type
+            error_message = exc.error_message
+            collect_usage = error_type in {"completion_missing", "output_validation", "session_discovery"}
+        if isinstance(exc, ValidationError):
+            error_type = "argument_validation"
+            error_message = str(exc)
         if isinstance(exc, TimeoutError):
-            self._collect_usage_after_failure(state=state)
-            self._print_usage(state)
-            return StepResult(
-                status="failed",
-                error_type="timeout",
-                error_message=str(exc),
-                transcript=state.transcript,
-                usage=state.usage,
-                usage_state=state.usage_state,
-                usage_error_message=state.usage_error_message,
-            )
+            error_type = "timeout"
+            error_message = str(exc)
+            collect_usage = True
         if isinstance(exc, OSError):
             return StepResult(
                 status="failed",
@@ -399,6 +387,18 @@ class AgentContext:
                 transcript=state.transcript,
                 usage_state="not_attempted",
             )
+        if collect_usage:
+            self._collect_usage_after_failure(state=state)
+            self._print_usage(state)
+        return StepResult(
+            status="failed",
+            error_type=error_type,
+            error_message=error_message,
+            transcript=state.transcript,
+            usage=state.usage,
+            usage_state=state.usage_state,
+            usage_error_message=state.usage_error_message,
+        )
         raise exc
 
     def _resolve_agent_config(self, agent_name: str) -> AgentRuntimeConfig:
@@ -426,28 +426,23 @@ class AgentContext:
         session_id: str | None,
         fork: bool | None,
         extra_args: Any,
-    ) -> dict[str, Any]:
-        defaults = self.project_defaults
-        default_agent = defaults.agent if defaults is not None and defaults.agent is not None else None
-        default_model = defaults.model if defaults is not None and defaults.model is not None else None
-        default_interactive = (
-            defaults.interactive if defaults is not None and defaults.interactive is not None else True
+    ) -> StepExecutionArgs:
+        defaults = self.project_defaults.model_dump(
+            exclude_none=True,
+            include={"agent", "model", "interactive", "session_id", "fork", "extra_args"},
         )
-        default_session_id = defaults.session_id if defaults is not None and defaults.session_id is not None else None
-        default_fork = defaults.fork if defaults is not None and defaults.fork is not None else False
-        default_extra_args = (
-            list(defaults.extra_args) if defaults is not None and defaults.extra_args is not None else None
-        )
-
-        return {
+        return StepExecutionArgs.model_validate({
             "input": input,
-            "agent": agent if agent is not None else default_agent,
-            "model": model if model is not None else default_model,
-            "interactive": interactive if interactive is not None else default_interactive,
-            "session_id": session_id if session_id is not None else default_session_id,
-            "fork": fork if fork is not None else default_fork,
-            "extra_args": extra_args if extra_args is not None else default_extra_args,
-        }
+            **defaults,
+            **{key: value for key, value in {
+                "agent": agent,
+                "model": model,
+                "interactive": interactive,
+                "session_id": session_id,
+                "fork": fork,
+                "extra_args": extra_args,
+            }.items() if value is not None},
+        })
 
     def _collect_usage_after_failure(
         self,
@@ -584,7 +579,7 @@ def _build_payload_validator(output_template: dict[str, Any]) -> Callable[[Any],
 
     def validate(payload: Any) -> str | None:
         try:
-            validate_step_output(output_template, payload)
+            _validate_output_node(output_template, payload, path="output")
         except ValueError:
             return "output format mismatch\nRequired output format:\n" + expected_output
         return None
