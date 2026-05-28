@@ -4,6 +4,6 @@ from __future__ import annotations
 
 from .definition.parser import load_workflow
 from .execution.engine import run_workflow
-from .execution.steps import run_agent
+from .execution.steps import AgentContext, run_agent
 
-__all__ = ["run_agent", "load_workflow", "run_workflow"]
+__all__ = ["AgentContext", "run_agent", "load_workflow", "run_workflow"]
