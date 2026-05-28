@@ -71,7 +71,7 @@ class StepDefinitionModel(BaseModel):
     @model_validator(mode="after")
     def _agent_must_exist(self) -> "StepDefinitionModel":
         if self.agent is not None:
-            from .agents import get_agent_config
+            from ..agents import get_agent_config
 
             try:
                 get_agent_config(self.agent)

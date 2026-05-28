@@ -137,7 +137,7 @@ See [codex.py](codex.py) or [pi.py](pi.py) for examples
 Let's say you want to create an agent alias that launches codex with specific
 command-line flags included. For example, let's create an agent named
 `codex_mini` that uses `--model gpt-5.4-mini`. Create a file in
-`.myteam/.configs/`. If you named it `codex_mini.py`, you would run it by
+`.myteam/.config/`. If you named it `codex_mini.py`, you would run it by
 passing `agent="codex_mini"` into `run_agent`.
 
 ```python

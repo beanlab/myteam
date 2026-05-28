@@ -20,13 +20,12 @@ This package is intentionally split into two layers:
 
 The workflow layer is further split so each file stays narrow:
 
-- `parser.py` loads authored YAML
-- `reference_resolver.py` resolves `$step.path` references
-- `models.py` owns the workflow schema models used for parser validation
-- `engine.py` handles multi-step orchestration
-- `steps.py` handles single-step execution and prompt/argv construction
-- `usage.py` owns usage tracking and reporting helpers
-- `models.py` owns the pydantic models used for execution-time step validation
+- `definition/parser.py` loads authored YAML
+- `definition/models.py` owns the workflow schema models and execution-time step models
+- `resolution/reference_resolver.py` resolves `$step.path` references
+- `execution/engine.py` handles multi-step orchestration
+- `execution/steps.py` handles single-step execution and prompt/argv construction
+- `execution/usage.py` owns usage tracking and reporting helpers
 
 ## Black-Box View
 
@@ -66,14 +65,12 @@ The terminal contract is:
 - [__init__.py](__init__.py)
   Exposes the main public workflow entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
 
+- [definition/models.py](definition/models.py)
+  Owns shared workflow types: authored step definitions, completed-step state, run results, and the pydantic models
+  used to validate authored YAML step definitions.
+
 - [definition/parser.py](definition/parser.py)
   Owns workflow-file loading and top-level orchestration around workflow schema validation.
-
-- [models.py](models.py)
-  Owns shared workflow types, including the pydantic models used to validate authored YAML step definitions.
-
-- [definition/models.py](definition/models.py)
-  Owns shared workflow types: authored step definitions, completed-step state, and run results.
 
 - [resolution/reference_resolver.py](resolution/reference_resolver.py)
   Owns `$step.path` reference resolution against prior completed steps.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from myteam.workflow.models import WorkflowRunResult
+from myteam.workflow.definition.models import WorkflowRunResult
 
 
 def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_project: Path, monkeypatch):
