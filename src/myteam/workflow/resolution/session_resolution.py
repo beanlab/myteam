@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
 
 from ...disclosure import PROJECT_ROOT_ENV_VAR
 from ..execution.errors import StepExecutionError
