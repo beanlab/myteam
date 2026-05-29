@@ -9,7 +9,6 @@
   workflow files.
 - Added a brief warning when no-extension resolution finds multiple matches and the command
   continues with the prioritized target.
-- Rejected unsupported workflow file extensions for `myteam start`.
 - Added `myteam new task` for scaffolding markdown-defined single-step workflows from a template.
 - Markdown task workflows load the file body as the prompt and use YAML frontmatter for optional
   workflow settings.
