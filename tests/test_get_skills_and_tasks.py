@@ -1,0 +1,118 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from myteam import list_skills, list_tasks
+
+
+def test_list_skills_prints_directory_names(monkeypatch, capsys, tmp_path: Path):
+    root = tmp_path / "skills"
+    skill_dir = root / "developer"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "skill.md").write_text(
+        "---\n"
+        "name: developer\n"
+        "description: Handles project implementation work\n"
+        "---\n"
+        "Skill prompt\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("myteam.disclosure.has_builtin_skill", lambda *_: False)
+
+    list_skills(root, root, [])
+
+    out = capsys.readouterr().out
+    assert "developer" in out
+    assert "Handles project implementation work" not in out
+
+
+def test_get_skills_lists_child_skills_with_metadata(run_myteam, initialized_project: Path):
+    skill_dir = initialized_project / ".myteam" / "developer"
+    skill_dir.mkdir()
+    (skill_dir / "skill.md").write_text(
+        "---\n"
+        "name: developer\n"
+        "description: Handles project implementation work\n"
+        "---\n"
+        "Skill prompt\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(initialized_project, "get_skills")
+
+    assert result.exit_code == 0
+    assert "developer" in result.stdout
+    assert "Handles project implementation work" in result.stdout
+
+
+def test_list_tasks_prints_filenames(capsys, tmp_path: Path):
+    root = tmp_path / "tasks"
+    task_dir = root / "research"
+    task_dir.mkdir(parents=True)
+    (task_dir / "summary.md").write_text(
+        "---\n"
+        "name: research/summary\n"
+        "description: Summarize the current state of the project\n"
+        "input:\n"
+        "  topic: implementation\n"
+        "  audience: team\n"
+        "---\n"
+        "Task prompt\n",
+        encoding="utf-8",
+    )
+
+    list_tasks(root, root, [])
+
+    out = capsys.readouterr().out
+    assert "research/summary.md" in out
+    assert "Summarize the current state of the project" not in out
+
+
+def test_get_tasks_lists_tasks_and_input(run_myteam, initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "research"
+    task_dir.mkdir()
+    (task_dir / "summary.md").write_text(
+        "---\n"
+        "name: research/summary\n"
+        "description: Summarize the current state of the project\n"
+        "input:\n"
+        "  topic: implementation\n"
+        "  audience: team\n"
+        "---\n"
+        "Task prompt\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(initialized_project, "get_tasks", "research")
+
+    assert result.exit_code == 0
+    assert "research/summary" in result.stdout
+    assert "Summarize the current state of the project" in result.stdout
+    assert "input:" in result.stdout
+    assert "topic: implementation" in result.stdout
+    assert "audience: team" in result.stdout
+
+
+def test_get_task_prints_task_detail(run_myteam, initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "research"
+    task_dir.mkdir()
+    task_file = task_dir / "summary.md"
+    task_file.write_text(
+        "---\n"
+        "name: research/summary\n"
+        "description: Summarize the current state of the project\n"
+        "input:\n"
+        "  topic: implementation\n"
+        "---\n"
+        "Task prompt\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(initialized_project, "get", "task", "research/summary")
+
+    assert result.exit_code == 0
+    assert "research/summary: Summarize the current state of the project" in result.stdout
+    assert "input:" in result.stdout
+    assert "topic: implementation" in result.stdout
+    assert "Task prompt" in result.stdout

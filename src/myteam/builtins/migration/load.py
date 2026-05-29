@@ -7,8 +7,8 @@ from myteam.upgrade import print_pending_migrations
 from myteam.utils import (
     builtin_skill_dir,
     get_active_myteam_root,
+    get_skills,
     list_roles,
-    list_skills,
     list_tools,
     print_directory_tree,
     print_instructions,
@@ -24,7 +24,7 @@ def main() -> int:
     print_instructions(base)
     print_pending_migrations(myteam)
     print_directory_tree(myteam)
-    list_skills(base, builtin_root, [])
+    get_skills(base, builtin_root, [])
     list_tools(base, display_root, [])
     list_roles(base, builtin_root, [])
 

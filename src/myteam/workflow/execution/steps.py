@@ -95,6 +95,8 @@ class AgentContext:
         session_id: str | None = None,
         fork: bool | None = None,
         extra_args: tuple[str, ...] | None = None,
+        skills: list[str] | None = None,
+        tasks: list[str] | None = None,
     ) -> StepResult:
         state = RunState()
         try:

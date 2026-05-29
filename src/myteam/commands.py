@@ -18,7 +18,7 @@ from .disclosure import (
     is_role_dir,
     is_skill_dir,
     load_definition_workflow_settings,
-    format_frontmatter_info,
+    print_definition_text,
     split_yaml_frontmatter,
     get_skills as disclose_get_skills,
     get_tasks as disclose_get_tasks,
@@ -298,14 +298,7 @@ def _resolve_task_file(task: str, *, prefix: str) -> Path:
 def get_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Print the detailed contents for a single task."""
     task_file = _resolve_task_file(task, prefix=prefix)
-    frontmatter, body = split_yaml_frontmatter(task_file.read_text(encoding=ENCODING))
-    info = format_frontmatter_info(frontmatter)
-    if info and body:
-        sys.stdout.write(f"{info}\n\n{body.rstrip('\n')}\n")
-    elif info:
-        sys.stdout.write(f"{info}\n")
-    elif body:
-        sys.stdout.write(f"{body.rstrip('\n')}\n")
+    print_definition_text(task_file.read_text(encoding=ENCODING))
     raise SystemExit(0)
 
 

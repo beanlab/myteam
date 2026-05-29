@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import builtin_skill_dir, list_roles, list_skills, list_tools, print_instructions
+from myteam.utils import builtin_skill_dir, get_skills, list_roles, list_tools, print_instructions
 
 
 def main() -> int:
@@ -11,7 +11,7 @@ def main() -> int:
     display_root = base.parent
 
     print_instructions(base)
-    list_skills(base, display_root, [])
+    get_skills(base, display_root, [])
     list_tools(base, display_root, [])
     list_roles(base, display_root, [])
 

@@ -86,7 +86,7 @@ def print_instructions(base: Path):
     for file in ["role.md", "ROLE.md", "skill.md", "SKILL.md"]:
         instructions_file = base / file
         if instructions_file.exists():
-            print_text_block(instructions_file.read_text(encoding="utf-8"))
+            print_definition_text(instructions_file.read_text(encoding="utf-8"))
             return
 
 
@@ -168,24 +168,36 @@ def load_definition_workflow_settings(folder: Path, definition_stem: str) -> Wor
 
 
 def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
-    name = frontmatter.get("name", "")
-    description = frontmatter.get("description", "")
-    input_value = frontmatter.get("input", "")
-    if name and description and input_value:
-        input_info = ""
+    lines: list[str] = []
+
+    description = frontmatter.get("description")
+    if isinstance(description, str) and description.strip():
+        lines.append(description.strip())
+
+    input_value = frontmatter.get("input")
+    if input_value is not None:
+        lines.append("input:")
         if isinstance(input_value, dict):
             for key, value in input_value.items():
-                input_info += f"\n  {key}: {value}"
+                lines.append(f"  {key}: {value}")
         else:
-            input_info = f"\n  {input_value}"
-        return f"{name}: {description}\n input:{input_info}"
-    elif name and description:
-        return f"{name}: {description}"
-    elif name:
-        return name
-    elif description:
-        return description
-    return ""
+            lines.append(f"  {input_value}")
+
+    return "\n".join(lines)
+
+
+def print_definition_text(text: str) -> None:
+    frontmatter, body = split_yaml_frontmatter(text)
+    info = format_frontmatter_info(frontmatter)
+    if info:
+        body = body.lstrip("\n")
+        if body:
+            _print_block(f"{info}\n\n{body}")
+        else:
+            _print_block(info)
+        return
+
+    _print_block(_strip_yaml_frontmatter(text))
 
 
 def _get_folder_info(folder: Path, definition_stem: str) -> str:
