@@ -9,16 +9,30 @@ def test_new_role_creates_definition_and_loader(run_myteam, initialized_project:
     result = run_myteam(initialized_project, "new", "role", "developer")
 
     assert result.exit_code == 0
-    assert (initialized_project / ".myteam" / "developer" / "role.md").exists()
+    role_file = initialized_project / ".myteam" / "developer" / "role.md"
+    assert role_file.exists()
     assert (initialized_project / ".myteam" / "developer" / "load.py").exists()
+
+    text = role_file.read_text(encoding="utf-8")
+    frontmatter_text, _ = text.split("---\n", 2)[1:]
+    frontmatter = yaml.safe_load(frontmatter_text)
+    assert isinstance(frontmatter, dict)
+    assert frontmatter["name"] == "developer"
 
 
 def test_new_skill_supports_nested_paths(run_myteam, initialized_project: Path):
     result = run_myteam(initialized_project, "new", "skill", "python/testing")
 
     assert result.exit_code == 0
-    assert (initialized_project / ".myteam" / "python" / "testing" / "skill.md").exists()
+    skill_file = initialized_project / ".myteam" / "python" / "testing" / "skill.md"
+    assert skill_file.exists()
     assert (initialized_project / ".myteam" / "python" / "testing" / "load.py").exists()
+
+    text = skill_file.read_text(encoding="utf-8")
+    frontmatter_text, _ = text.split("---\n", 2)[1:]
+    frontmatter = yaml.safe_load(frontmatter_text)
+    assert isinstance(frontmatter, dict)
+    assert frontmatter["name"] == "python/testing"
 
 
 def test_new_role_accepts_custom_prefix(run_myteam, tmp_path: Path):
@@ -67,7 +81,9 @@ def test_new_task_creates_markdown_workflow(run_myteam, initialized_project: Pat
     text = task_file.read_text(encoding="utf-8")
     assert text.startswith("---\n")
     frontmatter_text, body = text.split("---\n", 2)[1:]
-    assert isinstance(yaml.safe_load(frontmatter_text), dict)
+    frontmatter = yaml.safe_load(frontmatter_text)
+    assert isinstance(frontmatter, dict)
+    assert frontmatter["name"] == "research/summary"
     assert body.strip()
 
 

@@ -9,6 +9,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from . import __version__
 from .disclosure import (
     PROJECT_ROOT_ENV_VAR,
@@ -16,6 +18,7 @@ from .disclosure import (
     is_role_dir,
     is_skill_dir,
     load_definition_workflow_settings,
+    split_yaml_frontmatter,
     WorkflowStepSettings,
 )
 from .paths import (
@@ -68,7 +71,8 @@ def new_dir(
         raise SystemExit(1)
 
     ensure_dir(name_dir)
-    (name_dir / f"{dir_type}.md").write_text(instruction_text, encoding=ENCODING)
+    rendered_instruction = _set_template_name(instruction_text, name)
+    (name_dir / f"{dir_type}.md").write_text(rendered_instruction, encoding=ENCODING)
     write_py_script(name_dir / "load.py", load_text)
 
 
@@ -154,7 +158,15 @@ def _new_workflow_file(
         write_py_script(workflow_path, template)
         return
 
+    template = _set_template_name(template, workflow)
     workflow_path.write_text(template, encoding=ENCODING)
+
+
+def _set_template_name(template: str, name: str) -> str:
+    frontmatter, body = split_yaml_frontmatter(template)
+    frontmatter["name"] = name
+    rendered_frontmatter = yaml.safe_dump(frontmatter, sort_keys=False).strip()
+    return f"---\n{rendered_frontmatter}\n---\n{body}"
 
 
 def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
