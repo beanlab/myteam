@@ -4,6 +4,12 @@
 
 - Expanded `myteam start` so it can resolve roles and skills in addition to Python and YAML 
   workflows.
+- Changed `myteam start` to prefer role and skill directories before workflow files when no file
+  extension is provided, and to prioritize `.py` before `.yaml` before `.yml` when resolving
+  workflow files.
+- Added a brief warning when no-extension resolution finds multiple matches and the command
+  continues with the prioritized target.
+- Rejected unsupported workflow file extensions for `myteam start`.
 - Added optional workflow settings to the frontmatter of skills and roles.
   - the `input` field can be used to format the prompt and the values may be passed in using
     `myteam start <path> --input <dict>`.

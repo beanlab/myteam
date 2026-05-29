@@ -230,8 +230,13 @@ Inputs:
 
 - `<path>` is a slash-delimited workflow path such as `dev/frontend`.
 - The command resolves that path relative to the selected local root.
-- The command accepts any standard YAML workflow file extension for the resolved file, including
-  `.yaml` and `.yml`, plus Python workflow files ending in `.py`.
+- If no extension is provided, the command looks for a matching role or skill directory first and
+  falls back to workflow files.
+- When falling back to workflow files, the command prioritizes `.py`, then `.yaml`, then `.yml`.
+- If multiple matches exist at the same priority, the command prints a brief warning and continues
+  with the prioritized target.
+- The command accepts `.py`, `.yaml`, and `.yml` workflow files. Any other explicit extension is
+  rejected with an error.
 - If `.myteam/.config.yaml` defines workflow defaults, the workflow executor uses those settings as
   project defaults for authored steps.
 - `--verbose` enables workflow lifecycle logging on standard error.
@@ -254,6 +259,8 @@ User-visible result:
 
 - The caller can invoke a workflow stored at `.myteam/dev/frontend.yaml` or
   `.myteam/dev/frontend.py` with `myteam start dev/frontend`.
+- A call like `myteam start dev/frontend` prefers a matching `dev/frontend` role or skill
+  directory before checking workflow files.
 - `--prefix` changes which local root is searched for workflows in the same way it does for other
   project-local tree commands.
 - Workflow execution mirrors the child session's terminal output to standard output as the workflow
@@ -263,8 +270,9 @@ User-visible result:
 
 Failure conditions that matter at the interface:
 
-- If the target path does not resolve to a workflow file with a supported extension in the
-  selected local tree, the command exits with an error.
+- If the target path does not resolve to a role, skill, or workflow file with a supported extension
+  in the selected local tree, the command exits with an error.
+- If the target path names a file with an unsupported extension, the command exits with an error.
 - If the workflow definition is malformed or references an unknown agent, the command exits with an error.
 - If any workflow step fails, the command stops at that first failing step, does not execute later
   steps, and exits with an error.
@@ -281,6 +289,8 @@ Inputs:
 - `--json <json>` passes the payload directly as JSON text.
 - `--text <text>` wraps plain text as `{"text": <text>}`.
 - If neither flag is provided, the command reads JSON from standard input.
+- This command does not resolve filesystem paths itself. It submits the request to the active
+  workflow step, and the parent workflow runner resolves the requested workflow name.
 
 Expected outcome on success:
 

@@ -46,6 +46,19 @@ From outside the package, the flow is:
    - a completed workflow output mapping
    - or a failed result naming the first failed step
 
+The path-resolution rule for `commands.start(...)` and `workflow.execution.run_named_workflow(...)`
+is:
+
+- if no extension is provided, prefer a matching role or skill directory
+- if no directory matches, prefer `.py`, then `.yaml`, then `.yml`
+- if multiple matches exist at the same priority, continue with the prioritized target and emit a
+  brief warning
+- if an explicit extension is not one of `.py`, `.yaml`, or `.yml`, treat it as an error
+
+`workflow.execution.cli_commands.workflow_start(...)` is different: it only submits a child-workflow
+request over the control channel. The parent workflow runner resolves the requested child workflow
+name when it handles that request.
+
 The terminal contract is:
 
 - terminal output is for user-visible interaction and diagnostics
