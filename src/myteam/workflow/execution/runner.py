@@ -14,7 +14,7 @@ from ...disclosure import (
     is_skill_dir,
     load_definition_workflow_settings,
 )
-from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir
+from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir, workflow_candidates
 from ..definition.default_workflow import run_default_workflow
 from ..definition.models import StepResult
 from ..definition.parser import load_workflow
@@ -49,34 +49,49 @@ def run_named_workflow(
             input=input,
         )
 
-    try:
-        path = _workflow_target(project_root, workflow)
-    except ValueError as exc:
-        return NamedWorkflowRunResult(status="failed", error_message=str(exc))
-    if path is not None:
-        if logger is not None:
-            logger(f"Resolved workflow '{workflow}' to {path}")
-        if path.suffix == ".py":
-            return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
-        return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
-
     folder = project_root.joinpath(*workflow.split("/"))
-    if is_role_dir(folder):
-        return _run_named_role_or_skill(
-            workflow=workflow,
-            folder=folder,
-            dir_type="role",
-            project_root=project_root,
-            input=input,
-        )
-    if is_skill_dir(folder):
-        return _run_named_role_or_skill(
-            workflow=workflow,
-            folder=folder,
-            dir_type="skill",
-            project_root=project_root,
-            input=input,
-        )
+    if not folder.suffix:
+        directory_matches: list[tuple[str, Path]] = []
+        if is_role_dir(folder):
+            directory_matches.append(("role", folder))
+        if is_skill_dir(folder):
+            directory_matches.append(("skill", folder))
+
+        file_candidates = workflow_candidates(_workflow_lookup_base(project_root, prefix=prefix), workflow, prefix=prefix)
+        if directory_matches:
+            if len(directory_matches) > 1 or file_candidates:
+                if logger is not None:
+                    logger(
+                        f"Workflow '{workflow}' matched multiple targets; prioritizing {directory_matches[0][0]} directory."
+                    )
+            return _run_named_role_or_skill(
+                workflow=workflow,
+                folder=directory_matches[0][1],
+                dir_type=directory_matches[0][0],
+                project_root=project_root,
+                input=input,
+            )
+        if file_candidates:
+            if len(file_candidates) > 1 and logger is not None:
+                logger(f"Workflow '{workflow}' matched multiple files; prioritizing {file_candidates[0]}.")
+            path = file_candidates[0]
+            if logger is not None:
+                logger(f"Resolved workflow '{workflow}' to {path}")
+            if path.suffix == ".py":
+                return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
+            return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
+    else:
+        try:
+            file_candidates = workflow_candidates(_workflow_lookup_base(project_root, prefix=prefix), workflow, prefix=prefix)
+        except ValueError as exc:
+            return NamedWorkflowRunResult(status="failed", error_message=str(exc))
+        if file_candidates:
+            path = file_candidates[0]
+            if logger is not None:
+                logger(f"Resolved workflow '{workflow}' to {path}")
+            if path.suffix == ".py":
+                return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
+            return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
 
     return NamedWorkflowRunResult(status="failed", error_message=f"Workflow '{workflow}' not found.")
 
@@ -89,23 +104,11 @@ def _resolve_named_workflow_root(*, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
     return agents_root(cwd, prefix)
 
 
-def _workflow_target(project_root: Path, workflow: str) -> Path | None:
-    requested_path = project_root.joinpath(*workflow.split("/"))
-    if requested_path.suffix in {".yaml", ".yml", ".py"}:
-        return requested_path if requested_path.exists() else None
-
-    candidates: list[Path] = []
-    for suffix in (".yaml", ".yml", ".py"):
-        candidate = requested_path.with_suffix(suffix)
-        if candidate.exists():
-            candidates.append(candidate)
-
-    if len(candidates) > 1:
-        matches = ", ".join(str(path) for path in candidates)
-        raise ValueError(f"Workflow '{workflow}' is ambiguous. Matching files: {matches}")
-    if candidates:
-        return candidates[0]
-    return None
+def _workflow_lookup_base(project_root: Path, *, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
+    cwd = base_dir().resolve()
+    if project_root.resolve() == cwd and cwd.name == prefix:
+        return cwd.parent
+    return cwd
 
 
 def _run_yaml_child_workflow(path: Path, *, workflow: str, logger) -> NamedWorkflowRunResult:

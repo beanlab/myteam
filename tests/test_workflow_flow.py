@@ -3,6 +3,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
+from myteam.paths import workflow_candidates
 from myteam.workflow.definition.models import WorkflowRunResult
 
 
@@ -101,6 +104,24 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
     assert seen["path"] == workflow_file
 
 
+def test_workflow_candidates_prioritize_python_then_yaml_then_yml(initialized_project: Path):
+    python_file = initialized_project / ".myteam" / "demo.py"
+    yaml_file = initialized_project / ".myteam" / "demo.yaml"
+    yml_file = initialized_project / ".myteam" / "demo.yml"
+    python_file.write_text("print('py')\n", encoding="utf-8")
+    yaml_file.write_text("step1: {}\n", encoding="utf-8")
+    yml_file.write_text("step1: {}\n", encoding="utf-8")
+
+    assert workflow_candidates(initialized_project, "demo") == [python_file, yaml_file, yml_file]
+
+
+def test_workflow_candidates_reject_unsupported_extension(initialized_project: Path):
+    (initialized_project / ".myteam" / "demo.txt").write_text("ignored\n", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        workflow_candidates(initialized_project, "demo.txt")
+
+
 def test_start_runs_python_workflow_file(run_myteam, initialized_project: Path):
     workflow_file = initialized_project / ".myteam" / "demo.py"
     workflow_file.write_text(
@@ -162,22 +183,101 @@ def test_start_runs_python_workflow_like_load_py(run_myteam_inprocess, initializ
     assert seen["kwargs"]["env"]["MYTEAM_PROJECT_ROOT"] == str(initialized_project / ".myteam")
 
 
+def test_start_prefers_named_directory_over_workflow_files(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    workflow_dir = initialized_project / ".myteam" / "demo"
+    workflow_dir.mkdir()
+    (workflow_dir / "role.md").write_text("Demo role\n", encoding="utf-8")
+    (workflow_dir / "load.py").write_text("print('role')\n", encoding="utf-8")
+    (initialized_project / ".myteam" / "demo.py").write_text("print('py')\n", encoding="utf-8")
+    (initialized_project / ".myteam" / "demo.yaml").write_text("step1: {}\n", encoding="utf-8")
+
+    calls: list[tuple[str, Path]] = []
+
+    monkeypatch.setattr(
+        "myteam.commands._run_named_start_fallback",
+        lambda **kwargs: calls.append(("named", kwargs["folder"])),
+    )
+    monkeypatch.setattr(
+        "myteam.commands._run_python_start_workflow",
+        lambda *args, **kwargs: calls.append(("py", args[0])),
+    )
+    monkeypatch.setattr(
+        "myteam.commands._run_yaml_start_workflow",
+        lambda *args, **kwargs: calls.append(("yaml", args[0])),
+    )
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert calls == [("named", workflow_dir)]
+
+
+def test_start_uses_explicit_python_file_when_directory_exists(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    workflow_dir = initialized_project / ".myteam" / "demo"
+    workflow_dir.mkdir()
+    (workflow_dir / "role.md").write_text("Demo role\n", encoding="utf-8")
+    (workflow_dir / "load.py").write_text("print('role')\n", encoding="utf-8")
+    python_file = initialized_project / ".myteam" / "demo.py"
+    python_file.write_text("print('py')\n", encoding="utf-8")
+
+    calls: list[tuple[str, Path]] = []
+
+    monkeypatch.setattr(
+        "myteam.commands._run_named_start_fallback",
+        lambda **kwargs: calls.append(("named", kwargs["folder"])),
+    )
+    monkeypatch.setattr(
+        "myteam.commands._run_python_start_workflow",
+        lambda *args, **kwargs: calls.append(("py", args[0])),
+    )
+    monkeypatch.setattr(
+        "myteam.commands._run_yaml_start_workflow",
+        lambda *args, **kwargs: calls.append(("yaml", args[0])),
+    )
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo.py")
+
+    assert result.exit_code == 0
+    assert calls == [("py", python_file)]
+    assert result.stderr == ""
+
+
+def test_start_prefers_python_workflow_when_multiple_files_exist(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    python_file = initialized_project / ".myteam" / "demo.py"
+    yaml_file = initialized_project / ".myteam" / "demo.yaml"
+    yml_file = initialized_project / ".myteam" / "demo.yml"
+    python_file.write_text("print('py')\n", encoding="utf-8")
+    yaml_file.write_text("step1: {}\n", encoding="utf-8")
+    yml_file.write_text("step1: {}\n", encoding="utf-8")
+
+    calls: list[tuple[str, Path]] = []
+
+    monkeypatch.setattr(
+        "myteam.commands._run_python_start_workflow",
+        lambda *args, **kwargs: calls.append(("py", args[0])),
+    )
+    monkeypatch.setattr(
+        "myteam.commands._run_yaml_start_workflow",
+        lambda *args, **kwargs: calls.append(("yaml", args[0])),
+    )
+    monkeypatch.setattr(
+        "myteam.commands._run_named_start_fallback",
+        lambda **kwargs: calls.append(("named", kwargs["folder"])),
+    )
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo")
+
+    assert result.exit_code == 0
+    assert calls == [("py", python_file)]
+    assert result.stderr.strip() != ""
+
+
 def test_start_fails_when_workflow_file_is_missing(run_myteam_inprocess, initialized_project: Path):
     result = run_myteam_inprocess(initialized_project, "start", "missing")
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert "Workflow 'missing' not found." in result.stderr
-
-
-def test_start_fails_for_ambiguous_workflow_extensions(run_myteam_inprocess, initialized_project: Path):
-    (initialized_project / ".myteam" / "demo.yaml").write_text("step1: {}\n", encoding="utf-8")
-    (initialized_project / ".myteam" / "demo.yml").write_text("step1: {}\n", encoding="utf-8")
-
-    result = run_myteam_inprocess(initialized_project, "start", "demo")
-
-    assert result.exit_code == 1
-    assert "Workflow 'demo' is ambiguous." in result.stderr
+    assert result.stderr.strip() != ""
 
 
 def test_start_reports_workflow_parse_failures(run_myteam_inprocess, initialized_project: Path, monkeypatch):

@@ -8,6 +8,8 @@ DEFAULT_LOCAL_ROOT = ".myteam"
 AGENTS_DIRNAME = DEFAULT_LOCAL_ROOT
 BUILTIN_ROOT_NAME = "builtins"
 ENCODING = "utf-8"
+SUPPORTED_WORKFLOW_SUFFIXES = {".py", ".yaml", ".yml"}
+WORKFLOW_SUFFIX_PRIORITY = (".py", ".yaml", ".yml")
 
 
 def base_dir() -> Path:
@@ -39,14 +41,16 @@ def workflow_candidates(base: Path, workflow: str, prefix: str | Path | None = N
     requested_path = root.joinpath(*workflow.split("/"))
     candidates: list[Path] = []
 
-    if requested_path.suffix in {".yaml", ".yml", ".py"}:
-        if requested_path.exists():
+    if requested_path.suffix:
+        if requested_path.suffix not in SUPPORTED_WORKFLOW_SUFFIXES:
+            raise ValueError(f"Workflow '{workflow}' has unsupported extension '{requested_path.suffix}'.")
+        if requested_path.is_file():
             candidates.append(requested_path)
         return candidates
 
-    for suffix in (".yaml", ".yml", ".py"):
+    for suffix in WORKFLOW_SUFFIX_PRIORITY:
         candidate = requested_path.with_suffix(suffix)
-        if candidate.exists():
+        if candidate.is_file():
             candidates.append(candidate)
     return candidates
 
@@ -55,7 +59,4 @@ def workflow_path(base: Path, workflow: str, prefix: str | Path | None = None) -
     candidates = workflow_candidates(base, workflow, prefix)
     if not candidates:
         raise ValueError(f"Workflow '{workflow}' not found.")
-    if len(candidates) > 1:
-        matches = ", ".join(str(path) for path in candidates)
-        raise ValueError(f"Workflow '{workflow}' is ambiguous. Matching files: {matches}")
     return candidates[0]

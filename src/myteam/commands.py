@@ -25,6 +25,7 @@ from .paths import (
     agents_root,
     base_dir,
     role_dir,
+    workflow_candidates,
 )
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
@@ -242,26 +243,6 @@ def _run_start_fallback(
     raise SystemExit(1)
 
 
-def _workflow_target(project_root: Path, workflow: str) -> Path | None:
-    requested_path = project_root.joinpath(*workflow.split("/"))
-    if requested_path.suffix in {".yaml", ".yml", ".py"}:
-        return requested_path if requested_path.exists() else None
-
-    candidates: list[Path] = []
-    for suffix in (".yaml", ".yml", ".py"):
-        candidate = requested_path.with_suffix(suffix)
-        if candidate.exists():
-            candidates.append(candidate)
-
-    if len(candidates) > 1:
-        matches = ", ".join(str(path) for path in candidates)
-        print(f"Workflow '{workflow}' is ambiguous. Matching files: {matches}", file=sys.stderr)
-        raise SystemExit(1)
-    if candidates:
-        return candidates[0]
-    return None
-
-
 def _load_start_prompt(name_dir: Path, name: str | None, *, dir_type: str, project_root: Path) -> str:
     try:
         result = _run_load_py(dir_type, name_dir, name, project_root=project_root)
@@ -470,39 +451,64 @@ def start(
         logger("Workflow start fallback completed successfully.")
         return
 
-    path = _workflow_target(project_root, workflow)
-    if path is not None:
-        logger(f"Resolved workflow '{workflow}' to {path}")
-        if path.suffix == ".py":
-            _run_python_start_workflow(path, workflow=workflow, project_root=project_root)
+    folder = project_root.joinpath(*workflow.split("/"))
+    requested_path = folder
+    if not requested_path.suffix:
+        directory_matches: list[tuple[str, Path]] = []
+        if is_role_dir(folder):
+            directory_matches.append(("role", folder))
+        if is_skill_dir(folder):
+            directory_matches.append(("skill", folder))
+
+        file_candidates = workflow_candidates(base_dir(), workflow, prefix=prefix)
+        if directory_matches:
+            if len(directory_matches) > 1 or file_candidates:
+                print(
+                    f"Workflow '{workflow}' matched multiple targets; prioritizing {directory_matches[0][0]} directory.",
+                    file=sys.stderr,
+                )
+            _run_named_start_fallback(
+                    workflow=workflow,
+                    folder=directory_matches[0][1],
+                    dir_type=directory_matches[0][0],
+                    project_root=project_root,
+                    input=input,
+                    logger=logger,
+            )
+            return
+        if file_candidates:
+            if len(file_candidates) > 1:
+                print(
+                    f"Workflow '{workflow}' matched multiple files; prioritizing {file_candidates[0]}.",
+                    file=sys.stderr,
+                )
+            path = file_candidates[0]
+            logger(f"Resolved workflow '{workflow}' to {path}")
+            if path.suffix == ".py":
+                _run_python_start_workflow(path, workflow=workflow, project_root=project_root)
+                logger(f"Workflow '{workflow}' completed successfully.")
+                return
+
+            _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
             logger(f"Workflow '{workflow}' completed successfully.")
             return
+    else:
+        try:
+            file_candidates = workflow_candidates(base_dir(), workflow, prefix=prefix)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            raise SystemExit(1)
+        if file_candidates:
+            path = file_candidates[0]
+            logger(f"Resolved workflow '{workflow}' to {path}")
+            if path.suffix == ".py":
+                _run_python_start_workflow(path, workflow=workflow, project_root=project_root)
+                logger(f"Workflow '{workflow}' completed successfully.")
+                return
 
-        _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
-        logger(f"Workflow '{workflow}' completed successfully.")
-        return
-
-    folder = project_root.joinpath(*workflow.split("/"))
-    if is_role_dir(folder):
-        _run_named_start_fallback(
-                workflow=workflow,
-                folder=folder,
-                dir_type="role",
-                project_root=project_root,
-                input=input,
-                logger=logger,
-        )
-        return
-    if is_skill_dir(folder):
-        _run_named_start_fallback(
-                workflow=workflow,
-                folder=folder,
-                dir_type="skill",
-                project_root=project_root,
-                input=input,
-                logger=logger,
-        )
-        return
+            _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
+            logger(f"Workflow '{workflow}' completed successfully.")
+            return
 
     print(f"Workflow '{workflow}' not found.", file=sys.stderr)
     raise SystemExit(1)
