@@ -41,7 +41,8 @@ myteam get role developer
 
 1. Prints the contents of `role.md` or `ROLE.md`
 2. Prints built-in guidance about roles, skills, and tools
-3. Lists the immediate child roles in that directory
+3. Prints built-in guidance about runnable tasks
+4. Lists the immediate child roles in that directory
 4. Lists the immediate child skills in that directory
 5. Lists Python tools in that directory
 
@@ -306,9 +307,10 @@ myteam get_skills developer --prefix .agents
 
 ### `myteam get_tasks [directory] [--prefix <path>]`
 
-Prints detailed task metadata for the markdown task workflows available in a directory. Each task
-entry prints its `name`, `description`, and `input` frontmatter when present. Omit `directory` to
-use the selected local root.
+Prints detailed task metadata for the supported workflow files available in a directory. Each task
+entry prints its `name`, `description`, and `input` frontmatter when present. Supported workflow
+files use `.py`, `.md`, `.yaml`, and `.yml` suffixes. Omit `directory` to use the selected local
+root.
 
 Examples:
 
@@ -320,8 +322,8 @@ myteam get_tasks research --prefix .agents
 
 ### `myteam get task <path> [--prefix <path>]`
 
-Prints the detailed contents for a single markdown task file, including frontmatter metadata and the
-task prompt body.
+Prints the detailed contents for a single task file, including frontmatter metadata when present
+and the task prompt body for markdown tasks.
 
 Examples:
 

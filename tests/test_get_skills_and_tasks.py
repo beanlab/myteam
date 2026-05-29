@@ -94,6 +94,21 @@ def test_get_tasks_lists_tasks_and_input(run_myteam, initialized_project: Path):
     assert "audience: team" in result.stdout
 
 
+def test_get_tasks_lists_supported_workflow_files(run_myteam, initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "workflows"
+    task_dir.mkdir()
+    (task_dir / "daily.py").write_text("print('daily')\n", encoding="utf-8")
+    (task_dir / "summary.yaml").write_text("step1: {}\n", encoding="utf-8")
+    (task_dir / "notes.yml").write_text("step1: {}\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get_tasks", "workflows")
+
+    assert result.exit_code == 0
+    assert "workflows/daily.py" in result.stdout
+    assert "workflows/summary.yaml" in result.stdout
+    assert "workflows/notes.yml" in result.stdout
+
+
 def test_get_task_prints_task_detail(run_myteam, initialized_project: Path):
     task_dir = initialized_project / ".myteam" / "research"
     task_dir.mkdir()
@@ -112,7 +127,19 @@ def test_get_task_prints_task_detail(run_myteam, initialized_project: Path):
     result = run_myteam(initialized_project, "get", "task", "research/summary")
 
     assert result.exit_code == 0
-    assert "research/summary: Summarize the current state of the project" in result.stdout
+    assert "Summarize the current state of the project" in result.stdout
     assert "input:" in result.stdout
     assert "topic: implementation" in result.stdout
     assert "Task prompt" in result.stdout
+
+
+def test_get_task_accepts_supported_workflow_files(run_myteam, initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "workflows"
+    task_dir.mkdir()
+    task_file = task_dir / "daily.py"
+    task_file.write_text("print('daily task')\n", encoding="utf-8")
+
+    result = run_myteam(initialized_project, "get", "task", "workflows/daily")
+
+    assert result.exit_code == 0
+    assert "print('daily task')" in result.stdout

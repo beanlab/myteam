@@ -287,11 +287,14 @@ def get_tasks(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) ->
 
 def _resolve_task_file(task: str, *, prefix: str) -> Path:
     _selected_root(prefix)
-    candidates = [path for path in workflow_candidates(base_dir(), task, prefix=prefix) if path.suffix == ".md"]
+    candidates = workflow_candidates(base_dir(), task, prefix=prefix)
     if candidates:
         return candidates[0]
 
-    print(f"Task '{task}' not found. Run 'myteam new task {task}' to create it.", file=sys.stderr)
+    print(
+        f"Task '{task}' not found. Run 'myteam new task {task}' or 'myteam new workflow {task}' to create it.",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
 
 

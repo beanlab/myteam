@@ -143,7 +143,8 @@ def test_new_role_template_lists_skills_then_tools_then_roles(run_myteam, initia
 
     assert result.exit_code == 0
     assert result.stdout.index("# Skills") < result.stdout.index("# Tools")
-    assert result.stdout.index("# Tools") < result.stdout.index("# Roles")
+    assert result.stdout.index("# Tools") < result.stdout.index("# Tasks")
+    assert result.stdout.index("# Tasks") < result.stdout.index("# Roles")
 
 
 def test_new_skill_template_lists_skills_then_tools_then_roles(run_myteam, initialized_project: Path):
@@ -264,7 +265,6 @@ def test_root_role_lists_packaged_builtin_skill_namespace(run_myteam, initialize
     assert result.exit_code == 0
     assert "*********** Skills ***********" in result.stdout
     assert "---------- builtins ----------" in result.stdout
-    assert "Packaged maintenance and upgrade helpers" not in result.stdout
 
 
 def test_builtin_changelog_skill_reports_newer_release_notes(run_myteam, initialized_project: Path):

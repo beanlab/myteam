@@ -9,7 +9,7 @@ from typing import Any, Callable, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from ..paths import BUILTIN_ROOT_NAME, builtin_agents_root
+from ..paths import BUILTIN_ROOT_NAME, SUPPORTED_WORKFLOW_SUFFIXES, builtin_agents_root
 from ..templates import get_template
 
 
@@ -479,7 +479,13 @@ def get_skills(folder: Path, base_dir: Path, ignore: list[str]):
 
 
 def _is_task_file(path: Path) -> bool:
-    return path.is_file() and path.suffix == ".md" and path.name.lower() not in {"info.md", "role.md", "skill.md", "readme.md"}
+    return path.is_file() and path.suffix.lower() in SUPPORTED_WORKFLOW_SUFFIXES and path.name.lower() not in {
+        "info.md",
+        "load.py",
+        "readme.md",
+        "role.md",
+        "skill.md",
+    }
 
 
 def list_tasks(folder: Path, base_dir: Path, ignore: list[str]):
@@ -496,6 +502,10 @@ def list_tools(folder: Path, base_dir: Path, ignore: list[str]):
 
 def explain_skills():
     _print_block(get_template("explain_skills.md"))
+
+
+def explain_tasks():
+    _print_block(get_template("explain_tasks.md"))
 
 
 def explain_roles():

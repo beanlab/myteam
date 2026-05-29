@@ -199,6 +199,7 @@ Expected outcome on success:
 - Executes the target role's `load.py`.
 - Prints the role instructions.
 - Prints built-in guidance about roles, skills, and tools when the loader includes it.
+- Prints built-in guidance about runnable tasks when the loader includes it.
 - Prints the immediately discoverable child roles, child skills, and Python tools exposed from that node.
 
 User-visible result:
