@@ -16,7 +16,7 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
         "#!/usr/bin/env python3\n"
         "from __future__ import annotations\n\n"
         "from pathlib import Path\n\n"
-        "from myteam.utils import print_instructions, get_myteam_root, explain_skills, explain_roles, explain_tools, list_skills, list_roles, list_tools, print_directory_tree\n\n"
+        "from myteam.utils import print_instructions, get_myteam_root, explain_skills, explain_roles, list_skills, list_roles, print_directory_tree\n\n"
         "def main() -> int:\n"
         "    base = Path(__file__).resolve().parent\n"
         "    print('ROLE LOAD MARKER')\n"
@@ -27,8 +27,6 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
         "    list_roles(base, myteam, [])\n"
         "    explain_skills()\n"
         "    list_skills(base, myteam, [])\n"
-        "    explain_tools()\n"
-        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -55,7 +53,7 @@ def test_get_role_strips_frontmatter_and_lists_children(run_myteam, initialized_
     assert "name: Developer" not in result.stdout
     assert "developer/frontend" in result.stdout
     assert "developer/testing" in result.stdout
-    assert ".myteam/developer/helper.py" in result.stdout
+    assert ".myteam/developer/helper.py" not in result.stdout
 
 
 def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized_project: Path):
@@ -68,7 +66,7 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
     (skill_dir / "load.py").write_text(
         "#!/usr/bin/env python3\nfrom __future__ import annotations\n\n"
         "from pathlib import Path\n\n"
-        "from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills, list_tools\n\n"
+        "from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills\n\n"
         "def main() -> int:\n"
         "    base = Path(__file__).resolve().parent\n"
         "    print('SKILL LOAD MARKER')\n"
@@ -76,7 +74,6 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
         "    myteam = get_myteam_root(base)\n"
         "    list_roles(base, myteam, [])\n"
         "    list_skills(base, myteam, [])\n"
-        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -96,7 +93,7 @@ def test_get_skill_strips_frontmatter_and_lists_children(run_myteam, initialized
     assert "Use Python." in result.stdout
     assert "name: Python" not in result.stdout
     assert "python/testing" in result.stdout
-    assert ".myteam/python/lint.py" in result.stdout
+    assert ".myteam/python/lint.py" not in result.stdout
 
 
 def test_get_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
@@ -122,7 +119,7 @@ def test_builtin_skill_uses_custom_prefix_project_root(run_myteam, tmp_path: Pat
     assert "New `myteam` features since 0.2.5" in result.stdout
 
 
-def test_new_role_template_lists_skills_then_tools_then_roles(run_myteam, initialized_project: Path):
+def test_new_role_template_lists_skills_then_tasks_then_roles(run_myteam, initialized_project: Path):
     create_result = run_myteam(initialized_project, "new", "role", "developer")
     assert create_result.exit_code == 0
 
@@ -142,12 +139,11 @@ def test_new_role_template_lists_skills_then_tools_then_roles(run_myteam, initia
     result = run_myteam(initialized_project, "get", "role", "developer")
 
     assert result.exit_code == 0
-    assert result.stdout.index("# Skills") < result.stdout.index("# Tools")
-    assert result.stdout.index("# Tools") < result.stdout.index("# Tasks")
+    assert result.stdout.index("# Skills") < result.stdout.index("# Tasks")
     assert result.stdout.index("# Tasks") < result.stdout.index("# Roles")
 
 
-def test_new_skill_template_lists_skills_then_tools_then_roles(run_myteam, initialized_project: Path):
+def test_new_skill_template_lists_skills_then_roles(run_myteam, initialized_project: Path):
     create_result = run_myteam(initialized_project, "new", "skill", "python")
     assert create_result.exit_code == 0
 
@@ -167,8 +163,7 @@ def test_new_skill_template_lists_skills_then_tools_then_roles(run_myteam, initi
     result = run_myteam(initialized_project, "get", "skill", "python")
 
     assert result.exit_code == 0
-    assert result.stdout.index("*********** Skills ***********") < result.stdout.index("*********** Tools ***********")
-    assert result.stdout.index("*********** Tools ***********") < result.stdout.index("******** Team Members ********")
+    assert result.stdout.index("*********** Skills ***********") < result.stdout.index("******** Team Members ********")
 
 
 def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project: Path):
@@ -179,7 +174,7 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "#!/usr/bin/env python3\n"
         "from __future__ import annotations\n\n"
         "from pathlib import Path\n\n"
-        "from myteam.utils import print_instructions, get_myteam_root, explain_skills, explain_roles, explain_tools, list_skills, list_roles, list_tools, print_directory_tree\n\n"
+        "from myteam.utils import print_instructions, get_myteam_root, explain_skills, explain_roles, list_skills, list_roles, print_directory_tree\n\n"
         "def main() -> int:\n"
         "    base = Path(__file__).resolve().parent\n"
         "    print('UPPERCASE ROLE LOAD MARKER')\n"
@@ -190,8 +185,6 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "    list_roles(base, myteam, [])\n"
         "    explain_skills()\n"
         "    list_skills(base, myteam, [])\n"
-        "    explain_tools()\n"
-        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -204,7 +197,7 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
     (skill_dir / "load.py").write_text(
         "#!/usr/bin/env python3\nfrom __future__ import annotations\n\n"
         "from pathlib import Path\n\n"
-        "from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills, list_tools\n\n"
+        "from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills\n\n"
         "def main() -> int:\n"
         "    base = Path(__file__).resolve().parent\n"
         "    print('UPPERCASE SKILL LOAD MARKER')\n"
@@ -212,7 +205,6 @@ def test_uppercase_definition_files_are_accepted(run_myteam, initialized_project
         "    myteam = get_myteam_root(base)\n"
         "    list_roles(base, myteam, [])\n"
         "    list_skills(base, myteam, [])\n"
-        "    list_tools(base, myteam.parent, [])\n"
         "    return 0\n\n"
         "if __name__ == '__main__':\n"
         "    raise SystemExit(main())\n",
@@ -297,7 +289,7 @@ def test_builtin_migration_skill_includes_latest_packaged_migration(run_myteam, 
     assert result.exit_code == 0
     assert "Pending migrations for `.myteam` tracked at 0.2.23" in result.stdout
     assert "## 0.2.24 migration" in result.stdout
-    assert "tool paths stay rooted at the project tree" in result.stdout
+    assert "removes the legacy tool-listing section" in result.stdout
 
 
 def test_builtin_parent_skill_lists_packaged_children(run_myteam, initialized_project: Path):

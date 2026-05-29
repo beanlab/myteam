@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam.upgrade import print_pending_migrations
-from myteam.utils import print_instructions, get_active_myteam_root, get_skills, list_roles, list_tools
+from myteam.utils import print_instructions, get_active_myteam_root, get_skills, list_roles
 
 
 def main() -> int:
@@ -14,7 +14,6 @@ def main() -> int:
     print_instructions(base)
     print_pending_migrations(myteam)
     get_skills(base, myteam, [])
-    list_tools(base, myteam, [])
     list_roles(base, myteam, [])
 
     return 0

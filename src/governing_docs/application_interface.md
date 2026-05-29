@@ -5,9 +5,9 @@
 `myteam` is a command-line application for building file-based agent systems.
 
 Its public purpose is to let a project define agent instructions in a project-local directory and
-then let agents load those instructions themselves. The tool treats roles, skills, workflows, and
-tools as discoverable filesystem objects that can be created, listed, loaded, started, downloaded,
-and removed through the CLI. It also ships version-aware built-in maintenance skills so agents can
+then let agents load those instructions themselves. The tool treats roles, skills, and workflows as
+discoverable filesystem objects that can be created, listed, loaded, started, downloaded, and
+removed through the CLI. It also ships version-aware built-in maintenance skills so agents can
 surface upgrade guidance for older local trees without copying those built-ins into each project.
 
 The intended workflow is:
@@ -16,7 +16,7 @@ The intended workflow is:
 2. A human author creates or downloads roles and skills.
 3. Agents run `myteam get role ...` and `myteam get skill ...` to load the instructions relevant to their current task.
 4. A human may run `myteam start ...` to execute a workflow defined in the project-local tree.
-5. Each loaded role or skill reveals the next level of roles, skills, and tools that are available from that point in the hierarchy.
+5. Each loaded role or skill reveals the next level of roles and skills that are available from that point in the hierarchy.
 
 ## Operating Model
 
@@ -198,9 +198,9 @@ Expected outcome on success:
 
 - Executes the target role's `load.py`.
 - Prints the role instructions.
-- Prints built-in guidance about roles, skills, and tools when the loader includes it.
+- Prints built-in guidance about roles and skills when the loader includes it.
 - Prints built-in guidance about runnable tasks when the loader includes it.
-- Prints the immediately discoverable child roles, child skills, and Python tools exposed from that node.
+- Prints the immediately discoverable child roles, child skills, and runnable tasks exposed from that node.
 
 User-visible result:
 
@@ -231,7 +231,7 @@ Expected outcome on success:
 - Resolves all other skill paths from the selected local tree root.
 - Executes the resolved skill's loader.
 - Prints the skill instructions.
-- Prints any child roles, child skills, and Python tools exposed from that node by the loader.
+- Prints any child roles and child skills exposed from that node by the loader.
 
 User-visible result:
 
@@ -614,7 +614,7 @@ The following behavior is part of the current application contract:
 - A local tree may carry a stored `myteam` version used for upgrade notices and migration guidance.
 - Upgrade guidance is surfaced through the generated root role and built-in maintenance skills, not through a dedicated migration CLI command.
 - If the tracked version file is missing, upgrade-related built-in loaders treat the tree as a legacy untracked local tree rather than failing.
-- Default generated loaders present discoverable skills first, then tools, and roles last.
+- Default generated loaders present discoverable skills first, then tasks where applicable, and roles last.
 - Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
 - Errors are communicated as command failure plus an error message on standard error.
 

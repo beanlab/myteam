@@ -496,10 +496,6 @@ def get_tasks(folder: Path, base_dir: Path, ignore: list[str]):
     _print_named_info("Tasks", _collect_task_entries(folder, base_dir, ignore, include_info=True))
 
 
-def list_tools(folder: Path, base_dir: Path, ignore: list[str]):
-    _print_info("Tools", folder, base_dir, ignore + ["load.py"], _is_py_file, lambda f: "")
-
-
 def explain_skills():
     _print_block(get_template("explain_skills.md"))
 
@@ -510,7 +506,3 @@ def explain_tasks():
 
 def explain_roles():
     _print_block(get_template("explain_roles.md"))
-
-
-def explain_tools():
-    _print_block(get_template("explain_tools.md"))

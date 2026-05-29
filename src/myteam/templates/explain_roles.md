@@ -9,7 +9,7 @@ and pass to other team members whatever parts should by done by them.
 
 ## Delegation to Roles
 Appropriate tasks should be handed off using whatever tool is available to you to spawn in subagents.
-If you lack a tool to spawn in a subagent team member, or if no such tool is available to you, inform the user immediately.
+If you lack a way to spawn a subagent team member, or if no such capability is available to you, inform the user immediately.
 When spawning an agent, provide the agent's role exactly as it appears in the Team Members list. 
 Use the template demonstrated in the following example.
 

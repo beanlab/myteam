@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import print_instructions, get_active_myteam_root, explain_skills, explain_tasks, explain_roles, explain_tools, get_skills, \
-    list_roles, list_tasks, list_tools, print_directory_tree
+from myteam.utils import print_instructions, get_active_myteam_root, explain_skills, explain_tasks, explain_roles, get_skills, \
+    list_roles, list_tasks, print_directory_tree
 
 
 def main() -> int:
@@ -16,9 +16,6 @@ def main() -> int:
 
     explain_skills()
     get_skills(base, myteam, [])
-
-    explain_tools()
-    list_tools(base, myteam.parent, [])
 
     explain_tasks()
     list_tasks(myteam, myteam, [])

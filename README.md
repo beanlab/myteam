@@ -4,10 +4,10 @@
 
 The core model is simple:
 
-- users define roles, skills, and tools inside `.myteam/`
+- users define roles and skills inside `.myteam/`
 - agents assume a role by running `myteam get role <role>`
 - agents load a skill by running `myteam get skill <skill>`
-- each loaded role or skill reveals the next layer of discoverable roles, skills, and tools
+- each loaded role or skill reveals the next layer of discoverable roles and skills
 
 This makes `myteam` useful for hierarchical multi-agent systems where instructions should be explicit, inspectable, and
 versioned in Git.
@@ -24,7 +24,7 @@ Typical flow:
 1. A user or top-level agent sets up `.myteam/`.
 2. A sub-agent is assigned a role such as `developer`.
 3. That sub-agent runs `myteam get role developer`.
-4. `myteam` prints the role instructions plus any immediately available child roles, child skills, and tools.
+4. `myteam` prints the role instructions plus any immediately available child roles, child skills, and tasks.
 5. If the agent needs a skill, it runs `myteam get skill <skill>`.
 
 In other words, roles and skills are loaded by the agent that is assuming them.
@@ -40,11 +40,11 @@ myteam get role developer
 `myteam` executes that role's `load.py`, which:
 
 1. Prints the contents of `role.md` or `ROLE.md`
-2. Prints built-in guidance about roles, skills, and tools
+2. Prints built-in guidance about roles and skills
 3. Prints built-in guidance about runnable tasks
 4. Lists the immediate child roles in that directory
-4. Lists the immediate child skills in that directory
-5. Lists Python tools in that directory
+5. Lists the immediate child skills in that directory
+6. Lists the immediate child tasks in that directory
 
 The same pattern applies to skills:
 
@@ -61,7 +61,6 @@ next available things it can assume or use.
 
 - A role is a team member with instructions.
 - A skill is a reusable capability with instructions.
-- A tool is a Python script colocated with a role or skill.
 - A roster is a reusable bundle that can be downloaded into `.myteam/`.
 
 Roles and skills are identified by definition files:
@@ -512,7 +511,6 @@ the selected local root in `MYTEAM_PROJECT_ROOT`, and returns its exit status di
 - agents load their own instructions directly from the filesystem
 - roles and skills are explicit, inspectable, and Git-friendly
 - discovery is layered, which fits hierarchical agent systems
-- tools can live next to the roles and skills that use them
 - rosters let you reuse agent-system structures across projects
 - workflows let you create predefined, deterministic agent workflows
 

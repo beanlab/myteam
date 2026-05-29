@@ -4,19 +4,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam.upgrade import print_release_notes
-from myteam.utils import builtin_skill_dir, get_active_myteam_root, get_skills, list_roles, list_tools, print_instructions
+from myteam.utils import builtin_skill_dir, get_active_myteam_root, get_skills, list_roles, print_instructions
 
 
 def main() -> int:
     base = Path(__file__).resolve().parent
     builtin_root = builtin_skill_dir("builtins")
-    display_root = builtin_root.parent
     myteam = get_active_myteam_root(base)
 
     print_instructions(base)
     print_release_notes(myteam)
     get_skills(base, builtin_root, [])
-    list_tools(base, display_root, [])
     list_roles(base, builtin_root, [])
 
     return 0
