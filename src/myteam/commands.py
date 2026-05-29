@@ -16,6 +16,7 @@ from .disclosure import (
     is_role_dir,
     is_skill_dir,
     load_definition_workflow_settings,
+    WorkflowStepSettings,
 )
 from .paths import (
     APP_NAME,
@@ -31,7 +32,7 @@ from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
 from .workflow.definition.default_workflow import run_default_workflow
-from .workflow.definition.parser import load_workflow
+from .workflow.definition.parser import load_markdown_workflow, load_workflow
 from .workflow.execution.cli_commands import workflow_result as submit_workflow_result
 from .workflow.execution.cli_commands import workflow_start as submit_workflow_start
 from .workflow.execution.engine import run_workflow
@@ -113,15 +114,47 @@ def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
 
 
 def new_workflow(workflow: str = "agent", prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    _new_workflow_file(
+        workflow,
+        prefix=prefix,
+        suffix=".py",
+        template_name="workflow_definition_template.py",
+        label="Workflow",
+    )
+
+
+def new_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    _new_workflow_file(
+        task,
+        prefix=prefix,
+        suffix=".md",
+        template_name="task_definition_template.md",
+        label="Task",
+    )
+
+
+def _new_workflow_file(
+    workflow: str,
+    *,
+    prefix: str,
+    suffix: str,
+    template_name: str,
+    label: str,
+) -> None:
     workflow_root = _selected_root(prefix)
-    workflow_path = workflow_root.joinpath(*workflow.split("/")).with_suffix(".py")
+    workflow_path = workflow_root.joinpath(*workflow.split("/")).with_suffix(suffix)
     if workflow_path.exists():
-        print(f"Workflow '{workflow}' already exists at {workflow_path}", file=sys.stderr)
+        print(f"{label} '{workflow}' already exists at {workflow_path}", file=sys.stderr)
         raise SystemExit(1)
 
     ensure_dir(workflow_path.parent)
-    template = get_template("workflow_definition_template.py").removesuffix("\n")
-    write_py_script(workflow_path, template)
+    template = get_template(template_name)
+    if suffix == ".py":
+        template = template.removesuffix("\n")
+        write_py_script(workflow_path, template)
+        return
+
+    workflow_path.write_text(template, encoding=ENCODING)
 
 
 def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
@@ -413,6 +446,31 @@ def _run_yaml_start_workflow(path: Path, *, workflow: str, logger) -> None:
         raise SystemExit(1)
 
 
+def _run_markdown_start_workflow(path: Path, *, workflow: str, input: Any, logger) -> None:
+    try:
+        prompt, workflow_settings = load_markdown_workflow(path)
+    except (OSError, ValueError) as exc:
+        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+    if input is not None:
+        workflow_settings = (
+            replace(workflow_settings, input=input)
+            if workflow_settings is not None
+            else WorkflowStepSettings(input=input)
+        )
+
+    result = run_default_workflow(prompt, cwd=path.parent, workflow_settings=workflow_settings)
+    if result.status != "completed":
+        if result.error_message:
+            print(f"Workflow '{workflow}' failed: {result.error_message}", file=sys.stderr)
+        else:
+            print(f"Workflow '{workflow}' failed.", file=sys.stderr)
+        raise SystemExit(1)
+
+    logger(f"Workflow '{workflow}' completed successfully.")
+
+
 def start(
         workflow: str | None = None,
         prefix: str = DEFAULT_LOCAL_ROOT,
@@ -489,6 +547,10 @@ def start(
                 logger(f"Workflow '{workflow}' completed successfully.")
                 return
 
+            if path.suffix == ".md":
+                _run_markdown_start_workflow(path, workflow=workflow, input=input, logger=logger)
+                return
+
             _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
             logger(f"Workflow '{workflow}' completed successfully.")
             return
@@ -504,6 +566,10 @@ def start(
             if path.suffix == ".py":
                 _run_python_start_workflow(path, workflow=workflow, project_root=project_root)
                 logger(f"Workflow '{workflow}' completed successfully.")
+                return
+
+            if path.suffix == ".md":
+                _run_markdown_start_workflow(path, workflow=workflow, input=input, logger=logger)
                 return
 
             _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
@@ -543,6 +609,7 @@ __all__ = [
     "list_available_rosters",
     "new_role",
     "new_skill",
+    "new_task",
     "new_workflow",
     "remove",
     "start",

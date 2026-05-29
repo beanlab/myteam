@@ -83,3 +83,37 @@ def test_python_child_workflow_can_return_step_result(initialized_project: Path,
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
 
+
+def test_markdown_child_workflow_uses_prompt_body_and_frontmatter(initialized_project: Path, monkeypatch):
+    workflow_file = initialized_project / ".myteam" / "child.md"
+    workflow_file.write_text(
+        "---\n"
+        "name: Child task\n"
+        "description: Summarize notes\n"
+        "agent: codex\n"
+        "output:\n"
+        "  answer: ok\n"
+        "---\n"
+        "Summarize the attached notes.\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, object] = {}
+
+    def fake_run_default_workflow(prompt: str, **kwargs):
+        seen["prompt"] = prompt
+        seen["kwargs"] = kwargs
+        return StepResult(status="completed", output={"answer": "ok"})
+
+    monkeypatch.setattr("myteam.workflow.execution.runner.run_default_workflow", fake_run_default_workflow)
+    monkeypatch.chdir(initialized_project)
+
+    result = run_named_workflow("child")
+
+    assert result.status == "completed"
+    assert result.output == {"answer": "ok"}
+    assert seen["prompt"].strip()
+    assert seen["kwargs"]["cwd"] == workflow_file.parent
+    workflow_settings = seen["kwargs"]["workflow_settings"]
+    assert workflow_settings.agent == "codex"
+    assert workflow_settings.output == {"answer": "ok"}

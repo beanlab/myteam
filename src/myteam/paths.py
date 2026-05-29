@@ -8,8 +8,8 @@ DEFAULT_LOCAL_ROOT = ".myteam"
 AGENTS_DIRNAME = DEFAULT_LOCAL_ROOT
 BUILTIN_ROOT_NAME = "builtins"
 ENCODING = "utf-8"
-SUPPORTED_WORKFLOW_SUFFIXES = {".py", ".yaml", ".yml"}
-WORKFLOW_SUFFIX_PRIORITY = (".py", ".yaml", ".yml")
+SUPPORTED_WORKFLOW_SUFFIXES = {".py", ".md", ".yaml", ".yml"}
+WORKFLOW_SUFFIX_PRIORITY = (".py", ".md", ".yaml", ".yml")
 
 
 def base_dir() -> Path:

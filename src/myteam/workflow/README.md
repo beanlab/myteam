@@ -7,7 +7,7 @@
 Its job is to:
 
 - load and validate authored workflow files
-- resolve workflow file paths for YAML and Python workflows
+- resolve workflow file paths for YAML, Python, and markdown task workflows
 - resolve references between completed steps
 - run each step through an interactive terminal-backed agent session
 - collect the final structured step result through an out-of-band result channel
@@ -33,6 +33,7 @@ From outside the package, the flow is:
 
 1. `commands.start(...)` resolves a workflow file path and either executes a Python workflow script or loads YAML.
 2. `workflow.definition.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation`.
+   `workflow.definition.load_markdown_workflow(...)` loads markdown task frontmatter and body text.
 3. `workflow.execution.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.execution.run_agent(...)`:
    - receives the resolved step values from the engine
@@ -50,10 +51,10 @@ The path-resolution rule for `commands.start(...)` and `workflow.execution.run_n
 is:
 
 - if no extension is provided, prefer a matching role or skill directory
-- if no directory matches, prefer `.py`, then `.yaml`, then `.yml`
+- if no directory matches, prefer `.py`, then `.md`, then `.yaml`, then `.yml`
 - if multiple matches exist at the same priority, continue with the prioritized target and emit a
   brief warning
-- if an explicit extension is not one of `.py`, `.yaml`, or `.yml`, treat it as an error
+- if an explicit extension is not one of `.py`, `.md`, `.yaml`, or `.yml`, treat it as an error
 
 `workflow.execution.cli_commands.workflow_start(...)` is different: it only submits a child-workflow
 request over the control channel. The parent workflow runner resolves the requested child workflow

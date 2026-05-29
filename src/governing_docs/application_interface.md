@@ -49,7 +49,7 @@ invocation.
 At the black-box level, `myteam` provides these categories of behavior:
 
 - It can scaffold a local agent-system tree.
-- It can scaffold new role and skill nodes inside that local tree.
+- It can scaffold new role, skill, and markdown task nodes inside that local tree.
 - It can record which `myteam` version last initialized or refreshed a local tree.
 - It can load and print instructions for a role or skill.
 - It can resolve and execute a workflow definition from the selected local tree.
@@ -139,6 +139,28 @@ User-visible result:
 Failure conditions that matter at the interface:
 
 - If the target directory already exists, the command exits with an error and does not overwrite it.
+
+### `myteam new task <path> [--prefix <path>]`
+
+Creates a new markdown-defined single-step workflow below the selected local tree root.
+
+Inputs:
+
+- `<path>` is slash-delimited and may describe a nested task such as `research/summary`.
+
+Expected outcome on success:
+
+- Creates any missing parent directories under the selected local root.
+- Creates a `.md` task file at the target path.
+- Uses the repository's task scaffold contents for the new file.
+
+User-visible result:
+
+- The new task file can later be executed with `myteam start <path>`.
+
+Failure conditions that matter at the interface:
+
+- If the target file already exists, the command exits with an error and does not overwrite it.
 
 ### `myteam new workflow [path] [--prefix <path>]`
 
@@ -233,10 +255,11 @@ Inputs:
 - If no extension is provided, the command looks for a matching role or skill directory first and
   falls back to workflow files.
 - When falling back to workflow files, the command prioritizes `.py`, then `.yaml`, then `.yml`.
+- Markdown task files use `.md` and are treated as single-step workflows.
 - If multiple matches exist at the same priority, the command prints a brief warning and continues
   with the prioritized target.
-- The command accepts `.py`, `.yaml`, and `.yml` workflow files. Any other explicit extension is
-  rejected with an error.
+- The command accepts `.py`, `.yaml`, `.yml`, and `.md` workflow files. Any other explicit extension
+  is rejected with an error.
 - If `.myteam/.config.yaml` defines workflow defaults, the workflow executor uses those settings as
   project defaults for authored steps.
 - `--verbose` enables workflow lifecycle logging on standard error.
@@ -248,6 +271,8 @@ Expected outcome on success:
 - Resolves the workflow file from the selected local tree using the requested workflow path.
 - For YAML workflows, loads and validates the authored workflow definition and executes the
   workflow's steps in order.
+- For markdown task workflows, loads the task frontmatter as workflow settings and uses the body as
+  the single-step prompt.
 - For Python workflows, executes the workflow file as a separate Python process.
 - For role and skill fallback execution, loads the target `load.py` as the prompt source and
   validates any required frontmatter input keys before formatting the prompt body.
@@ -378,6 +403,31 @@ step2:
     best_haiku:
       haiku: the haiku text
       reason: why this haiku was chosen over the others
+```
+
+### Markdown Task Workflow Format
+
+Markdown task workflows are single-step workflows stored as `.md` files in the selected local tree.
+
+Expected authored shape:
+
+- A task file may include YAML frontmatter at the top.
+- The body of the file becomes the single-step prompt.
+- Frontmatter can define workflow settings such as `agent`, `model`, `input`, `output`,
+  `interactive`, `session_id`, `fork`, `extra_args`, `usage_logging`, and `timeout`.
+
+Example:
+
+```md
+---
+name: Research summary
+description: Summarize the attached notes.
+agent: codex
+output:
+  summary: short summary text
+---
+
+Summarize the attached notes in one concise paragraph.
 ```
 
 Authoring rules that matter at the interface:

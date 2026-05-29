@@ -7,6 +7,7 @@ import pytest
 
 from myteam.paths import workflow_candidates
 from myteam.workflow.definition.models import WorkflowRunResult
+from myteam.workflow.definition.models import StepResult
 
 
 def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -106,13 +107,15 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
 
 def test_workflow_candidates_prioritize_python_then_yaml_then_yml(initialized_project: Path):
     python_file = initialized_project / ".myteam" / "demo.py"
+    markdown_file = initialized_project / ".myteam" / "demo.md"
     yaml_file = initialized_project / ".myteam" / "demo.yaml"
     yml_file = initialized_project / ".myteam" / "demo.yml"
     python_file.write_text("print('py')\n", encoding="utf-8")
+    markdown_file.write_text("---\nname: Demo\n---\nTask prompt\n", encoding="utf-8")
     yaml_file.write_text("step1: {}\n", encoding="utf-8")
     yml_file.write_text("step1: {}\n", encoding="utf-8")
 
-    assert workflow_candidates(initialized_project, "demo") == [python_file, yaml_file, yml_file]
+    assert workflow_candidates(initialized_project, "demo") == [python_file, markdown_file, yaml_file, yml_file]
 
 
 def test_workflow_candidates_reject_unsupported_extension(initialized_project: Path):
@@ -270,6 +273,41 @@ def test_start_prefers_python_workflow_when_multiple_files_exist(run_myteam_inpr
     assert result.exit_code == 0
     assert calls == [("py", python_file)]
     assert result.stderr.strip() != ""
+
+
+def test_start_runs_markdown_task_workflow(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "demo.md"
+    task_file.write_text(
+        "---\n"
+        "name: Demo task\n"
+        "description: Summarize notes\n"
+        "agent: codex\n"
+        "output:\n"
+        "  result: short summary\n"
+        "---\n"
+        "Summarize the attached notes.\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, object] = {}
+
+    def fake_run_default_workflow(prompt: str, **kwargs):
+        seen["prompt"] = prompt
+        seen["kwargs"] = kwargs
+        return StepResult(status="completed", output={"result": "short summary"})
+
+    monkeypatch.setattr("myteam.commands.run_default_workflow", fake_run_default_workflow)
+
+    result = run_myteam_inprocess(initialized_project, "start", "demo.md")
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert seen["prompt"].strip()
+    assert seen["kwargs"]["cwd"] == task_file.parent
+    workflow_settings = seen["kwargs"]["workflow_settings"]
+    assert workflow_settings.agent == "codex"
+    assert workflow_settings.output == {"result": "short summary"}
 
 
 def test_start_fails_when_workflow_file_is_missing(run_myteam_inprocess, initialized_project: Path):

@@ -106,16 +106,21 @@ def is_skill_dir(folder: Path) -> bool:
     return folder.is_dir() and _get_definition_file(folder, "skill") is not None
 
 
-def _parse_yaml_frontmatter(file: Path) -> dict[str, str]:
+def _parse_yaml_frontmatter(file: Path) -> dict[str, Any]:
     if not file.exists():
         return {}
-    return _parse_yaml_frontmatter_text(file.read_text(encoding="utf-8"))
+    return parse_yaml_frontmatter(file.read_text(encoding="utf-8"))
 
 
-def _parse_yaml_frontmatter_text(text: str) -> dict[str, str]:
+def parse_yaml_frontmatter(text: str) -> dict[str, Any]:
+    frontmatter, _ = split_yaml_frontmatter(text)
+    return frontmatter
+
+
+def split_yaml_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
-        return {}
+        return {}, text
 
     end = None
     for i in range(1, len(lines)):
@@ -123,23 +128,26 @@ def _parse_yaml_frontmatter_text(text: str) -> dict[str, str]:
             end = i
             break
     if end is None:
-        return {}
+        return {}, text
 
     frontmatter = "\n".join(lines[1:end])
     try:
         loaded = yaml.safe_load(frontmatter)
     except yaml.YAMLError:
-        return {}
+        return {}, text
 
     if not isinstance(loaded, dict):
-        return {}
+        return {}, text
 
-    data: dict[str, str] = {}
+    data: dict[str, Any] = {}
     for key, value in loaded.items():
         if value is None:
             continue
-        data[str(key).lower()] = str(value)
-    return data
+        data[str(key).lower()] = value
+    body = "\n".join(lines[end + 1 :])
+    if text.endswith("\n"):
+        body += "\n"
+    return data, body
 
 
 def load_definition_workflow_settings(folder: Path, definition_stem: str) -> WorkflowStepSettings | None:
@@ -147,7 +155,7 @@ def load_definition_workflow_settings(folder: Path, definition_stem: str) -> Wor
     if definition_file is None:
         return None
 
-    frontmatter = _parse_yaml_frontmatter_text(definition_file.read_text(encoding="utf-8"))
+    frontmatter = _parse_yaml_frontmatter(definition_file)
     if not frontmatter:
         return None
 
@@ -159,7 +167,7 @@ def load_definition_workflow_settings(folder: Path, definition_stem: str) -> Wor
             f"Workflow definition file {folder} frontmatter workflow-settings is invalid: {exc}") from exc
 
 
-def _format_frontmatter_info(frontmatter: dict[str, str]) -> str:
+def _format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
     name = frontmatter.get("name", "")
     description = frontmatter.get("description", "")
     if name and description:

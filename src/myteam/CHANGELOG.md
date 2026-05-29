@@ -2,14 +2,17 @@
 
 ## 0.2.27
 
-- Expanded `myteam start` so it can resolve roles and skills in addition to Python and YAML 
-  workflows.
+- Expanded `myteam start` so it can resolve roles and skills in addition to Python, markdown, and
+  YAML workflows.
 - Changed `myteam start` to prefer role and skill directories before workflow files when no file
-  extension is provided, and to prioritize `.py` before `.yaml` before `.yml` when resolving
+  extension is provided, and to prioritize `.py` before `.md` before `.yaml` before `.yml` when resolving
   workflow files.
 - Added a brief warning when no-extension resolution finds multiple matches and the command
   continues with the prioritized target.
 - Rejected unsupported workflow file extensions for `myteam start`.
+- Added `myteam new task` for scaffolding markdown-defined single-step workflows from a template.
+- Markdown task workflows load the file body as the prompt and use YAML frontmatter for optional
+  workflow settings.
 - Added optional workflow settings to the frontmatter of skills and roles.
   - the `input` field can be used to format the prompt and the values may be passed in using
     `myteam start <path> --input <dict>`.

@@ -13,11 +13,12 @@ from ...disclosure import (
     is_role_dir,
     is_skill_dir,
     load_definition_workflow_settings,
+    WorkflowStepSettings,
 )
 from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir, workflow_candidates
 from ..definition.default_workflow import run_default_workflow
 from ..definition.models import StepResult
-from ..definition.parser import load_workflow
+from ..definition.parser import load_markdown_workflow, load_workflow
 from .engine import run_workflow
 
 
@@ -79,6 +80,8 @@ def run_named_workflow(
                 logger(f"Resolved workflow '{workflow}' to {path}")
             if path.suffix == ".py":
                 return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
+            if path.suffix == ".md":
+                return _run_markdown_child_workflow(path, workflow=workflow, input=input, logger=logger)
             return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
     else:
         try:
@@ -91,6 +94,8 @@ def run_named_workflow(
                 logger(f"Resolved workflow '{workflow}' to {path}")
             if path.suffix == ".py":
                 return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
+            if path.suffix == ".md":
+                return _run_markdown_child_workflow(path, workflow=workflow, input=input, logger=logger)
             return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
 
     return NamedWorkflowRunResult(status="failed", error_message=f"Workflow '{workflow}' not found.")
@@ -123,6 +128,37 @@ def _run_yaml_child_workflow(path: Path, *, workflow: str, logger) -> NamedWorkf
         output=result.output,
         error_message=result.error_message,
         failed_step_name=result.failed_step_name,
+    )
+
+
+def _run_markdown_child_workflow(
+    path: Path,
+    *,
+    workflow: str,
+    input: Any,
+    logger,
+) -> NamedWorkflowRunResult:
+    try:
+        prompt, workflow_settings = load_markdown_workflow(path)
+    except (OSError, ValueError) as exc:
+        return NamedWorkflowRunResult(status="failed", error_message=f"Failed to load workflow '{workflow}': {exc}")
+
+    if input is not None:
+        workflow_settings = (
+            replace(workflow_settings, input=input)
+            if workflow_settings is not None
+            else WorkflowStepSettings(input=input)
+        )
+
+    result = run_default_workflow(prompt, cwd=path.parent, workflow_settings=workflow_settings)
+    if result.status != "completed":
+        return NamedWorkflowRunResult(status="failed", error_message=result.error_message)
+
+    if logger is not None:
+        logger(f"Workflow '{workflow}' completed successfully.")
+    return NamedWorkflowRunResult(
+        status="completed",
+        output=result.output if result.output is not None else {"status": "completed"},
     )
 
 
