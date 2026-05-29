@@ -105,11 +105,31 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
     assert seen["path"] == workflow_file
 
 
-def test_start_requires_a_workflow_path(run_myteam_inprocess, initialized_project: Path):
+def test_start_defaults_to_agent_workflow(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    workflow_file = initialized_project / ".myteam" / "agent.py"
+    workflow_file.write_text(
+        "def main():\n"
+        "    return {'answer': 'ok'}\n",
+        encoding="utf-8",
+    )
+
+    seen: dict[str, Path] = {}
+
+    def fake_run_python_start_workflow(path: Path, *, workflow: str, project_root: Path):
+        seen["path"] = path
+        seen["workflow"] = workflow
+        seen["project_root"] = project_root
+
+    monkeypatch.setattr("myteam.commands._run_python_start_workflow", fake_run_python_start_workflow)
+
     result = run_myteam_inprocess(initialized_project, "start")
 
-    assert result.exit_code == 2
-    assert "start" in result.stderr
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert seen["path"] == workflow_file
+    assert seen["workflow"] == "agent"
+    assert seen["project_root"] == initialized_project / ".myteam"
 
 
 def test_workflow_candidates_prioritize_python_then_yaml_then_yml(initialized_project: Path):

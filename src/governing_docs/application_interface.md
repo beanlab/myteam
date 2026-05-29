@@ -245,14 +245,15 @@ Failure conditions that matter at the interface:
 - If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
 - If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
 
-### `myteam start <path> [--prefix <path>] [--verbose] [--input <mapping>]`
+### `myteam start [path] [--prefix <path>] [--verbose] [--input <mapping>]`
 
 Executes a workflow definition from the selected local tree.
 
 Inputs:
 
-- `<path>` is a slash-delimited workflow path such as `dev/frontend`.
-- The command resolves that path relative to the selected local root.
+- `<path>` is optional. When omitted, `myteam start` runs the default `agent` workflow.
+- When provided, `<path>` is a slash-delimited workflow path such as `dev/frontend`.
+- The command resolves provided paths relative to the selected local root.
 - If no extension is provided, the command prioritizes `.py`, then `.md`, then `.yaml`, then `.yml`.
 - Markdown task files use `.md` and are treated as single-step workflows.
 - If multiple matches exist at the same priority, the command prints a brief warning and continues

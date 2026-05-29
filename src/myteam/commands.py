@@ -380,7 +380,7 @@ def _run_markdown_start_workflow(path: Path, *, workflow: str, input: Any, logge
 
 
 def start(
-        workflow: str,
+        workflow: str = "agent",
         prefix: str = DEFAULT_LOCAL_ROOT,
         verbose: bool = False,
         input: Any = None,

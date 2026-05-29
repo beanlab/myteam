@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`src/myteam/workflow/` implements the `myteam start <workflow>` feature.
+`src/myteam/workflow/` implements the `myteam start [workflow]` feature.
 
 Its job is to:
 

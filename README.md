@@ -332,7 +332,7 @@ myteam get task research/summary.md
 myteam get task research/summary --prefix .agents
 ```
 
-### `myteam start <path> [--prefix <path>] [--verbose]`
+### `myteam start [path] [--prefix <path>] [--verbose]`
 
 Executes a workflow definition from the selected local root.
 
@@ -346,7 +346,7 @@ Executes a workflow definition from the selected local root.
 - Python workflow files may pass `cwd` to `run_agent(...)` to override the default agent launch
   directory
 - role and skill directories are not valid `start` targets
-- omitting the path is an error
+- omitting the path runs the default `agent` workflow
 
 Examples:
 
