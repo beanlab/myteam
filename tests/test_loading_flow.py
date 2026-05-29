@@ -264,7 +264,7 @@ def test_root_role_lists_packaged_builtin_skill_namespace(run_myteam, initialize
     assert result.exit_code == 0
     assert "*********** Skills ***********" in result.stdout
     assert "---------- builtins ----------" in result.stdout
-    assert "Packaged maintenance and upgrade helpers" in result.stdout
+    assert "Packaged maintenance and upgrade helpers" not in result.stdout
 
 
 def test_builtin_changelog_skill_reports_newer_release_notes(run_myteam, initialized_project: Path):

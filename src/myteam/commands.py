@@ -18,7 +18,10 @@ from .disclosure import (
     is_role_dir,
     is_skill_dir,
     load_definition_workflow_settings,
+    format_frontmatter_info,
     split_yaml_frontmatter,
+    get_skills as disclose_get_skills,
+    get_tasks as disclose_get_tasks,
     WorkflowStepSettings,
 )
 from .paths import (
@@ -258,6 +261,52 @@ def get_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
         get_name("skill", folder, skill, project_root=project_root)
     print(f"Not a skill: {skill}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def get_skills(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    """Print detailed information for skills available in a directory."""
+    project_root = _selected_root(prefix)
+    folder = project_root if directory is None else project_root.joinpath(*directory.split("/"))
+    if not folder.is_dir():
+        print(f"Not a directory: {folder}", file=sys.stderr)
+        raise SystemExit(1)
+
+    disclose_get_skills(folder, project_root, [])
+
+
+def get_tasks(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    """Print detailed information for tasks available in a directory."""
+    project_root = _selected_root(prefix)
+    folder = project_root if directory is None else project_root.joinpath(*directory.split("/"))
+    if not folder.is_dir():
+        print(f"Not a directory: {folder}", file=sys.stderr)
+        raise SystemExit(1)
+
+    disclose_get_tasks(folder, project_root, [])
+
+
+def _resolve_task_file(task: str, *, prefix: str) -> Path:
+    _selected_root(prefix)
+    candidates = [path for path in workflow_candidates(base_dir(), task, prefix=prefix) if path.suffix == ".md"]
+    if candidates:
+        return candidates[0]
+
+    print(f"Task '{task}' not found. Run 'myteam new task {task}' to create it.", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def get_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    """Print the detailed contents for a single task."""
+    task_file = _resolve_task_file(task, prefix=prefix)
+    frontmatter, body = split_yaml_frontmatter(task_file.read_text(encoding=ENCODING))
+    info = format_frontmatter_info(frontmatter)
+    if info and body:
+        sys.stdout.write(f"{info}\n\n{body.rstrip('\n')}\n")
+    elif info:
+        sys.stdout.write(f"{info}\n")
+    elif body:
+        sys.stdout.write(f"{body.rstrip('\n')}\n")
+    raise SystemExit(0)
 
 
 def _log(message: str) -> None:
@@ -617,6 +666,9 @@ __all__ = [
     "download_roster",
     "get_role",
     "get_skill",
+    "get_skills",
+    "get_tasks",
+    "get_task",
     "init",
     "list_available_rosters",
     "new_role",

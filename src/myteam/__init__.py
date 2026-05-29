@@ -5,7 +5,9 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import tomllib
 
-__all__ = ["__version__"]
+from .utils import list_skills, list_tasks
+
+__all__ = ["__version__", "list_skills", "list_tasks"]
 
 
 def _project_version() -> str:

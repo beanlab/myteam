@@ -291,6 +291,46 @@ myteam get skill research/literature-review
 myteam get skill python/testing --prefix .agents
 ```
 
+### `myteam get_skills [directory] [--prefix <path>]`
+
+Prints detailed skill metadata for the child skills available in a directory. Omit `directory` to
+use the selected local root.
+
+Examples:
+
+```bash
+myteam get_skills
+myteam get_skills developer
+myteam get_skills developer --prefix .agents
+```
+
+### `myteam get_tasks [directory] [--prefix <path>]`
+
+Prints detailed task metadata for the markdown task workflows available in a directory. Each task
+entry prints its `name`, `description`, and `input` frontmatter when present. Omit `directory` to
+use the selected local root.
+
+Examples:
+
+```bash
+myteam get_tasks
+myteam get_tasks research
+myteam get_tasks research --prefix .agents
+```
+
+### `myteam get task <path> [--prefix <path>]`
+
+Prints the detailed contents for a single markdown task file, including frontmatter metadata and the
+task prompt body.
+
+Examples:
+
+```bash
+myteam get task research/summary
+myteam get task research/summary.md
+myteam get task research/summary --prefix .agents
+```
+
 ### `myteam start <path> [--prefix <path>] [--verbose]`
 
 Executes a workflow definition from the selected local root.

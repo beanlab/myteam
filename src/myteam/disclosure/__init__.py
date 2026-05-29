@@ -167,14 +167,23 @@ def load_definition_workflow_settings(folder: Path, definition_stem: str) -> Wor
             f"Workflow definition file {folder} frontmatter workflow-settings is invalid: {exc}") from exc
 
 
-def _format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
+def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
     name = frontmatter.get("name", "")
     description = frontmatter.get("description", "")
-    if name and description:
+    input_value = frontmatter.get("input", "")
+    if name and description and input_value:
+        input_info = ""
+        if isinstance(input_value, dict):
+            for key, value in input_value.items():
+                input_info += f"\n  {key}: {value}"
+        else:
+            input_info = f"\n  {input_value}"
+        return f"{name}: {description}\n input:{input_info}"
+    elif name and description:
         return f"{name}: {description}"
-    if name:
+    elif name:
         return name
-    if description:
+    elif description:
         return description
     return ""
 
@@ -182,7 +191,7 @@ def _format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
 def _get_folder_info(folder: Path, definition_stem: str) -> str:
     definition_file = _get_definition_file(folder, definition_stem)
     if definition_file is not None:
-        frontmatter_info = _format_frontmatter_info(_parse_yaml_frontmatter(definition_file))
+        frontmatter_info = format_frontmatter_info(_parse_yaml_frontmatter(definition_file))
         if frontmatter_info:
             return frontmatter_info
 
@@ -260,6 +269,56 @@ def _print_named_info(header: str, entries: list[tuple[str, str]]) -> None:
         if info:
             print(info)
     print()
+
+
+def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[tuple[str, str]]:
+    effective_ignore = list(ignore)
+    entries: list[tuple[str, str]] = []
+    if folder == base_dir and not _is_under_builtin_root(folder):
+        effective_ignore.append(BUILTIN_ROOT_NAME)
+
+    if folder.exists():
+        for skill_dir in sorted(
+            (path for path in folder.iterdir() if is_skill_dir(path) and path.name not in effective_ignore),
+            key=lambda path: path.name,
+        ):
+            name = skill_dir.relative_to(base_dir).as_posix()
+            entries.append((name, _get_folder_info(skill_dir, "skill") if include_info else ""))
+
+    if include_info and folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
+        entries.append((BUILTIN_ROOT_NAME, _builtin_root_info()))
+
+    if not include_info and folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
+        entries.append((BUILTIN_ROOT_NAME, ""))
+
+    return entries
+
+
+def _collect_task_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[tuple[str, str]]:
+    effective_ignore = {name.lower() for name in ignore}
+    entries: list[tuple[str, str]] = []
+
+    def _visit(current: Path) -> None:
+        for path in sorted(current.iterdir(), key=lambda path: (not path.is_dir(), path.name.lower(), path.name)):
+            if path.name.lower() in effective_ignore:
+                continue
+            if path.is_dir():
+                _visit(path)
+                continue
+            if not _is_task_file(path):
+                continue
+
+            name = path.relative_to(base_dir).as_posix()
+            if include_info:
+                info = format_frontmatter_info(_parse_yaml_frontmatter(path))
+            else:
+                info = ""
+            entries.append((name, info))
+
+    if folder.exists():
+        _visit(folder)
+
+    return entries
 
 
 def _matches_tree_glob(path: Path, root: Path, glob: str) -> bool:
@@ -400,23 +459,23 @@ def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
 
 
 def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
-    effective_ignore = list(ignore)
-    entries: list[tuple[str, str]] = []
-    if folder == base_dir and not _is_under_builtin_root(folder):
-        effective_ignore.append(BUILTIN_ROOT_NAME)
+    _print_named_info("Skills", _collect_skill_entries(folder, base_dir, ignore, include_info=False))
 
-    if folder.exists():
-        for skill_dir in sorted(
-            (path for path in folder.iterdir() if is_skill_dir(path) and path.name not in effective_ignore),
-            key=lambda path: path.name,
-        ):
-            name = skill_dir.relative_to(base_dir).as_posix()
-            entries.append((name, _get_folder_info(skill_dir, "skill")))
 
-    if folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
-        entries.append((BUILTIN_ROOT_NAME, _builtin_root_info()))
+def get_skills(folder: Path, base_dir: Path, ignore: list[str]):
+    _print_named_info("Skills", _collect_skill_entries(folder, base_dir, ignore, include_info=True))
 
-    _print_named_info("Skills", entries)
+
+def _is_task_file(path: Path) -> bool:
+    return path.is_file() and path.suffix == ".md" and path.name.lower() not in {"info.md", "role.md", "skill.md", "readme.md"}
+
+
+def list_tasks(folder: Path, base_dir: Path, ignore: list[str]):
+    _print_named_info("Tasks", _collect_task_entries(folder, base_dir, ignore, include_info=False))
+
+
+def get_tasks(folder: Path, base_dir: Path, ignore: list[str]):
+    _print_named_info("Tasks", _collect_task_entries(folder, base_dir, ignore, include_info=True))
 
 
 def list_tools(folder: Path, base_dir: Path, ignore: list[str]):
