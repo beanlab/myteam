@@ -25,7 +25,7 @@ def resolve_project_root(cwd: Path | None = None) -> Path:
 
 def resolve_session_id(
     *,
-    payload: dict,
+    payload: dict | None,
     session_id: str | None,
     fork: bool,
     nonce: str | None,
@@ -38,7 +38,7 @@ def resolve_session_id(
     except LookupError as exc:
         session_info = None
         session_lookup_error = exc
-    discovered_session_id = payload.get("session_id")
+    discovered_session_id = None if payload is None else payload.get("session_id")
     if discovered_session_id is None and session_id is not None and not fork:
         discovered_session_id = session_id
     if discovered_session_id is not None:

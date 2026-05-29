@@ -369,19 +369,21 @@ class AgentContext:
         state: RunState,
         exc: Exception,
     ) -> StepResult:
+        error_type = "unexpected_error"
+        error_message = str(exc)
         collect_usage = False
         if isinstance(exc, StepExecutionError):
             error_type = exc.error_type
             error_message = exc.error_message
             collect_usage = error_type in {"completion_missing", "output_validation", "session_discovery"}
-        if isinstance(exc, ValidationError):
+        elif isinstance(exc, ValidationError):
             error_type = "argument_validation"
             error_message = str(exc)
-        if isinstance(exc, TimeoutError):
+        elif isinstance(exc, TimeoutError):
             error_type = "timeout"
             error_message = str(exc)
             collect_usage = True
-        if isinstance(exc, OSError):
+        elif isinstance(exc, OSError):
             return StepResult(
                 status="failed",
                 error_type="agent_launch",

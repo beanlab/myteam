@@ -15,9 +15,9 @@ from . import __version__
 from .disclosure import (
     PROJECT_ROOT_ENV_VAR,
     builtin_skill_dir,
+    format_required_input_shape,
     is_role_dir,
     is_skill_dir,
-    load_definition_workflow_settings,
     print_definition_text,
     split_yaml_frontmatter,
     get_skills as disclose_get_skills,
@@ -316,162 +316,6 @@ def _run_python_workflow(path: Path, *, project_root: Path) -> int:
     return result.returncode
 
 
-def _run_start_fallback(
-        prompt: str,
-        *,
-        cwd: Path,
-        workflow_settings: Any | None = None,
-        input: Any = None,
-) -> None:
-    if workflow_settings is not None and input is not None:
-        workflow_settings = replace(workflow_settings, input=input)
-    result = run_default_workflow(prompt, cwd=cwd, workflow_settings=workflow_settings)
-    if result.status == "completed" or result.error_type == "completion_missing":
-        return
-    if result.error_message:
-        print(result.error_message, file=sys.stderr)
-    raise SystemExit(1)
-
-
-def _load_start_prompt(name_dir: Path, name: str | None, *, dir_type: str, project_root: Path) -> str:
-    try:
-        result = _run_load_py(dir_type, name_dir, name, project_root=project_root)
-    except OSError as exc:
-        print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-    if result.returncode != 0:
-        raise SystemExit(result.returncode)
-    return result.stdout or ""
-
-
-def _format_start_prompt(
-        prompt: str,
-        input_value: Any,
-        *,
-        workflow: str,
-        dir_type: str,
-        required_input: dict[str, Any] | None = None,
-) -> str:
-    if input_value is None:
-        return prompt
-    if not isinstance(input_value, dict):
-        print(
-            f"Input for {dir_type} '{workflow}' must be a mapping to format the prompt.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-    try:
-        return prompt.format(**input_value)
-    except (AttributeError, KeyError, IndexError, ValueError) as exc:
-        required_shape = _format_required_input_shape(required_input if required_input is not None else input_value)
-        print(
-            f"Failed to format prompt for {dir_type} '{workflow}' because the provided input does not match "
-            f"the required input shape.\n"
-            f"{required_shape}\n"
-            f"Formatting error: {exc}",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
-
-def _format_required_input(required_input: dict[str, Any]) -> str:
-    parts: list[str] = []
-    for key, description in required_input.items():
-        if isinstance(description, str) and description.strip():
-            parts.append(f"{key} ({description.strip()})")
-        else:
-            parts.append(str(key))
-    return ", ".join(parts)
-
-
-def _format_required_input_shape(required_input: dict[str, Any]) -> str:
-    lines = ["Required input shape:"]
-    for key, description in required_input.items():
-        if isinstance(description, str) and description.strip():
-            lines.append(f"  {key}: {description.strip()}")
-        else:
-            lines.append(f"  {key}: <required>")
-    return "\n".join(lines)
-
-
-def _format_input_keys(input_value: dict[str, Any]) -> str:
-    keys = sorted(str(key) for key in input_value)
-    return ", ".join(keys)
-
-
-def _validate_start_input(
-        required_input: dict[str, Any] | None,
-        input_value: Any,
-        *,
-        workflow: str,
-        dir_type: str,
-) -> Any:
-    if required_input is None:
-        return input_value
-
-    if not isinstance(input_value, dict):
-        required = _format_required_input(required_input)
-        print(
-            f"Workflow settings for {dir_type} '{workflow}' input contract mismatch.\n"
-            f"{_format_required_input_shape(required_input)}\n"
-            f"Received: <none>.\n"
-            f"Missing keys: {required}.\n"
-            f"Unexpected keys: <none>.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
-    missing = [key for key in required_input if key not in input_value]
-    if missing:
-        missing_formatted = _format_required_input({key: required_input[key] for key in missing})
-        print(
-            f"Workflow settings for {dir_type} '{workflow}' input contract mismatch.\n"
-            f"{_format_required_input_shape(required_input)}\n"
-            f"Received keys: {_format_input_keys(input_value)}.\n"
-            f"Missing keys: {missing_formatted}.\n"
-            f"Unexpected keys: {_format_input_keys({key: input_value[key] for key in input_value if key not in required_input}) or '<none>'}.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
-    return input_value
-
-
-def _run_named_start_fallback(
-        *,
-        workflow: str,
-        folder: Path,
-        dir_type: str,
-        project_root: Path,
-        input: Any = None,
-        logger,
-) -> None:
-    try:
-        workflow_settings = load_definition_workflow_settings(folder, dir_type)
-    except ValueError as exc:
-        print(f"Failed to load workflow settings for {dir_type} '{workflow}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-
-    prompt = _load_start_prompt(folder, workflow, dir_type=dir_type, project_root=project_root)
-    start_input = _validate_start_input(
-        workflow_settings.input if workflow_settings is not None else None,
-        input,
-        workflow=workflow,
-        dir_type=dir_type,
-    )
-    if isinstance(start_input, dict):
-        prompt = _format_start_prompt(
-            prompt,
-            start_input,
-            workflow=workflow,
-            dir_type=dir_type,
-            required_input=workflow_settings.input if workflow_settings is not None else None,
-        )
-
-    _run_start_fallback(prompt, cwd=folder, workflow_settings=workflow_settings, input=start_input)
-    logger(f"Started {dir_type} '{workflow}' using fallback agent runner.")
-
-
 def _run_python_start_workflow(path: Path, *, workflow: str, project_root: Path) -> None:
     try:
         returncode = _run_python_workflow(path, project_root=project_root)
@@ -510,6 +354,13 @@ def _run_markdown_start_workflow(path: Path, *, workflow: str, input: Any, logge
         print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
         raise SystemExit(1)
 
+    if workflow_settings is not None and workflow_settings.input is not None and input is None:
+        print(
+            f"Workflow '{workflow}' requires input:\n{format_required_input_shape(workflow_settings.input)}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
     if input is not None:
         workflow_settings = (
             replace(workflow_settings, input=input)
@@ -529,7 +380,7 @@ def _run_markdown_start_workflow(path: Path, *, workflow: str, input: Any, logge
 
 
 def start(
-        workflow: str | None = None,
+        workflow: str,
         prefix: str = DEFAULT_LOCAL_ROOT,
         verbose: bool = False,
         input: Any = None,
@@ -537,60 +388,10 @@ def start(
     logger = _log if verbose else (lambda msg: None)
     project_root = agents_root(base_dir(), prefix)
 
-    if workflow is None:
-        if not is_role_dir(project_root):
-            print("Not a role: None", file=sys.stderr)
-            raise SystemExit(1)
-        workflow_label = "<root role>"
-        try:
-            workflow_settings = load_definition_workflow_settings(project_root, "role")
-        except ValueError as exc:
-            print(f"Failed to load workflow settings for role '{workflow_label}': {exc}", file=sys.stderr)
-            raise SystemExit(1)
-        prompt = _load_start_prompt(project_root, None, dir_type="role", project_root=project_root)
-        start_input = _validate_start_input(
-            workflow_settings.input if workflow_settings is not None else None,
-            input,
-            workflow=workflow_label,
-            dir_type="role",
-        )
-        if isinstance(start_input, dict):
-            prompt = _format_start_prompt(
-                prompt,
-                start_input,
-                workflow=workflow_label,
-                dir_type="role",
-                required_input=workflow_settings.input if workflow_settings is not None else None,
-            )
-        _run_start_fallback(prompt, cwd=project_root, workflow_settings=workflow_settings, input=start_input)
-        logger("Workflow start fallback completed successfully.")
-        return
-
     folder = project_root.joinpath(*workflow.split("/"))
     requested_path = folder
     if not requested_path.suffix:
-        directory_matches: list[tuple[str, Path]] = []
-        if is_role_dir(folder):
-            directory_matches.append(("role", folder))
-        if is_skill_dir(folder):
-            directory_matches.append(("skill", folder))
-
         file_candidates = workflow_candidates(base_dir(), workflow, prefix=prefix)
-        if directory_matches:
-            if len(directory_matches) > 1 or file_candidates:
-                print(
-                    f"Workflow '{workflow}' matched multiple targets; prioritizing {directory_matches[0][0]} directory.",
-                    file=sys.stderr,
-                )
-            _run_named_start_fallback(
-                    workflow=workflow,
-                    folder=directory_matches[0][1],
-                    dir_type=directory_matches[0][0],
-                    project_root=project_root,
-                    input=input,
-                    logger=logger,
-            )
-            return
         if file_candidates:
             if len(file_candidates) > 1:
                 print(

@@ -345,6 +345,8 @@ Executes a workflow definition from the selected local root.
   `StepResult.session_id` into `run_agent(...)` as `session_id`, with `fork=True` to fork
 - Python workflow files may pass `cwd` to `run_agent(...)` to override the default agent launch
   directory
+- role and skill directories are not valid `start` targets
+- omitting the path is an error
 
 Examples:
 

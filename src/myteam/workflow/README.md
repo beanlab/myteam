@@ -34,6 +34,8 @@ From outside the package, the flow is:
 1. `commands.start(...)` resolves a workflow file path and either executes a Python workflow script or loads YAML.
 2. `workflow.definition.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation`.
    `workflow.definition.load_markdown_workflow(...)` loads markdown task frontmatter and body text.
+   If the frontmatter declares required input and the caller did not supply it, `commands.start(...)`
+   reports an error before launching the workflow.
 3. `workflow.execution.run_workflow(...)` executes steps in authored order.
 4. For each step, `workflow.execution.run_agent(...)`:
    - receives the resolved step values from the engine
@@ -50,8 +52,7 @@ From outside the package, the flow is:
 The path-resolution rule for `commands.start(...)` and `workflow.execution.run_named_workflow(...)`
 is:
 
-- if no extension is provided, prefer a matching role or skill directory
-- if no directory matches, prefer `.py`, then `.md`, then `.yaml`, then `.yml`
+- if no extension is provided, prefer `.py`, then `.md`, then `.yaml`, then `.yml`
 - if multiple matches exist at the same priority, continue with the prioritized target and emit a
   brief warning
 - if an explicit extension is not one of `.py`, `.md`, `.yaml`, or `.yml`, treat it as an error

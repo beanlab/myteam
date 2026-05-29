@@ -253,9 +253,7 @@ Inputs:
 
 - `<path>` is a slash-delimited workflow path such as `dev/frontend`.
 - The command resolves that path relative to the selected local root.
-- If no extension is provided, the command looks for a matching role or skill directory first and
-  falls back to workflow files.
-- When falling back to workflow files, the command prioritizes `.py`, then `.yaml`, then `.yml`.
+- If no extension is provided, the command prioritizes `.py`, then `.md`, then `.yaml`, then `.yml`.
 - Markdown task files use `.md` and are treated as single-step workflows.
 - If multiple matches exist at the same priority, the command prints a brief warning and continues
   with the prioritized target.
@@ -264,8 +262,9 @@ Inputs:
 - If `.myteam/.config.yaml` defines workflow defaults, the workflow executor uses those settings as
   project defaults for authored steps.
 - `--verbose` enables workflow lifecycle logging on standard error.
-- `--input` supplies structured caller input for role/skill fallback execution when the selected
-  role or skill declares required frontmatter input keys.
+- `--input` supplies structured caller input for markdown workflow frontmatter that declares
+  required input keys. If such frontmatter is present and `--input` is omitted, the command exits
+  with an error.
 
 Expected outcome on success:
 
@@ -275,8 +274,6 @@ Expected outcome on success:
 - For markdown task workflows, loads the task frontmatter as workflow settings and uses the body as
   the single-step prompt.
 - For Python workflows, executes the workflow file as a separate Python process.
-- For role and skill fallback execution, loads the target `load.py` as the prompt source and
-  validates any required frontmatter input keys before formatting the prompt body.
 - Supplies each configured workflow agent with the authored step prompt when the step session starts.
 - Allows later steps to reference completed state from earlier steps.
 - Returns success only after all workflow steps complete in order.
@@ -285,8 +282,6 @@ User-visible result:
 
 - The caller can invoke a workflow stored at `.myteam/dev/frontend.yaml` or
   `.myteam/dev/frontend.py` with `myteam start dev/frontend`.
-- A call like `myteam start dev/frontend` prefers a matching `dev/frontend` role or skill
-  directory before checking workflow files.
 - `--prefix` changes which local root is searched for workflows in the same way it does for other
   project-local tree commands.
 - Workflow execution mirrors the child session's terminal output to standard output as the workflow
@@ -296,8 +291,8 @@ User-visible result:
 
 Failure conditions that matter at the interface:
 
-- If the target path does not resolve to a role, skill, or workflow file with a supported extension
-  in the selected local tree, the command exits with an error.
+- If the target path does not resolve to a workflow file with a supported extension in the selected
+  local tree, the command exits with an error.
 - If the target path names a file with an unsupported extension, the command exits with an error.
 - If the workflow definition is malformed or references an unknown agent, the command exits with an error.
 - If any workflow step fails, the command stops at that first failing step, does not execute later

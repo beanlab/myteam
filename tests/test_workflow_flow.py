@@ -105,6 +105,13 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
     assert seen["path"] == workflow_file
 
 
+def test_start_requires_a_workflow_path(run_myteam_inprocess, initialized_project: Path):
+    result = run_myteam_inprocess(initialized_project, "start")
+
+    assert result.exit_code == 2
+    assert "start" in result.stderr
+
+
 def test_workflow_candidates_prioritize_python_then_yaml_then_yml(initialized_project: Path):
     python_file = initialized_project / ".myteam" / "demo.py"
     markdown_file = initialized_project / ".myteam" / "demo.md"
@@ -186,20 +193,20 @@ def test_start_runs_python_workflow_like_load_py(run_myteam_inprocess, initializ
     assert seen["kwargs"]["env"]["MYTEAM_PROJECT_ROOT"] == str(initialized_project / ".myteam")
 
 
-def test_start_prefers_named_directory_over_workflow_files(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+def test_start_ignores_named_directories_when_workflow_files_exist(run_myteam_inprocess, initialized_project: Path, monkeypatch):
     workflow_dir = initialized_project / ".myteam" / "demo"
     workflow_dir.mkdir()
     (workflow_dir / "role.md").write_text("Demo role\n", encoding="utf-8")
     (workflow_dir / "load.py").write_text("print('role')\n", encoding="utf-8")
+    skill_dir = initialized_project / ".myteam" / "demo-skill"
+    skill_dir.mkdir()
+    (skill_dir / "skill.md").write_text("Demo skill\n", encoding="utf-8")
+    (skill_dir / "load.py").write_text("print('skill')\n", encoding="utf-8")
     (initialized_project / ".myteam" / "demo.py").write_text("print('py')\n", encoding="utf-8")
     (initialized_project / ".myteam" / "demo.yaml").write_text("step1: {}\n", encoding="utf-8")
 
     calls: list[tuple[str, Path]] = []
 
-    monkeypatch.setattr(
-        "myteam.commands._run_named_start_fallback",
-        lambda **kwargs: calls.append(("named", kwargs["folder"])),
-    )
     monkeypatch.setattr(
         "myteam.commands._run_python_start_workflow",
         lambda *args, **kwargs: calls.append(("py", args[0])),
@@ -212,7 +219,7 @@ def test_start_prefers_named_directory_over_workflow_files(run_myteam_inprocess,
     result = run_myteam_inprocess(initialized_project, "start", "demo")
 
     assert result.exit_code == 0
-    assert calls == [("named", workflow_dir)]
+    assert calls == [("py", initialized_project / ".myteam" / "demo.py")]
 
 
 def test_start_uses_explicit_python_file_when_directory_exists(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -225,10 +232,6 @@ def test_start_uses_explicit_python_file_when_directory_exists(run_myteam_inproc
 
     calls: list[tuple[str, Path]] = []
 
-    monkeypatch.setattr(
-        "myteam.commands._run_named_start_fallback",
-        lambda **kwargs: calls.append(("named", kwargs["folder"])),
-    )
     monkeypatch.setattr(
         "myteam.commands._run_python_start_workflow",
         lambda *args, **kwargs: calls.append(("py", args[0])),
@@ -262,10 +265,6 @@ def test_start_prefers_python_workflow_when_multiple_files_exist(run_myteam_inpr
     monkeypatch.setattr(
         "myteam.commands._run_yaml_start_workflow",
         lambda *args, **kwargs: calls.append(("yaml", args[0])),
-    )
-    monkeypatch.setattr(
-        "myteam.commands._run_named_start_fallback",
-        lambda **kwargs: calls.append(("named", kwargs["folder"])),
     )
 
     result = run_myteam_inprocess(initialized_project, "start", "demo")
@@ -308,6 +307,37 @@ def test_start_runs_markdown_task_workflow(run_myteam_inprocess, initialized_pro
     workflow_settings = seen["kwargs"]["workflow_settings"]
     assert workflow_settings.agent == "codex"
     assert workflow_settings.output == {"result": "short summary"}
+
+
+def test_start_reports_missing_required_markdown_input(run_myteam_inprocess, initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "test.md"
+    task_file.write_text(
+        "---\n"
+        "name: Test task\n"
+        "description: Requires caller input\n"
+        "input:\n"
+        "  test: test value\n"
+        "---\n"
+        "Write the prompt here.\n",
+        encoding="utf-8",
+    )
+
+    called = False
+
+    def fake_run_default_workflow(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("run_default_workflow should not be called when input is missing")
+
+    monkeypatch.setattr("myteam.commands.run_default_workflow", fake_run_default_workflow)
+
+    result = run_myteam_inprocess(initialized_project, "start", "test")
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "input:" in result.stderr
+    assert "test value" in result.stderr
+    assert not called
 
 
 def test_start_fails_when_workflow_file_is_missing(run_myteam_inprocess, initialized_project: Path):

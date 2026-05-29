@@ -24,8 +24,8 @@ def build_step_prompt(
                 "",
                 "If you are asked to launch a workflow, use this command:",
                 f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
-                "and pass any required input with `--json`",
-                "as needed.",
+                "and pass any required input with `--json` as needed. Use JSON-safe quoting.",
+                "",
                 "Otherwise, perform the task yourself."
             ]
         )

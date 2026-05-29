@@ -202,6 +202,7 @@ class StepResult:
     - ``completion_missing``: the agent session ended without producing a structured result.
     - ``output_validation``: the completion payload content did not satisfy the authored output template.
     - ``session_discovery``: the step completed but the runtime could not discover the new agent session id.
+    - ``unexpected_error``: the executor raised an uncategorized internal exception.
 
     Usage tracking values:
     - ``not_attempted``: usage lookup was skipped because the step failed before launch.

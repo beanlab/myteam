@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..paths import BUILTIN_ROOT_NAME, SUPPORTED_WORKFLOW_SUFFIXES, builtin_agents_root
 from ..templates import get_template
@@ -150,23 +150,6 @@ def split_yaml_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     return data, body
 
 
-def load_definition_workflow_settings(folder: Path, definition_stem: str) -> WorkflowStepSettings | None:
-    definition_file = _get_definition_file(folder, definition_stem)
-    if definition_file is None:
-        return None
-
-    frontmatter = _parse_yaml_frontmatter(definition_file)
-    if not frontmatter:
-        return None
-
-    workflow_settings = {k: v for k, v in frontmatter.items() if k not in ("name", "description")}
-    try:
-        return WorkflowStepSettings.model_validate(workflow_settings)
-    except ValidationError as exc:
-        raise ValueError(
-            f"Workflow definition file {folder} frontmatter workflow-settings is invalid: {exc}") from exc
-
-
 def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
     lines: list[str] = []
 
@@ -183,6 +166,16 @@ def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
         else:
             lines.append(f"  {input_value}")
 
+    return "\n".join(lines)
+
+
+def format_required_input_shape(input_value: Any) -> str:
+    lines = ["input:"]
+    if isinstance(input_value, dict):
+        dumped = yaml.safe_dump(input_value, default_flow_style=False, sort_keys=False).rstrip("\n")
+        lines.extend(f"  {line}" for line in dumped.splitlines())
+    else:
+        lines.append(f"  {input_value}")
     return "\n".join(lines)
 
 
