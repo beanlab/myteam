@@ -1,15 +1,12 @@
 # Tasks
 
-Tasks are task files that an agent can execute with `myteam start`.
+Tasks can be executed with `myteam task start`.
 
-Use the task section to find runnable task definitions near your current node.
+If you are asked to launch a task, use this command:
+`myteam task start <task> --session-nonce {session_nonce}`
+and pass any required input with `--json` as needed. Use JSON-safe quoting.
 
-Supported task file types are:
-
-- `.py`
-- `.md`
-- `.yaml`
-- `.yml`
+Otherwise, perform the task yourself.
 
 When a task is relevant to your work, inspect it directly with `myteam get task` or run it with
-`myteam start`.
+`myteam task start`.

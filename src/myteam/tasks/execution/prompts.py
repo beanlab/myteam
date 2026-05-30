@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from myteam.templates import get_template
+
 from ...disclosure import format_named_info_block
 
 
@@ -24,13 +26,7 @@ def build_step_prompt(
             [
                 f"Session nonce: {session_nonce}",
                 "",
-                "Use this nonce with both task commands.",
-                "",
-                "If you are asked to launch a task, use this command:",
-                f"`myteam task start <task> --session-nonce {session_nonce}`",
-                "and pass any required input with `--json` as needed. Use JSON-safe quoting.",
-                "",
-                "Otherwise, perform the task yourself."
+                "Use this nonce with task commands.",
             ]
         )
     if output_template:
@@ -40,8 +36,10 @@ def build_step_prompt(
             f"`myteam task result --session-nonce {session_nonce} --json '{json.dumps(output_template)}'`",
         ])
     if skills:
+        sections.extend(["", get_template("explain_skills.md")])
         sections.extend(["", format_named_info_block("Skills", skills)])
     if tasks:
+        sections.extend(["", get_template("explain_tasks.md")])
         sections.extend(["", format_named_info_block("Tasks", tasks)])
     if resolved_input is not None:
         sections.extend(
