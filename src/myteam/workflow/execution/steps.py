@@ -16,6 +16,7 @@ from ..definition.models import ProjectWorkflowDefaults, StepExecutionArgs, Step
 from .errors import StepExecutionError
 from .prompts import build_child_resume_prompt, build_step_prompt
 from ..resolution.session_resolution import resolve_project_root, resolve_session_id
+from ...disclosure import resolve_skill_entries, resolve_task_entries
 from .usage import (
     print_aggregated_usage_summary,
     print_usage_summary,
@@ -35,6 +36,32 @@ def _validate_output_node(template: Any, value: Any, *, path: str) -> None:
         if key not in value:
             raise ValueError(f"{path}.{key} is missing.")
         _validate_output_node(nested, value[key], path=f"{path}.{key}")
+
+
+def _normalize_name_list(value: list[str] | str | None, *, argument_name: str) -> tuple[str, ...] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        if not value:
+            raise StepExecutionError("argument_validation", f"argument '{argument_name}' must not be empty.")
+        return (value,)
+    if not isinstance(value, list):
+        raise StepExecutionError(
+            "argument_validation",
+            f"argument '{argument_name}' must be a string or list of strings.",
+        )
+
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item:
+            raise StepExecutionError(
+                "argument_validation",
+                f"argument '{argument_name}' must be a string or list of strings.",
+            )
+        normalized.append(item)
+
+    return tuple(normalized) if normalized else None
+
 
 class AgentContext:
     def __init__(
@@ -95,11 +122,13 @@ class AgentContext:
         session_id: str | None = None,
         fork: bool | None = None,
         extra_args: tuple[str, ...] | None = None,
-        skills: list[str] | None = None,
-        tasks: list[str] | None = None,
+        skills: list[str] | str | None = None,
+        tasks: list[str] | str | None = None,
     ) -> StepResult:
         state = RunState()
         try:
+            resolved_skills = _normalize_name_list(skills, argument_name="skills")
+            resolved_tasks = _normalize_name_list(tasks, argument_name="tasks")
             if output is None:
                 output_template: dict[str, Any] = {}
             elif isinstance(output, dict):
@@ -120,6 +149,8 @@ class AgentContext:
                 session_id=session_id,
                 fork=fork,
                 extra_args=extra_args,
+                skills=resolved_skills,
+                tasks=resolved_tasks,
             )
             session_result = self._run_prepared_step(state=state, prepared=prepared)
             while session_result.control_request is not None:
@@ -151,6 +182,8 @@ class AgentContext:
         session_id: str | None,
         fork: bool | None,
         extra_args: Any,
+        skills: tuple[str, ...] | None,
+        tasks: tuple[str, ...] | None,
     ) -> PreparedStep:
         nonce = str(uuid.uuid4())
         state.nonce = nonce
@@ -168,11 +201,16 @@ class AgentContext:
         agent_config = self._resolve_agent_config(resolved_args.agent)
         state.agent_config = agent_config
 
+        resolved_skill_entries = resolve_skill_entries(self.project_root, skills)
+        resolved_task_entries = resolve_task_entries(self.project_root, tasks)
+
         prompt_text = build_step_prompt(
             resolved_input=resolved_args.input,
             objective_text=prompt,
             output_template=output_template,
             session_nonce=nonce,
+            skills=resolved_skill_entries,
+            tasks=resolved_task_entries,
         )
         argv = _build_agent_argv(
             agent_config=agent_config,
@@ -198,6 +236,8 @@ class AgentContext:
             session_id=resolved_args.session_id,
             fork=resolved_args.fork,
             extra_args=resolved_args.extra_args,
+            skills=tuple(resolved_skill_entries) if resolved_skill_entries is not None else None,
+            tasks=tuple(resolved_task_entries) if resolved_task_entries is not None else None,
         )
 
     def _run_prepared_step(
@@ -284,6 +324,8 @@ class AgentContext:
         resume_prompt = build_child_resume_prompt(
             child_workflow=request.workflow,
             child_result=child_payload,
+            skills=prepared.skills,
+            tasks=prepared.tasks,
         )
         argv = _build_agent_argv(
             agent_config=prepared.agent_config,
@@ -309,6 +351,8 @@ class AgentContext:
             session_id=parent_session_id,
             fork=False,
             extra_args=prepared.extra_args,
+            skills=prepared.skills,
+            tasks=prepared.tasks,
         )
 
     def _update_state(
@@ -517,6 +561,8 @@ def run_agent(
     fork: bool | None = None,
     extra_args: tuple[str, ...] | None = None,
     cwd: Path | str | None = None,
+    skills: list[str] | str | None = None,
+    tasks: list[str] | str | None = None,
 ) -> StepResult:
     """
     Execute one workflow step with an interactive agent runtime.
@@ -544,6 +590,8 @@ def run_agent(
             session_id=session_id,
             fork=fork,
             extra_args=extra_args,
+            skills=skills,
+            tasks=tasks,
         )
 def _build_agent_argv(
     *,

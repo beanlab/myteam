@@ -289,7 +289,6 @@ def test_builtin_migration_skill_includes_latest_packaged_migration(run_myteam, 
     assert result.exit_code == 0
     assert "Pending migrations for `.myteam` tracked at 0.2.23" in result.stdout
     assert "## 0.2.24 migration" in result.stdout
-    assert "removes the legacy tool-listing section" in result.stdout
 
 
 def test_builtin_parent_skill_lists_packaged_children(run_myteam, initialized_project: Path):

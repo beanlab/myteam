@@ -10,6 +10,7 @@ BUILTIN_ROOT_NAME = "builtins"
 ENCODING = "utf-8"
 SUPPORTED_WORKFLOW_SUFFIXES = {".py", ".md", ".yaml", ".yml"}
 WORKFLOW_SUFFIX_PRIORITY = (".py", ".md", ".yaml", ".yml")
+NON_TASK_FILES = {"info.md", "load.py", "readme.md", "role.md", "skill.md", ".config.yaml"}
 
 
 def base_dir() -> Path:

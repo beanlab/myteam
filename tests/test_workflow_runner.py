@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from myteam.workflow.definition.models import StepResult
+from myteam.disclosure import resolve_skill_entry, resolve_task_entry
 from myteam.workflow.execution.steps import run_agent
 from myteam.workflow.execution.runner import run_named_workflow
 
@@ -176,3 +178,82 @@ def test_run_agent_returns_structured_failure_for_unexpected_exception(initializ
     assert result.status == "failed"
     assert result.error_type == "unexpected_error"
     assert "boom" in (result.error_message or "")
+
+
+def test_run_agent_accepts_single_string_or_list_context_values(initialized_project: Path, monkeypatch):
+    seen: dict[str, object] = {}
+
+    def fake_prepare_step(self, **kwargs):
+        seen["skills"] = kwargs["skills"]
+        seen["tasks"] = kwargs["tasks"]
+        return SimpleNamespace(
+            nonce="nonce",
+            agent_config=SimpleNamespace(exit_sequence=b"/quit"),
+            prompt_text="prompt",
+            objective_text="Say hello",
+            argv=["codex", "prompt"],
+            resolved_input=None,
+            output_template={},
+            agent_name="codex",
+            model=None,
+            interactive=True,
+            session_id=None,
+            fork=False,
+            extra_args=None,
+            skills=kwargs["skills"],
+            tasks=kwargs["tasks"],
+        )
+
+    def fake_run_prepared_step(self, **kwargs):
+        return SimpleNamespace(control_request=None, payload={"status": "ok"}, exit_code=0, transcript="")
+
+    def fake_update_state(self, **kwargs):
+        return StepResult(status="completed", output={"status": "ok"}, agent_name="codex")
+
+    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._prepare_step", fake_prepare_step)
+    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._run_prepared_step", fake_run_prepared_step)
+    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._update_state", fake_update_state)
+
+    result = run_agent(
+        prompt="Say hello",
+        cwd=initialized_project,
+        skills="developer",
+        tasks=["research/summary.md", "research/checklist.md"],
+    )
+
+    assert result.status == "completed"
+    assert seen["skills"] == ("developer",)
+    assert seen["tasks"] == ("research/summary.md", "research/checklist.md")
+
+
+def test_resolve_skill_and_task_entries_include_descriptions(initialized_project: Path):
+    skill_dir = initialized_project / ".myteam" / "developer"
+    skill_dir.mkdir()
+    (skill_dir / "skill.md").write_text(
+        "---\n"
+        "name: developer\n"
+        "description: Handles project implementation work\n"
+        "---\n"
+        "Skill prompt\n",
+        encoding="utf-8",
+    )
+
+    task_dir = initialized_project / ".myteam" / "research"
+    task_dir.mkdir()
+    (task_dir / "summary.md").write_text(
+        "---\n"
+        "name: research/summary\n"
+        "description: Summarize the current state of the project\n"
+        "---\n"
+        "Task prompt\n",
+        encoding="utf-8",
+    )
+
+    assert resolve_skill_entry(initialized_project, "developer") == (
+        "developer",
+        "Handles project implementation work",
+    )
+    assert resolve_task_entry(initialized_project, "research/summary") == (
+        "research/summary.md",
+        "Summarize the current state of the project",
+    )

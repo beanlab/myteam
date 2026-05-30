@@ -5,8 +5,8 @@ from pathlib import Path
 from myteam import list_skills, list_tasks
 
 
-def test_list_skills_prints_directory_names(monkeypatch, capsys, tmp_path: Path):
-    root = tmp_path / "skills"
+def test_list_skills_returns_directory_names(monkeypatch, capsys, initialized_project: Path):
+    root = initialized_project / ".myteam"
     skill_dir = root / "developer"
     skill_dir.mkdir(parents=True)
     (skill_dir / "skill.md").write_text(
@@ -18,13 +18,13 @@ def test_list_skills_prints_directory_names(monkeypatch, capsys, tmp_path: Path)
         encoding="utf-8",
     )
 
+    monkeypatch.setenv("MYTEAM_PROJECT_ROOT", str(root))
     monkeypatch.setattr("myteam.disclosure.has_builtin_skill", lambda *_: False)
 
-    list_skills(root, root, [])
+    result = list_skills()
 
-    out = capsys.readouterr().out
-    assert "developer" in out
-    assert "Handles project implementation work" not in out
+    assert result == ["developer"]
+    assert capsys.readouterr().out == ""
 
 
 def test_get_skills_lists_child_skills_with_metadata(run_myteam, initialized_project: Path):
@@ -46,10 +46,12 @@ def test_get_skills_lists_child_skills_with_metadata(run_myteam, initialized_pro
     assert "Handles project implementation work" in result.stdout
 
 
-def test_list_tasks_prints_filenames(capsys, tmp_path: Path):
-    root = tmp_path / "tasks"
+def test_list_tasks_returns_filenames(monkeypatch, capsys, initialized_project: Path):
+    root = initialized_project / ".myteam"
     task_dir = root / "research"
+    nested_dir = task_dir / "nested"
     task_dir.mkdir(parents=True)
+    nested_dir.mkdir()
     (task_dir / "summary.md").write_text(
         "---\n"
         "name: research/summary\n"
@@ -61,12 +63,21 @@ def test_list_tasks_prints_filenames(capsys, tmp_path: Path):
         "Task prompt\n",
         encoding="utf-8",
     )
+    (nested_dir / "ignored.md").write_text(
+        "---\n"
+        "name: research/nested/ignored\n"
+        "description: Ignore me\n"
+        "---\n"
+        "Nested prompt\n",
+        encoding="utf-8",
+    )
 
-    list_tasks(root, root, [])
+    monkeypatch.setenv("MYTEAM_PROJECT_ROOT", str(root))
 
-    out = capsys.readouterr().out
-    assert "research/summary.md" in out
-    assert "Summarize the current state of the project" not in out
+    result = list_tasks("research")
+
+    assert result == ["research/summary.md"]
+    assert capsys.readouterr().out == ""
 
 
 def test_get_tasks_lists_tasks_and_input(run_myteam, initialized_project: Path):

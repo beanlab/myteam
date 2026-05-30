@@ -161,6 +161,8 @@ class PreparedStep:
     session_id: str | None
     fork: bool
     extra_args: tuple[str, ...] | None
+    skills: tuple[tuple[str, str], ...] | None
+    tasks: tuple[tuple[str, str], ...] | None
 
 
 @dataclass

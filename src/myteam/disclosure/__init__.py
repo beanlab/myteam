@@ -9,7 +9,8 @@ from typing import Any, Callable, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..paths import BUILTIN_ROOT_NAME, SUPPORTED_WORKFLOW_SUFFIXES, builtin_agents_root
+from ..paths import BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, SUPPORTED_WORKFLOW_SUFFIXES, base_dir, builtin_agents_root, \
+    NON_TASK_FILES, workflow_candidates
 from ..templates import get_template
 
 
@@ -169,6 +170,40 @@ def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def resolve_skill_entry(project_root: Path, skill: str) -> tuple[str, str]:
+    if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
+        folder = builtin_skill_dir(skill)
+    else:
+        folder = project_root / DEFAULT_LOCAL_ROOT / skill
+
+    if not is_skill_dir(folder):
+        return skill, ""
+
+    return skill, _get_folder_info(folder, "skill")
+
+
+def resolve_task_entry(project_root: Path, task: str) -> tuple[str, str]:
+    candidates = workflow_candidates(project_root, task, prefix=DEFAULT_LOCAL_ROOT)
+    if not candidates:
+        return task, ""
+
+    task_file = candidates[0]
+    root = project_root / DEFAULT_LOCAL_ROOT
+    return task_file.relative_to(root).as_posix(), format_frontmatter_info(_parse_yaml_frontmatter(task_file))
+
+
+def resolve_skill_entries(project_root: Path, skills: list[str] | tuple[str, ...] | None) -> list[tuple[str, str]] | None:
+    if skills is None:
+        return None
+    return [resolve_skill_entry(project_root, skill) for skill in skills]
+
+
+def resolve_task_entries(project_root: Path, tasks: list[str] | tuple[str, ...] | None) -> list[tuple[str, str]] | None:
+    if tasks is None:
+        return None
+    return [resolve_task_entry(project_root, task) for task in tasks]
+
+
 def format_required_input_shape(input_value: Any) -> str:
     lines = ["input:"]
     if isinstance(input_value, dict):
@@ -264,16 +299,25 @@ def _print_info(
 
 
 def _print_named_info(header: str, entries: list[tuple[str, str]]) -> None:
-    if not entries:
+    block = format_named_info_block(header, entries)
+    if not block:
         return
 
     print()
-    print(f" {header} ".center(30, "*"))
-    for name, info in entries:
-        print(f" {name} ".center(30, "-"))
-        if info:
-            print(info)
+    print(block)
     print()
+
+
+def format_named_info_block(header: str, entries: list[tuple[str, str]]) -> str:
+    if not entries:
+        return ""
+
+    lines = [f" {header} ".center(30, "*")]
+    for name, info in entries:
+        lines.append(f" {name} ".center(30, "-"))
+        if info:
+            lines.append(info)
+    return "\n".join(lines)
 
 
 def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[tuple[str, str]]:
@@ -297,6 +341,10 @@ def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, i
         entries.append((BUILTIN_ROOT_NAME, ""))
 
     return entries
+
+
+def _collect_skill_names(folder: Path, base_dir: Path, ignore: list[str]) -> list[str]:
+    return [name for name, _ in _collect_skill_entries(folder, base_dir, ignore, include_info=False)]
 
 
 def _collect_task_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[tuple[str, str]]:
@@ -324,6 +372,35 @@ def _collect_task_entries(folder: Path, base_dir: Path, ignore: list[str], *, in
         _visit(folder)
 
     return entries
+
+
+def _collect_task_names(folder: Path, base_dir: Path, ignore: list[str]) -> list[str]:
+    effective_ignore = {name.lower() for name in ignore}
+    names: list[str] = []
+    if not folder.exists():
+        return names
+
+    for path in sorted(folder.iterdir(), key=lambda path: (not path.is_dir(), path.name.lower(), path.name)):
+        if path.name.lower() in effective_ignore:
+            continue
+        if not _is_task_file(path):
+            continue
+        names.append(path.relative_to(base_dir).as_posix())
+    return names
+
+
+def _resolve_listing_root(directory: Path | str | None) -> tuple[Path, Path]:
+    cwd = base_dir()
+    root = get_active_myteam_root(cwd)
+    if root == cwd and (cwd / DEFAULT_LOCAL_ROOT).is_dir():
+        root = cwd / DEFAULT_LOCAL_ROOT
+    if directory is None:
+        return root, root
+
+    folder = Path(directory)
+    if not folder.is_absolute():
+        folder = root / folder
+    return folder, root
 
 
 def _matches_tree_glob(path: Path, root: Path, glob: str) -> bool:
@@ -463,7 +540,11 @@ def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info("Team Members", folder, base_dir, ignore, is_role_dir, lambda role_dir: _get_folder_info(role_dir, "role"))
 
 
-def list_skills(folder: Path, base_dir: Path, ignore: list[str]):
+def list_skills(
+    folder: Path,
+    base_dir: Path,
+    ignore: list[str],
+):
     _print_named_info("Skills", _collect_skill_entries(folder, base_dir, ignore, include_info=False))
 
 
@@ -472,16 +553,14 @@ def get_skills(folder: Path, base_dir: Path, ignore: list[str]):
 
 
 def _is_task_file(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() in SUPPORTED_WORKFLOW_SUFFIXES and path.name.lower() not in {
-        "info.md",
-        "load.py",
-        "readme.md",
-        "role.md",
-        "skill.md",
-    }
+    return path.is_file() and path.suffix.lower() in SUPPORTED_WORKFLOW_SUFFIXES and path.name.lower() not in NON_TASK_FILES
 
 
-def list_tasks(folder: Path, base_dir: Path, ignore: list[str]):
+def list_tasks(
+    folder: Path,
+    base_dir: Path,
+    ignore: list[str],
+):
     _print_named_info("Tasks", _collect_task_entries(folder, base_dir, ignore, include_info=False))
 
 
