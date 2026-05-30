@@ -1,8 +1,8 @@
 # Tasks
 
-Tasks are workflow files that an agent can execute with `myteam start`.
+Tasks are task files that an agent can execute with `myteam start`.
 
-Use the task section to find runnable workflow definitions near your current node.
+Use the task section to find runnable task definitions near your current node.
 
 Supported task file types are:
 

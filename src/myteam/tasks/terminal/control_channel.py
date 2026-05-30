@@ -32,7 +32,7 @@ class ControlChannel:
         self._session_nonce = session_nonce
 
     def __enter__(self) -> "ControlChannel":
-        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-workflow-")
+        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-task-")
         self.socket_path = str(Path(self._tmpdir.name) / "control.sock")
         self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._server.bind(self.socket_path)
@@ -95,7 +95,7 @@ class ControlChannel:
         if message.get("version") != 1 or message.get("kind") != "child_task_request":
             return {"ok": False, "error": "Unsupported control message."}
         if message.get("token") != self.token:
-            return {"ok": False, "error": "Invalid workflow control token."}
+            return {"ok": False, "error": "Invalid task control token."}
         task = message.get("task")
         if not isinstance(task, str) or not task:
             return {"ok": False, "error": "Missing child task name."}

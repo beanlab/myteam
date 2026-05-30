@@ -27,7 +27,7 @@ def build_step_prompt(
                 "Use this nonce with both task commands.",
                 "",
                 "If you are asked to launch a task, use this command:",
-                f"`myteam task start <workflow> --session-nonce {session_nonce}`",
+                f"`myteam task start <task> --session-nonce {session_nonce}`",
                 "and pass any required input with `--json` as needed. Use JSON-safe quoting.",
                 "",
                 "Otherwise, perform the task yourself."
@@ -63,7 +63,7 @@ def build_step_prompt(
 
 def build_child_resume_prompt(
     *,
-    child_workflow: str,
+    child_task: str,
     child_result: dict[str, Any],
     skills: list[tuple[str, str]] | None = None,
     tasks: list[tuple[str, str]] | None = None,
@@ -73,7 +73,7 @@ def build_child_resume_prompt(
         sections.extend([format_named_info_block("Skills", skills), ""])
     if tasks:
         sections.extend([format_named_info_block("Tasks", tasks), ""])
-    sections.append(f"{child_workflow} result:")
+    sections.append(f"{child_task} result:")
     if (err := child_result.get("error_message")) is not None:
         sections.extend([
             "Error:",

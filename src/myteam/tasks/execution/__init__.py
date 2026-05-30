@@ -1,5 +1,5 @@
 from .cli_commands import main, task_result, task_start
-from .engine import run_workflow
+from .engine import run_task
 from .errors import StepExecutionError
 from .steps import AgentContext, run_agent
 
@@ -8,7 +8,7 @@ __all__ = [
     "StepExecutionError",
     "main",
     "run_agent",
-    "run_workflow",
+    "run_task",
     "task_result",
     "task_start",
 ]

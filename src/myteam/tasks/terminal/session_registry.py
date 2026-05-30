@@ -7,18 +7,18 @@ from threading import Lock
 from typing import Any
 
 
-_REGISTRY_DIR = Path(tempfile.gettempdir()) / "myteam-workflow-sessions"
+_REGISTRY_DIR = Path(tempfile.gettempdir()) / "myteam-task-sessions"
 _REGISTRY_LOCK = Lock()
 
 
 def load_channel_details(nonce: str, kind: str) -> tuple[str, str]:
     path = _registry_path(nonce)
     if not path.exists():
-        raise ValueError(f"No workflow session found for nonce: {nonce}")
+        raise ValueError(f"No task session found for nonce: {nonce}")
 
     data = _read_registry(path)
     if data.get("nonce") != nonce:
-        raise ValueError(f"No workflow session found for nonce: {nonce}")
+        raise ValueError(f"No task session found for nonce: {nonce}")
 
     channel = data.get(kind)
     if not isinstance(channel, dict):

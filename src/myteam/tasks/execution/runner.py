@@ -10,66 +10,66 @@ from typing import Any, Iterator
 
 from ...disclosure import (
     PROJECT_ROOT_ENV_VAR,
-    WorkflowStepSettings,
+    TaskStepSettings,
     format_required_input_shape,
 )
-from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir, workflow_candidates
-from ..definition.default_task import run_default_workflow
+from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir, task_candidates
+from ..definition.default_task import run_default_task
 from ..definition.models import StepResult
-from ..definition.parser import load_markdown_workflow, load_workflow
-from .engine import run_workflow
+from ..definition.parser import load_markdown_task, load_task
+from .engine import run_task
 
 
 @dataclass(frozen=True)
-class NamedWorkflowRunResult:
+class NamedTaskRunResult:
     status: str
     output: Any | None = None
     error_message: str | None = None
     failed_step_name: str | None = None
 
 
-def run_named_workflow(
-    workflow: str,
+def run_named_task(
+    task: str,
     *,
     input: Any = None,
     prefix: str = DEFAULT_LOCAL_ROOT,
     logger=None,
-) -> NamedWorkflowRunResult:
-    project_root = _resolve_named_workflow_root(prefix=prefix)
+) -> NamedTaskRunResult:
+    project_root = _resolve_named_task_root(prefix=prefix)
 
-    folder = project_root.joinpath(*workflow.split("/"))
+    folder = project_root.joinpath(*task.split("/"))
     if not folder.suffix:
-        file_candidates = workflow_candidates(_workflow_lookup_base(project_root, prefix=prefix), workflow, prefix=prefix)
+        file_candidates = task_candidates(_task_lookup_base(project_root, prefix=prefix), task, prefix=prefix)
         if file_candidates:
             if len(file_candidates) > 1 and logger is not None:
-                logger(f"Workflow '{workflow}' matched multiple files; prioritizing {file_candidates[0]}.")
+                logger(f"Task '{task}' matched multiple files; prioritizing {file_candidates[0]}.")
             path = file_candidates[0]
             if logger is not None:
-                logger(f"Resolved workflow '{workflow}' to {path}")
+                logger(f"Resolved task '{task}' to {path}")
             if path.suffix == ".py":
-                return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
+                return _run_python_child_task(path, task=task, project_root=project_root, input=input)
             if path.suffix == ".md":
-                return _run_markdown_child_workflow(path, workflow=workflow, input=input, logger=logger)
-            return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
+                return _run_markdown_child_task(path, task=task, input=input, logger=logger)
+            return _run_yaml_child_task(path, task=task, logger=logger)
     else:
         try:
-            file_candidates = workflow_candidates(_workflow_lookup_base(project_root, prefix=prefix), workflow, prefix=prefix)
+            file_candidates = task_candidates(_task_lookup_base(project_root, prefix=prefix), task, prefix=prefix)
         except ValueError as exc:
-            return NamedWorkflowRunResult(status="failed", error_message=str(exc))
+            return NamedTaskRunResult(status="failed", error_message=str(exc))
         if file_candidates:
             path = file_candidates[0]
             if logger is not None:
-                logger(f"Resolved workflow '{workflow}' to {path}")
+                logger(f"Resolved task '{task}' to {path}")
             if path.suffix == ".py":
-                return _run_python_child_workflow(path, workflow=workflow, project_root=project_root, input=input)
+                return _run_python_child_task(path, task=task, project_root=project_root, input=input)
             if path.suffix == ".md":
-                return _run_markdown_child_workflow(path, workflow=workflow, input=input, logger=logger)
-            return _run_yaml_child_workflow(path, workflow=workflow, logger=logger)
+                return _run_markdown_child_task(path, task=task, input=input, logger=logger)
+            return _run_yaml_child_task(path, task=task, logger=logger)
 
-    return NamedWorkflowRunResult(status="failed", error_message=f"Workflow '{workflow}' not found.")
+    return NamedTaskRunResult(status="failed", error_message=f"Task '{task}' not found.")
 
 
-def _resolve_named_workflow_root(*, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
+def _resolve_named_task_root(*, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
     cwd = base_dir().resolve()
     for candidate in (cwd, *cwd.parents):
         if candidate.name == prefix and candidate.is_dir():
@@ -77,21 +77,21 @@ def _resolve_named_workflow_root(*, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
     return agents_root(cwd, prefix)
 
 
-def _workflow_lookup_base(project_root: Path, *, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
+def _task_lookup_base(project_root: Path, *, prefix: str = DEFAULT_LOCAL_ROOT) -> Path:
     cwd = base_dir().resolve()
     if project_root.resolve() == cwd and cwd.name == prefix:
         return cwd.parent
     return cwd
 
 
-def _run_yaml_child_workflow(path: Path, *, workflow: str, logger) -> NamedWorkflowRunResult:
+def _run_yaml_child_task(path: Path, *, task: str, logger) -> NamedTaskRunResult:
     try:
-        workflow_definition = load_workflow(path)
-        result = run_workflow(workflow_definition, logger=logger)
+        task_definition = load_task(path)
+        result = run_task(task_definition, logger=logger)
     except (OSError, ValueError) as exc:
-        return NamedWorkflowRunResult(status="failed", error_message=f"Failed to load workflow '{workflow}': {exc}")
+        return NamedTaskRunResult(status="failed", error_message=f"Failed to load task '{task}': {exc}")
 
-    return NamedWorkflowRunResult(
+    return NamedTaskRunResult(
         status=result.status,
         output=result.output,
         error_message=result.error_message,
@@ -99,88 +99,88 @@ def _run_yaml_child_workflow(path: Path, *, workflow: str, logger) -> NamedWorkf
     )
 
 
-def _run_markdown_child_workflow(
+def _run_markdown_child_task(
     path: Path,
     *,
-    workflow: str,
+    task: str,
     input: Any,
     logger,
-) -> NamedWorkflowRunResult:
+) -> NamedTaskRunResult:
     try:
-        prompt, workflow_settings = load_markdown_workflow(path)
+        prompt, task_settings = load_markdown_task(path)
     except (OSError, ValueError) as exc:
-        return NamedWorkflowRunResult(status="failed", error_message=f"Failed to load workflow '{workflow}': {exc}")
+        return NamedTaskRunResult(status="failed", error_message=f"Failed to load task '{task}': {exc}")
 
-    if workflow_settings is not None and workflow_settings.input is not None and input is None:
-        return NamedWorkflowRunResult(
+    if task_settings is not None and task_settings.input is not None and input is None:
+        return NamedTaskRunResult(
             status="failed",
-            error_message=f"Workflow '{workflow}' requires input:\n{format_required_input_shape(workflow_settings.input)}",
+            error_message=f"Task '{task}' requires input:\n{format_required_input_shape(task_settings.input)}",
         )
 
     if input is not None:
-        workflow_settings = (
-            replace(workflow_settings, input=input)
-            if workflow_settings is not None
-            else WorkflowStepSettings(input=input)
+        task_settings = (
+            replace(task_settings, input=input)
+            if task_settings is not None
+            else TaskStepSettings(input=input)
         )
 
-    result = run_default_workflow(prompt, cwd=path.parent, workflow_settings=workflow_settings)
+    result = run_default_task(prompt, cwd=path.parent, task_settings=task_settings)
     if result.status != "completed":
-        return NamedWorkflowRunResult(status="failed", error_message=result.error_message)
+        return NamedTaskRunResult(status="failed", error_message=result.error_message)
 
     if logger is not None:
-        logger(f"Workflow '{workflow}' completed successfully.")
-    return NamedWorkflowRunResult(
+        logger(f"Task '{task}' completed successfully.")
+    return NamedTaskRunResult(
         status="completed",
         output=result.output if result.output is not None else {"status": "completed"},
     )
 
 
-def _run_python_child_workflow(
+def _run_python_child_task(
     path: Path,
     *,
-    workflow: str,
+    task: str,
     project_root: Path,
     input: Any,
-) -> NamedWorkflowRunResult:
+) -> NamedTaskRunResult:
     try:
         if input is not None and not isinstance(input, dict):
-            return NamedWorkflowRunResult(
+            return NamedTaskRunResult(
                 status="failed",
-                error_message=f"Input for Python workflow '{workflow}' must be a mapping.",
+                error_message=f"Input for Python task '{task}' must be a mapping.",
             )
-        with _temporary_python_workflow_context(path, project_root=project_root):
+        with _temporary_python_task_context(path, project_root=project_root):
             module = _load_module_from_path(path)
             main = getattr(module, "main", None)
             if not callable(main):
-                return NamedWorkflowRunResult(
+                return NamedTaskRunResult(
                     status="failed",
-                    error_message=f"Python workflow '{workflow}' does not define callable main().",
+                    error_message=f"Python task '{task}' does not define callable main().",
                 )
             output = main(**input) if isinstance(input, dict) else main()
     except BaseException as exc:
         if isinstance(exc, KeyboardInterrupt):
             raise
-        return NamedWorkflowRunResult(
+        return NamedTaskRunResult(
             status="failed",
-            error_message=f"Python workflow '{workflow}' failed: {exc}",
+            error_message=f"Python task '{task}' failed: {exc}",
         )
 
     if isinstance(output, StepResult):
-        return NamedWorkflowRunResult(
+        return NamedTaskRunResult(
             status=output.status,
             output=output.output,
             error_message=output.error_message,
         )
 
-    return NamedWorkflowRunResult(
+    return NamedTaskRunResult(
         status="completed",
         output=output if output is not None else {"status": "completed"},
     )
 
 
 def _load_module_from_path(path: Path) -> ModuleType:
-    module_name = f"_myteam_child_workflow_{path.stem}_{abs(hash(path))}"
+    module_name = f"_myteam_child_task_{path.stem}_{abs(hash(path))}"
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError("could not create import spec")
@@ -190,7 +190,7 @@ def _load_module_from_path(path: Path) -> ModuleType:
 
 
 @contextmanager
-def _temporary_python_workflow_context(path: Path, *, project_root: Path) -> Iterator[None]:
+def _temporary_python_task_context(path: Path, *, project_root: Path) -> Iterator[None]:
     previous_cwd = Path.cwd()
     previous_project_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
     os.environ[PROJECT_ROOT_ENV_VAR] = str(project_root)

@@ -6,27 +6,27 @@ from types import SimpleNamespace
 from myteam.tasks.definition.models import StepResult
 from myteam.disclosure import resolve_skill_entry, resolve_task_entry
 from myteam.tasks.execution.steps import run_agent
-from myteam.tasks.execution.runner import run_named_workflow
+from myteam.tasks.execution.runner import run_named_task
 
 
-def test_python_child_workflow_main_return_value_becomes_output(initialized_project: Path, monkeypatch):
-    workflow_file = initialized_project / ".myteam" / "child.py"
-    workflow_file.write_text(
+def test_python_child_task_main_return_value_becomes_output(initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "child.py"
+    task_file.write_text(
         "def main(feature_request):\n"
         "    return {'answer': feature_request.upper()}\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child", input={"feature_request": "build x"})
+    result = run_named_task("child", input={"feature_request": "build x"})
 
     assert result.status == "completed"
     assert result.output == {"answer": "BUILD X"}
 
 
-def test_python_child_workflow_resolves_from_nested_myteam_cwd(initialized_project: Path, monkeypatch):
-    workflow_file = initialized_project / ".myteam" / "child.py"
-    workflow_file.write_text(
+def test_python_child_task_resolves_from_nested_myteam_cwd(initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "child.py"
+    task_file.write_text(
         "def main():\n"
         "    return {'answer': 'ok'}\n",
         encoding="utf-8",
@@ -34,45 +34,45 @@ def test_python_child_workflow_resolves_from_nested_myteam_cwd(initialized_proje
     monkeypatch.setenv("MYTEAM_PROJECT_ROOT", str(initialized_project / ".myteam"))
     monkeypatch.chdir(initialized_project / ".myteam")
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
 
 
-def test_python_child_workflow_none_return_gets_completion_output(initialized_project: Path, monkeypatch):
-    workflow_file = initialized_project / ".myteam" / "child.py"
-    workflow_file.write_text(
+def test_python_child_task_none_return_gets_completion_output(initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "child.py"
+    task_file.write_text(
         "def main():\n"
         "    return None\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "completed"
     assert result.output == {"status": "completed"}
 
 
-def test_python_child_workflow_exception_returns_structured_failure(initialized_project: Path, monkeypatch):
-    workflow_file = initialized_project / ".myteam" / "child.py"
-    workflow_file.write_text(
+def test_python_child_task_exception_returns_structured_failure(initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "child.py"
+    task_file.write_text(
         "def main():\n"
         "    raise RuntimeError('boom')\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "failed"
     assert "boom" in (result.error_message or "")
 
 
-def test_python_child_workflow_can_return_step_result(initialized_project: Path, monkeypatch):
-    workflow_file = initialized_project / ".myteam" / "child.py"
-    workflow_file.write_text(
+def test_python_child_task_can_return_step_result(initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "child.py"
+    task_file.write_text(
         "from myteam.tasks.definition.models import StepResult\n"
         "\n"
         "def main():\n"
@@ -81,15 +81,15 @@ def test_python_child_workflow_can_return_step_result(initialized_project: Path,
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
 
 
-def test_markdown_child_workflow_uses_prompt_body_and_frontmatter(initialized_project: Path, monkeypatch):
-    workflow_file = initialized_project / ".myteam" / "child.md"
-    workflow_file.write_text(
+def test_markdown_child_task_uses_prompt_body_and_frontmatter(initialized_project: Path, monkeypatch):
+    task_file = initialized_project / ".myteam" / "child.md"
+    task_file.write_text(
         "---\n"
         "name: Child task\n"
         "description: Summarize notes\n"
@@ -103,31 +103,31 @@ def test_markdown_child_workflow_uses_prompt_body_and_frontmatter(initialized_pr
 
     seen: dict[str, object] = {}
 
-    def fake_run_default_workflow(prompt: str, **kwargs):
+    def fake_run_default_task(prompt: str, **kwargs):
         seen["prompt"] = prompt
         seen["kwargs"] = kwargs
         return StepResult(status="completed", output={"answer": "ok"})
 
-    monkeypatch.setattr("myteam.tasks.execution.runner.run_default_workflow", fake_run_default_workflow)
+    monkeypatch.setattr("myteam.tasks.execution.runner.run_default_task", fake_run_default_task)
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
     assert seen["prompt"].strip()
-    assert seen["kwargs"]["cwd"] == workflow_file.parent
-    workflow_settings = seen["kwargs"]["workflow_settings"]
-    assert workflow_settings.agent == "codex"
-    assert workflow_settings.output == {"answer": "ok"}
+    assert seen["kwargs"]["cwd"] == task_file.parent
+    task_settings = seen["kwargs"]["task_settings"]
+    assert task_settings.agent == "codex"
+    assert task_settings.output == {"answer": "ok"}
 
 
-def test_markdown_child_workflow_requires_caller_input_when_frontmatter_declares_it(
+def test_markdown_child_task_requires_caller_input_when_frontmatter_declares_it(
     initialized_project: Path,
     monkeypatch,
 ):
-    workflow_file = initialized_project / ".myteam" / "child.md"
-    workflow_file.write_text(
+    task_file = initialized_project / ".myteam" / "child.md"
+    task_file.write_text(
         "---\n"
         "name: Child task\n"
         "description: Needs input\n"
@@ -139,7 +139,7 @@ def test_markdown_child_workflow_requires_caller_input_when_frontmatter_declares
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "failed"
     assert result.error_message is not None
@@ -147,21 +147,21 @@ def test_markdown_child_workflow_requires_caller_input_when_frontmatter_declares
     assert "topic: release" in result.error_message
 
 
-def test_named_workflow_prefers_workflow_file_over_role_directory(initialized_project: Path, monkeypatch):
-    workflow_dir = initialized_project / ".myteam" / "child"
-    workflow_dir.mkdir()
-    (workflow_dir / "role.md").write_text("Child role\n", encoding="utf-8")
-    (workflow_dir / "load.py").write_text("print('role')\n", encoding="utf-8")
+def test_named_task_prefers_task_file_over_role_directory(initialized_project: Path, monkeypatch):
+    task_dir = initialized_project / ".myteam" / "child"
+    task_dir.mkdir()
+    (task_dir / "role.md").write_text("Child role\n", encoding="utf-8")
+    (task_dir / "load.py").write_text("print('role')\n", encoding="utf-8")
 
-    workflow_file = initialized_project / ".myteam" / "child.py"
-    workflow_file.write_text(
+    task_file = initialized_project / ".myteam" / "child.py"
+    task_file.write_text(
         "def main():\n"
         "    return {'answer': 'file'}\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_workflow("child")
+    result = run_named_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "file"}

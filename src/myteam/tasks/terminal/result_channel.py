@@ -31,7 +31,7 @@ class ResultChannel:
         self._payload_validator = payload_validator
 
     def __enter__(self) -> "ResultChannel":
-        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-workflow-")
+        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-task-")
         self.socket_path = str(Path(self._tmpdir.name) / "result.sock")
         self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._server.bind(self.socket_path)
@@ -94,11 +94,11 @@ class ResultChannel:
         if message.get("version") != 1 or message.get("kind") != "result":
             return {"ok": False, "error": "Unsupported result message."}
         if message.get("token") != self.token:
-            return {"ok": False, "error": "Invalid workflow result token."}
+            return {"ok": False, "error": "Invalid task result token."}
         if "payload" not in message:
-            return {"ok": False, "error": "Missing workflow result payload."}
+            return {"ok": False, "error": "Missing task result payload."}
         if self._result_ready.is_set():
-            return {"ok": False, "error": "Workflow result already recorded."}
+            return {"ok": False, "error": "Task result already recorded."}
 
         payload = message["payload"]
         if self._payload_validator is not None:
@@ -146,10 +146,10 @@ def submit_result_payload(
     try:
         ack = json.loads(response.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Workflow runner returned an invalid acknowledgement.") from exc
+        raise ValueError("Task runner returned an invalid acknowledgement.") from exc
 
     if not ack.get("ok"):
-        raise ValueError(str(ack.get("error") or "Workflow runner rejected the result."))
+        raise ValueError(str(ack.get("error") or "Task runner rejected the result."))
 
 
 def _read_socket_message(connection: socket.socket) -> bytes:

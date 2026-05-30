@@ -22,27 +22,27 @@ from .disclosure import (
     split_yaml_frontmatter,
     get_skills as disclose_get_skills,
     get_tasks as disclose_get_tasks,
-    WorkflowStepSettings,
+    TaskStepSettings,
 )
 from .paths import (
     APP_NAME,
     BUILTIN_ROOT_NAME,
     DEFAULT_LOCAL_ROOT,
     ENCODING,
-    SUPPORTED_WORKFLOW_SUFFIXES,
+    SUPPORTED_TASK_SUFFIXES,
     agents_root,
     base_dir,
     role_dir,
-    workflow_candidates,
+    task_candidates,
 )
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
-from .tasks.definition.default_task import run_default_workflow
-from .tasks.definition.parser import load_markdown_workflow, load_workflow
+from .tasks.definition.default_task import run_default_task
+from .tasks.definition.parser import load_markdown_task, load_task
 from .tasks.execution.cli_commands import task_result as submit_task_result
 from .tasks.execution.cli_commands import task_start as submit_task_start
-from .tasks.execution.engine import run_workflow
+from .tasks.execution.engine import run_task
 
 
 def ensure_dir(path: Path) -> None:
@@ -130,7 +130,7 @@ def new_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
             file=sys.stderr,
         )
         raise SystemExit(1)
-    if suffix not in SUPPORTED_WORKFLOW_SUFFIXES:
+    if suffix not in SUPPORTED_TASK_SUFFIXES:
         print(f"Task '{task}' has unsupported extension '{suffix}'.", file=sys.stderr)
         raise SystemExit(1)
 
@@ -277,7 +277,7 @@ def get_tasks(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) ->
 
 def _resolve_task_file(task: str, *, prefix: str) -> Path:
     _selected_root(prefix)
-    candidates = workflow_candidates(base_dir(), task, prefix=prefix)
+    candidates = task_candidates(base_dir(), task, prefix=prefix)
     if candidates:
         return candidates[0]
 
@@ -299,78 +299,78 @@ def _log(message: str) -> None:
     print(message, file=sys.stderr)
 
 
-def _run_python_workflow(path: Path, *, project_root: Path) -> int:
+def _run_python_task(path: Path, *, project_root: Path) -> int:
     env = dict(os.environ)
     env[PROJECT_ROOT_ENV_VAR] = str(project_root)
     result = subprocess.run([sys.executable, str(path)], cwd=path.parent, env=env, check=False)
     return result.returncode
 
 
-def _run_python_start_workflow(path: Path, *, workflow: str, project_root: Path) -> None:
+def _run_python_start_task(path: Path, *, task: str, project_root: Path) -> None:
     try:
-        returncode = _run_python_workflow(path, project_root=project_root)
+        returncode = _run_python_task(path, project_root=project_root)
     except OSError as exc:
-        print(f"Failed to execute Python workflow '{workflow}': {exc}", file=sys.stderr)
+        print(f"Failed to execute Python task '{task}': {exc}", file=sys.stderr)
         raise SystemExit(1)
     if returncode != 0:
         raise SystemExit(returncode)
 
 
-def _run_yaml_start_workflow(path: Path, *, workflow: str, logger) -> None:
+def _run_yaml_start_task(path: Path, *, task: str, logger) -> None:
     try:
-        workflow_definition = load_workflow(path)
+        task_definition = load_task(path)
     except (OSError, ValueError) as exc:
-        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
+        print(f"Failed to load task '{task}': {exc}", file=sys.stderr)
         raise SystemExit(1)
 
-    logger(f"Loaded workflow with {len(workflow_definition)} step(s)")
-    result = run_workflow(workflow_definition, logger=logger)
+    logger(f"Loaded task with {len(task_definition)} step(s)")
+    result = run_task(task_definition, logger=logger)
     if result.status != "completed":
         failed_step = result.failed_step_name or "<unknown>"
         if result.error_message:
             print(
-                f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
+                f"Task '{task}' failed at step '{failed_step}': {result.error_message}",
                 file=sys.stderr,
             )
         else:
-            print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
+            print(f"Task '{task}' failed at step '{failed_step}'.", file=sys.stderr)
         raise SystemExit(1)
 
 
-def _run_markdown_start_workflow(path: Path, *, workflow: str, input: Any, logger) -> None:
+def _run_markdown_start_task(path: Path, *, task: str, input: Any, logger) -> None:
     try:
-        prompt, workflow_settings = load_markdown_workflow(path)
+        prompt, task_settings = load_markdown_task(path)
     except (OSError, ValueError) as exc:
-        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
+        print(f"Failed to load task '{task}': {exc}", file=sys.stderr)
         raise SystemExit(1)
 
-    if workflow_settings is not None and workflow_settings.input is not None and input is None:
+    if task_settings is not None and task_settings.input is not None and input is None:
         print(
-            f"Workflow '{workflow}' requires input:\n{format_required_input_shape(workflow_settings.input)}",
+            f"Task '{task}' requires input:\n{format_required_input_shape(task_settings.input)}",
             file=sys.stderr,
         )
         raise SystemExit(1)
 
     if input is not None:
-        workflow_settings = (
-            replace(workflow_settings, input=input)
-            if workflow_settings is not None
-            else WorkflowStepSettings(input=input)
+        task_settings = (
+            replace(task_settings, input=input)
+            if task_settings is not None
+            else TaskStepSettings(input=input)
         )
 
-    result = run_default_workflow(prompt, cwd=path.parent, workflow_settings=workflow_settings)
+    result = run_default_task(prompt, cwd=path.parent, task_settings=task_settings)
     if result.status != "completed":
         if result.error_message:
-            print(f"Workflow '{workflow}' failed: {result.error_message}", file=sys.stderr)
+            print(f"Task '{task}' failed: {result.error_message}", file=sys.stderr)
         else:
-            print(f"Workflow '{workflow}' failed.", file=sys.stderr)
+            print(f"Task '{task}' failed.", file=sys.stderr)
         raise SystemExit(1)
 
-    logger(f"Workflow '{workflow}' completed successfully.")
+    logger(f"Task '{task}' completed successfully.")
 
 
 def start(
-        workflow: str = "agent",
+        task: str = "agent",
         prefix: str = DEFAULT_LOCAL_ROOT,
         verbose: bool = False,
         input: Any = None,
@@ -378,53 +378,53 @@ def start(
     logger = _log if verbose else (lambda msg: None)
     project_root = agents_root(base_dir(), prefix)
 
-    folder = project_root.joinpath(*workflow.split("/"))
+    folder = project_root.joinpath(*task.split("/"))
     requested_path = folder
     if not requested_path.suffix:
-        file_candidates = workflow_candidates(base_dir(), workflow, prefix=prefix)
+        file_candidates = task_candidates(base_dir(), task, prefix=prefix)
         if file_candidates:
             if len(file_candidates) > 1:
                 print(
-                    f"Workflow '{workflow}' matched multiple files; prioritizing {file_candidates[0]}.",
+                    f"Task '{task}' matched multiple files; prioritizing {file_candidates[0]}.",
                     file=sys.stderr,
                 )
             path = file_candidates[0]
-            logger(f"Resolved workflow '{workflow}' to {path}")
+            logger(f"Resolved task '{task}' to {path}")
             if path.suffix == ".py":
-                _run_python_start_workflow(path, workflow=workflow, project_root=project_root)
-                logger(f"Workflow '{workflow}' completed successfully.")
+                _run_python_start_task(path, task=task, project_root=project_root)
+                logger(f"Task '{task}' completed successfully.")
                 return
 
             if path.suffix == ".md":
-                _run_markdown_start_workflow(path, workflow=workflow, input=input, logger=logger)
+                _run_markdown_start_task(path, task=task, input=input, logger=logger)
                 return
 
-            _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
-            logger(f"Workflow '{workflow}' completed successfully.")
+            _run_yaml_start_task(path, task=task, logger=logger)
+            logger(f"Task '{task}' completed successfully.")
             return
     else:
         try:
-            file_candidates = workflow_candidates(base_dir(), workflow, prefix=prefix)
+            file_candidates = task_candidates(base_dir(), task, prefix=prefix)
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             raise SystemExit(1)
         if file_candidates:
             path = file_candidates[0]
-            logger(f"Resolved workflow '{workflow}' to {path}")
+            logger(f"Resolved task '{task}' to {path}")
             if path.suffix == ".py":
-                _run_python_start_workflow(path, workflow=workflow, project_root=project_root)
-                logger(f"Workflow '{workflow}' completed successfully.")
+                _run_python_start_task(path, task=task, project_root=project_root)
+                logger(f"Task '{task}' completed successfully.")
                 return
 
             if path.suffix == ".md":
-                _run_markdown_start_workflow(path, workflow=workflow, input=input, logger=logger)
+                _run_markdown_start_task(path, task=task, input=input, logger=logger)
                 return
 
-            _run_yaml_start_workflow(path, workflow=workflow, logger=logger)
-            logger(f"Workflow '{workflow}' completed successfully.")
+            _run_yaml_start_task(path, task=task, logger=logger)
+            logger(f"Task '{task}' completed successfully.")
             return
 
-    print(f"Workflow '{workflow}' not found.", file=sys.stderr)
+    print(f"Task '{task}' not found.", file=sys.stderr)
     raise SystemExit(1)
 
 
@@ -433,12 +433,12 @@ def task_result(json: str | None = None, text: str | None = None, session_nonce:
 
 
 def task_start(
-    workflow: str,
+    task: str,
     json: Any | None = None,
     text: str | None = None,
     session_nonce: str | None = None,
 ) -> None:
-    submit_task_start(workflow, json=json, text=text, session_nonce=session_nonce)
+    submit_task_start(task, json=json, text=text, session_nonce=session_nonce)
 
 
 def version() -> str:

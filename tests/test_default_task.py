@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.disclosure import WorkflowStepSettings
-from myteam.tasks.definition.default_task import run_default_workflow
+from myteam.disclosure import TaskStepSettings
+from myteam.tasks.definition.default_task import run_default_task
 from myteam.tasks.definition.models import StepResult
 
 
-def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_path: Path, monkeypatch):
+def test_run_default_task_uses_prompt_only_without_task_settings(tmp_path: Path, monkeypatch):
     seen: dict[str, object] = {}
     prompt = "workflow prompt"
 
@@ -27,7 +27,7 @@ def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_pat
 
     monkeypatch.setattr("myteam.tasks.definition.default_task.AgentContext", FakeAgentContext)
 
-    result = run_default_workflow(prompt, cwd=tmp_path)
+    result = run_default_task(prompt, cwd=tmp_path)
 
     assert result.status == "completed"
     assert seen["context_kwargs"] == {
@@ -39,10 +39,10 @@ def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_pat
     assert seen["run_agent_kwargs"]["prompt"]
 
 
-def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeypatch):
+def test_run_default_task_forwards_task_settings(tmp_path: Path, monkeypatch):
     seen: dict[str, object] = {}
     prompt = "workflow prompt"
-    workflow_settings = WorkflowStepSettings(
+    task_settings = TaskStepSettings(
         agent="codex",
         model="gpt-5.4-mini",
         input={"topic": "release"},
@@ -71,10 +71,10 @@ def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeyp
 
     monkeypatch.setattr("myteam.tasks.definition.default_task.AgentContext", FakeAgentContext)
 
-    result = run_default_workflow(
+    result = run_default_task(
         prompt,
         cwd=tmp_path,
-        workflow_settings=workflow_settings,
+        task_settings=task_settings,
     )
 
     assert result.status == "completed"

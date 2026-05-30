@@ -14,7 +14,7 @@ from myteam.tasks.agents.pi import get_session_info as get_pi_session_info
 from myteam.tasks.agents.agent_utils import estimate_usage_cost
 from myteam.tasks.agents.runtime import AgentSessionContext
 from myteam.tasks.agents.runtime import resolve_agent_runtime_config
-from myteam.tasks.definition.parser import load_workflow
+from myteam.tasks.definition.parser import load_task
 
 
 def agent_session_context(
@@ -238,7 +238,7 @@ def test_resolve_rejects_unknown_agent(tmp_path: Path, monkeypatch):
         )
 
 
-def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
+def test_load_task_accepts_project_local_agent(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_dir = tmp_path / ".myteam" / ".config"
     config_dir.mkdir(parents=True)
@@ -263,7 +263,7 @@ def test_load_workflow_accepts_project_local_agent(tmp_path: Path, monkeypatch):
         encoding="utf-8",
     )
 
-    workflow = load_workflow(workflow_file)
+    workflow = load_task(workflow_file)
 
     assert workflow["step1"]["agent"] == "custom"
 
@@ -319,7 +319,7 @@ def test_codex_build_argv_supports_session_modes():
 
 
 def test_codex_build_argv_rejects_noninteractive_fork():
-    with pytest.raises(ValueError, match="non-interactive workflow steps do not support"):
+    with pytest.raises(ValueError, match="non-interactive task steps do not support"):
         build_codex_argv("prompt", False, "fork-session", True)
 
 

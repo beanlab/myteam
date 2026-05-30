@@ -236,7 +236,7 @@ def _build_argv_callable(module: ModuleType) -> Callable[
         return build_argv
 
     raise AgentConfigError(
-        "missing build_argv; workflow agent configs must implement "
+        "missing build_argv; task agent configs must implement "
         "build_argv(prompt_text, interactive=True, session_id=None, fork=False, model=None, extra_args=None) "
         "and return a list of argv strings."
     )

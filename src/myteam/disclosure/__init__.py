@@ -9,12 +9,12 @@ from typing import Any, Callable, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..paths import BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, SUPPORTED_WORKFLOW_SUFFIXES, base_dir, builtin_agents_root, \
-    NON_TASK_FILES, workflow_candidates
+from ..paths import BUILTIN_ROOT_NAME, DEFAULT_LOCAL_ROOT, SUPPORTED_TASK_SUFFIXES, base_dir, builtin_agents_root, \
+    NON_TASK_FILES, task_candidates
 from ..templates import get_template
 
 
-class WorkflowStepSettings(BaseModel):
+class TaskStepSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     agent: str | None = Field(default=None, min_length=1)
@@ -183,7 +183,7 @@ def resolve_skill_entry(project_root: Path, skill: str) -> tuple[str, str]:
 
 
 def resolve_task_entry(project_root: Path, task: str) -> tuple[str, str]:
-    candidates = workflow_candidates(project_root, task, prefix=DEFAULT_LOCAL_ROOT)
+    candidates = task_candidates(project_root, task, prefix=DEFAULT_LOCAL_ROOT)
     if not candidates:
         return task, ""
 
@@ -553,7 +553,7 @@ def get_skills(folder: Path, base_dir: Path, ignore: list[str]):
 
 
 def _is_task_file(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() in SUPPORTED_WORKFLOW_SUFFIXES and path.name.lower() not in NON_TASK_FILES
+    return path.is_file() and path.suffix.lower() in SUPPORTED_TASK_SUFFIXES and path.name.lower() not in NON_TASK_FILES
 
 
 def list_tasks(

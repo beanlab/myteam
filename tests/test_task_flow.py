@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from myteam.paths import workflow_candidates
-from myteam.tasks.definition.models import WorkflowRunResult
+from myteam.paths import task_candidates
+from myteam.tasks.definition.models import TaskRunResult
 from myteam.tasks.definition.models import StepResult
 
 
@@ -22,14 +22,14 @@ def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_pr
 
     seen: dict[str, object] = {}
 
-    def fake_load_workflow(path: Path):
+    def fake_load_task(path: Path):
         seen["path"] = path
         return {"step1": {"prompt": "hello", "output": {"message": "hi"}}}
 
-    def fake_run_workflow(workflow_definition, **kwargs):
-        seen["workflow"] = workflow_definition
+    def fake_run_task(task_definition, **kwargs):
+        seen["task"] = task_definition
         seen["kwargs"] = kwargs
-        return WorkflowRunResult(
+        return TaskRunResult(
             status="completed",
             output={
                 "step1": {
@@ -40,8 +40,8 @@ def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_pr
             },
         )
 
-    monkeypatch.setattr("myteam.commands.load_workflow", fake_load_workflow)
-    monkeypatch.setattr("myteam.commands.run_workflow", fake_run_workflow)
+    monkeypatch.setattr("myteam.commands.load_task", fake_load_task)
+    monkeypatch.setattr("myteam.commands.run_task", fake_run_task)
 
     result = run_myteam_inprocess(initialized_project, "start", "demo")
 
@@ -49,7 +49,7 @@ def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_pr
     assert result.stdout == ""
     assert result.stderr == ""
     assert seen["path"] == workflow_file
-    assert seen["workflow"] == {"step1": {"prompt": "hello", "output": {"message": "hi"}}}
+    assert seen["task"] == {"step1": {"prompt": "hello", "output": {"message": "hi"}}}
     assert callable(seen["kwargs"]["logger"])
 
 
@@ -65,10 +65,10 @@ def test_start_accepts_prefix_for_workflow_lookup(run_myteam_inprocess, tmp_path
         encoding="utf-8",
     )
 
-    monkeypatch.setattr("myteam.commands.load_workflow", lambda path: {"step1": {"prompt": "hello", "output": {"message": "hi"}}})
+    monkeypatch.setattr("myteam.commands.load_task", lambda path: {"step1": {"prompt": "hello", "output": {"message": "hi"}}})
     monkeypatch.setattr(
-        "myteam.commands.run_workflow",
-        lambda workflow_definition, **kwargs: WorkflowRunResult(status="completed", output={}),
+        "myteam.commands.run_task",
+        lambda task_definition, **kwargs: TaskRunResult(status="completed", output={}),
     )
 
     result = run_myteam_inprocess(tmp_path, "start", "demo", "--prefix", ".agents")
@@ -89,14 +89,14 @@ def test_start_accepts_yml_extension(run_myteam_inprocess, initialized_project: 
 
     seen: dict[str, Path] = {}
 
-    def fake_load_workflow(path: Path):
+    def fake_load_task(path: Path):
         seen["path"] = path
         return {"step1": {"prompt": "hello", "output": {"message": "hi"}}}
 
-    monkeypatch.setattr("myteam.commands.load_workflow", fake_load_workflow)
+    monkeypatch.setattr("myteam.commands.load_task", fake_load_task)
     monkeypatch.setattr(
-        "myteam.commands.run_workflow",
-        lambda workflow_definition, **kwargs: WorkflowRunResult(status="completed", output={}),
+        "myteam.commands.run_task",
+        lambda task_definition, **kwargs: TaskRunResult(status="completed", output={}),
     )
 
     result = run_myteam_inprocess(initialized_project, "start", "demo")
@@ -115,12 +115,12 @@ def test_start_defaults_to_agent_workflow(run_myteam_inprocess, initialized_proj
 
     seen: dict[str, Path] = {}
 
-    def fake_run_python_start_workflow(path: Path, *, workflow: str, project_root: Path):
+    def fake_run_python_start_task(path: Path, *, task: str, project_root: Path):
         seen["path"] = path
-        seen["workflow"] = workflow
+        seen["task"] = task
         seen["project_root"] = project_root
 
-    monkeypatch.setattr("myteam.commands._run_python_start_workflow", fake_run_python_start_workflow)
+    monkeypatch.setattr("myteam.commands._run_python_start_task", fake_run_python_start_task)
 
     result = run_myteam_inprocess(initialized_project, "start")
 
@@ -128,7 +128,7 @@ def test_start_defaults_to_agent_workflow(run_myteam_inprocess, initialized_proj
     assert result.stdout == ""
     assert result.stderr == ""
     assert seen["path"] == workflow_file
-    assert seen["workflow"] == "agent"
+    assert seen["task"] == "agent"
     assert seen["project_root"] == initialized_project / ".myteam"
 
 
@@ -142,14 +142,14 @@ def test_workflow_candidates_prioritize_python_then_yaml_then_yml(initialized_pr
     yaml_file.write_text("step1: {}\n", encoding="utf-8")
     yml_file.write_text("step1: {}\n", encoding="utf-8")
 
-    assert workflow_candidates(initialized_project, "demo") == [python_file, markdown_file, yaml_file, yml_file]
+    assert task_candidates(initialized_project, "demo") == [python_file, markdown_file, yaml_file, yml_file]
 
 
 def test_workflow_candidates_reject_unsupported_extension(initialized_project: Path):
     (initialized_project / ".myteam" / "demo.txt").write_text("ignored\n", encoding="utf-8")
 
     with pytest.raises(ValueError):
-        workflow_candidates(initialized_project, "demo.txt")
+        task_candidates(initialized_project, "demo.txt")
 
 
 def test_start_runs_python_workflow_file(run_myteam, initialized_project: Path):
@@ -228,11 +228,11 @@ def test_start_ignores_named_directories_when_workflow_files_exist(run_myteam_in
     calls: list[tuple[str, Path]] = []
 
     monkeypatch.setattr(
-        "myteam.commands._run_python_start_workflow",
+        "myteam.commands._run_python_start_task",
         lambda *args, **kwargs: calls.append(("py", args[0])),
     )
     monkeypatch.setattr(
-        "myteam.commands._run_yaml_start_workflow",
+        "myteam.commands._run_yaml_start_task",
         lambda *args, **kwargs: calls.append(("yaml", args[0])),
     )
 
@@ -253,11 +253,11 @@ def test_start_uses_explicit_python_file_when_directory_exists(run_myteam_inproc
     calls: list[tuple[str, Path]] = []
 
     monkeypatch.setattr(
-        "myteam.commands._run_python_start_workflow",
+        "myteam.commands._run_python_start_task",
         lambda *args, **kwargs: calls.append(("py", args[0])),
     )
     monkeypatch.setattr(
-        "myteam.commands._run_yaml_start_workflow",
+        "myteam.commands._run_yaml_start_task",
         lambda *args, **kwargs: calls.append(("yaml", args[0])),
     )
 
@@ -279,11 +279,11 @@ def test_start_prefers_python_workflow_when_multiple_files_exist(run_myteam_inpr
     calls: list[tuple[str, Path]] = []
 
     monkeypatch.setattr(
-        "myteam.commands._run_python_start_workflow",
+        "myteam.commands._run_python_start_task",
         lambda *args, **kwargs: calls.append(("py", args[0])),
     )
     monkeypatch.setattr(
-        "myteam.commands._run_yaml_start_workflow",
+        "myteam.commands._run_yaml_start_task",
         lambda *args, **kwargs: calls.append(("yaml", args[0])),
     )
 
@@ -310,12 +310,12 @@ def test_start_runs_markdown_task_workflow(run_myteam_inprocess, initialized_pro
 
     seen: dict[str, object] = {}
 
-    def fake_run_default_workflow(prompt: str, **kwargs):
+    def fake_run_default_task(prompt: str, **kwargs):
         seen["prompt"] = prompt
         seen["kwargs"] = kwargs
         return StepResult(status="completed", output={"result": "short summary"})
 
-    monkeypatch.setattr("myteam.commands.run_default_workflow", fake_run_default_workflow)
+    monkeypatch.setattr("myteam.commands.run_default_task", fake_run_default_task)
 
     result = run_myteam_inprocess(initialized_project, "start", "demo.md")
 
@@ -324,9 +324,9 @@ def test_start_runs_markdown_task_workflow(run_myteam_inprocess, initialized_pro
     assert result.stderr == ""
     assert seen["prompt"].strip()
     assert seen["kwargs"]["cwd"] == task_file.parent
-    workflow_settings = seen["kwargs"]["workflow_settings"]
-    assert workflow_settings.agent == "codex"
-    assert workflow_settings.output == {"result": "short summary"}
+    task_settings = seen["kwargs"]["task_settings"]
+    assert task_settings.agent == "codex"
+    assert task_settings.output == {"result": "short summary"}
 
 
 def test_start_reports_missing_required_markdown_input(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -344,12 +344,12 @@ def test_start_reports_missing_required_markdown_input(run_myteam_inprocess, ini
 
     called = False
 
-    def fake_run_default_workflow(*args, **kwargs):
+    def fake_run_default_task(*args, **kwargs):
         nonlocal called
         called = True
-        raise AssertionError("run_default_workflow should not be called when input is missing")
+        raise AssertionError("run_default_task should not be called when input is missing")
 
-    monkeypatch.setattr("myteam.commands.run_default_workflow", fake_run_default_workflow)
+    monkeypatch.setattr("myteam.commands.run_default_task", fake_run_default_task)
 
     result = run_myteam_inprocess(initialized_project, "start", "test")
 
@@ -372,16 +372,16 @@ def test_start_reports_workflow_parse_failures(run_myteam_inprocess, initialized
     workflow_file = initialized_project / ".myteam" / "demo.yaml"
     workflow_file.write_text("step1: {}\n", encoding="utf-8")
 
-    def fake_load_workflow(path: Path):
+    def fake_load_task(path: Path):
         raise ValueError("bad workflow")
 
-    monkeypatch.setattr("myteam.commands.load_workflow", fake_load_workflow)
+    monkeypatch.setattr("myteam.commands.load_task", fake_load_task)
 
     result = run_myteam_inprocess(initialized_project, "start", "demo")
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert "Failed to load workflow 'demo': bad workflow" in result.stderr
+    assert "Failed to load task 'demo': bad workflow" in result.stderr
 
 
 def test_start_reports_failed_step_from_engine(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -394,10 +394,10 @@ def test_start_reports_failed_step_from_engine(run_myteam_inprocess, initialized
         encoding="utf-8",
     )
 
-    monkeypatch.setattr("myteam.commands.load_workflow", lambda path: {"step1": {"prompt": "hello", "output": {"message": "hi"}}})
+    monkeypatch.setattr("myteam.commands.load_task", lambda path: {"step1": {"prompt": "hello", "output": {"message": "hi"}}})
     monkeypatch.setattr(
-        "myteam.commands.run_workflow",
-        lambda workflow_definition, **kwargs: WorkflowRunResult(
+        "myteam.commands.run_task",
+        lambda task_definition, **kwargs: TaskRunResult(
             status="failed",
             failed_step_name="step1",
             error_message="missing completion",
@@ -408,7 +408,7 @@ def test_start_reports_failed_step_from_engine(run_myteam_inprocess, initialized
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert "Workflow 'demo' failed at step 'step1': missing completion" in result.stderr
+    assert "Task 'demo' failed at step 'step1': missing completion" in result.stderr
 
 
 def test_start_verbose_logs_to_stderr(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -421,25 +421,25 @@ def test_start_verbose_logs_to_stderr(run_myteam_inprocess, initialized_project:
         encoding="utf-8",
     )
 
-    def fake_load_workflow(path: Path):
+    def fake_load_task(path: Path):
         return {"step1": {"prompt": "hello", "output": {"message": "hi"}}}
 
-    def fake_run_workflow(workflow_definition, **kwargs):
+    def fake_run_task(task_definition, **kwargs):
         logger = kwargs["logger"]
         assert logger is not None
         logger("Starting step 'step1'")
         logger("Completed step 'step1'")
-        return WorkflowRunResult(status="completed", output={})
+        return TaskRunResult(status="completed", output={})
 
-    monkeypatch.setattr("myteam.commands.load_workflow", fake_load_workflow)
-    monkeypatch.setattr("myteam.commands.run_workflow", fake_run_workflow)
+    monkeypatch.setattr("myteam.commands.load_task", fake_load_task)
+    monkeypatch.setattr("myteam.commands.run_task", fake_run_task)
 
     result = run_myteam_inprocess(initialized_project, "start", "demo", "--verbose")
 
     assert result.exit_code == 0
     assert result.stdout == ""
-    assert "Resolved workflow 'demo' to" in result.stderr
-    assert "Loaded workflow with 1 step(s)" in result.stderr
+    assert "Resolved task 'demo' to" in result.stderr
+    assert "Loaded task with 1 step(s)" in result.stderr
     assert "Starting step 'step1'" in result.stderr
     assert "Completed step 'step1'" in result.stderr
-    assert "Workflow 'demo' completed successfully." in result.stderr
+    assert "Task 'demo' completed successfully." in result.stderr

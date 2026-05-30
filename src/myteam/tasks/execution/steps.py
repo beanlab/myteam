@@ -11,8 +11,8 @@ from pydantic import ValidationError
 
 from ..agents import resolve_agent_runtime_config
 from ..agents.runtime import AgentRuntimeConfig, AgentSessionContext
-from ..definition.config import load_project_workflow_defaults
-from ..definition.models import ProjectWorkflowDefaults, StepExecutionArgs, StepResult, UsageInfo, PreparedStep, RunState
+from ..definition.config import load_project_task_defaults
+from ..definition.models import ProjectTaskDefaults, StepExecutionArgs, StepResult, UsageInfo, PreparedStep, RunState
 from .errors import StepExecutionError
 from .prompts import build_child_resume_prompt, build_step_prompt
 from ..resolution.session_resolution import resolve_project_root, resolve_session_id
@@ -70,15 +70,15 @@ class AgentContext:
         usage_logging: Literal["none", "summary", "per_model", "verbose"] | None = None,
         cwd: Path | str | None = None,
         timeout: int | None = None,
-        project_defaults: ProjectWorkflowDefaults | None = None,
+        project_defaults: ProjectTaskDefaults | None = None,
     ) -> None:
         self.cwd = None if cwd is None else Path(cwd).resolve()
         self.project_root = resolve_project_root(cwd=self.cwd)
         self.launch_cwd = self.cwd if self.cwd is not None else self.project_root
         self.project_defaults = (
             project_defaults
-            or load_project_workflow_defaults(self.project_root)
-            or ProjectWorkflowDefaults()
+            or load_project_task_defaults(self.project_root)
+            or ProjectTaskDefaults()
         )
         self.usage_logging = (
             usage_logging
@@ -304,10 +304,10 @@ class AgentContext:
         )
         state.session_path = session_path
 
-        from .runner import run_named_workflow
+        from .runner import run_named_task
 
         try:
-            child_result = run_named_workflow(request.task, input=request.input)
+            child_result = run_named_task(request.task, input=request.input)
         except Exception as exc:
             child_payload = {
                 "status": "failed",
@@ -322,7 +322,7 @@ class AgentContext:
             }
 
         resume_prompt = build_child_resume_prompt(
-            child_workflow=request.task,
+            child_task=request.task,
             child_result=child_payload,
             skills=prepared.skills,
             tasks=prepared.tasks,
@@ -366,7 +366,7 @@ class AgentContext:
         if session_result.payload is None:
             raise StepExecutionError(
                 "completion_missing",
-                "Workflow agent exited before reporting a structured result.",
+                "Task agent exited before reporting a structured result.",
             )
 
         try:
@@ -431,7 +431,7 @@ class AgentContext:
             return StepResult(
                 status="failed",
                 error_type="agent_launch",
-                error_message=f"Failed to launch workflow agent: {exc}",
+                error_message=f"Failed to launch task agent: {exc}",
                 transcript=state.transcript,
                 usage_state="not_attempted",
             )
@@ -565,13 +565,13 @@ def run_agent(
     tasks: list[str] | str | None = None,
 ) -> StepResult:
     """
-    Execute one workflow step with an interactive agent runtime.
+    Execute one task step with an interactive agent runtime.
 
     Args:
         prompt: Objective text the agent should complete.
         output: Expected structured result shape the agent must report.
         input: Optional resolved input data included in the step prompt.
-        agent: Workflow agent runtime name to launch.
+        agent: Task agent runtime name to launch.
         model: Optional model name forwarded to the agent adapter.
         interactive: Whether to launch the agent in interactive mode.
         session_id: Optional existing agent session to resume or fork.
@@ -615,13 +615,13 @@ def _build_agent_argv(
     except Exception as exc:
         raise StepExecutionError(
             "agent_argv",
-            f"Failed to build argv for workflow agent '{agent_config.name}': {exc}",
+            f"Failed to build argv for task agent '{agent_config.name}': {exc}",
         ) from exc
 
     if not isinstance(argv, list) or any(not isinstance(item, str) for item in argv):
         raise StepExecutionError(
             "agent_argv",
-            f"Workflow agent '{agent_config.name}' build_argv must return a list of strings.",
+            f"Task agent '{agent_config.name}' build_argv must return a list of strings.",
         )
 
     return argv

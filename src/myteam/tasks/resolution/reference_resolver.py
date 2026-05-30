@@ -2,39 +2,39 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..definition.models import WorkflowOutput
+from ..definition.models import TaskOutput
 
 
-def _resolve_reference_path(reference: str, prior_steps: WorkflowOutput) -> Any:
+def _resolve_reference_path(reference: str, prior_steps: TaskOutput) -> Any:
     if not reference.startswith("$") or reference.startswith("$$"):
-        raise ValueError(f"Invalid workflow reference: {reference!r}")
+        raise ValueError(f"Invalid task reference: {reference!r}")
 
     path = reference[1:]
     if not path:
-        raise ValueError("Workflow reference cannot be empty.")
+        raise ValueError("Task reference cannot be empty.")
 
     tokens = path.split(".")
     if any(not token for token in tokens):
-        raise ValueError(f"Workflow reference has an empty path segment: {reference!r}")
+        raise ValueError(f"Task reference has an empty path segment: {reference!r}")
 
     step_name = tokens[0]
     if step_name not in prior_steps:
-        raise ValueError(f"Workflow reference points to unknown step: {step_name}")
+        raise ValueError(f"Task reference points to unknown step: {step_name}")
 
     current: Any = prior_steps[step_name]
     for token in tokens[1:]:
         if isinstance(current, list):
-            raise ValueError(f"Workflow references do not support list traversal: {reference!r}")
+            raise ValueError(f"Task references do not support list traversal: {reference!r}")
         if not isinstance(current, dict):
-            raise ValueError(f"Workflow reference cannot traverse into non-mapping value: {reference!r}")
+            raise ValueError(f"Task reference cannot traverse into non-mapping value: {reference!r}")
         if token not in current:
-            raise ValueError(f"Workflow reference path not found: {reference!r}")
+            raise ValueError(f"Task reference path not found: {reference!r}")
         current = current[token]
 
     return current
 
 
-def resolve_references(value: Any, prior_steps: WorkflowOutput) -> Any:
+def resolve_references(value: Any, prior_steps: TaskOutput) -> Any:
     if isinstance(value, str):
         if value.startswith("$$"):
             return value[1:]

@@ -8,8 +8,8 @@ DEFAULT_LOCAL_ROOT = ".myteam"
 AGENTS_DIRNAME = DEFAULT_LOCAL_ROOT
 BUILTIN_ROOT_NAME = "builtins"
 ENCODING = "utf-8"
-SUPPORTED_WORKFLOW_SUFFIXES = {".py", ".md", ".yaml", ".yml"}
-WORKFLOW_SUFFIX_PRIORITY = (".py", ".md", ".yaml", ".yml")
+SUPPORTED_TASK_SUFFIXES = {".py", ".md", ".yaml", ".yml"}
+TASK_SUFFIX_PRIORITY = (".py", ".md", ".yaml", ".yml")
 NON_TASK_FILES = {"info.md", "load.py", "readme.md", "role.md", "skill.md", ".config.yaml"}
 
 
@@ -37,27 +37,27 @@ def role_dir(base: Path, role: str, prefix: str | Path | None = None) -> Path:
     return agents_root(base, prefix) / role
 
 
-def workflow_candidates(base: Path, workflow: str, prefix: str | Path | None = None) -> list[Path]:
+def task_candidates(base: Path, task: str, prefix: str | Path | None = None) -> list[Path]:
     root = agents_root(base, prefix)
-    requested_path = root.joinpath(*workflow.split("/"))
+    requested_path = root.joinpath(*task.split("/"))
     candidates: list[Path] = []
 
     if requested_path.suffix:
-        if requested_path.suffix not in SUPPORTED_WORKFLOW_SUFFIXES:
-            raise ValueError(f"Workflow '{workflow}' has unsupported extension '{requested_path.suffix}'.")
+        if requested_path.suffix not in SUPPORTED_TASK_SUFFIXES:
+            raise ValueError(f"Task '{task}' has unsupported extension '{requested_path.suffix}'.")
         if requested_path.is_file():
             candidates.append(requested_path)
         return candidates
 
-    for suffix in WORKFLOW_SUFFIX_PRIORITY:
+    for suffix in TASK_SUFFIX_PRIORITY:
         candidate = requested_path.with_suffix(suffix)
         if candidate.is_file():
             candidates.append(candidate)
     return candidates
 
 
-def workflow_path(base: Path, workflow: str, prefix: str | Path | None = None) -> Path:
-    candidates = workflow_candidates(base, workflow, prefix)
+def task_path(base: Path, task: str, prefix: str | Path | None = None) -> Path:
+    candidates = task_candidates(base, task, prefix)
     if not candidates:
-        raise ValueError(f"Workflow '{workflow}' not found.")
+        raise ValueError(f"Task '{task}' not found.")
     return candidates[0]

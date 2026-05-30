@@ -23,7 +23,7 @@ class StepDefinition(TypedDict, total=False):
     fork: bool
 
 
-WorkflowDefinition = dict[str, StepDefinition]
+TaskDefinition = dict[str, StepDefinition]
 
 
 class CompletedStepState(TypedDict, total=False):
@@ -33,10 +33,10 @@ class CompletedStepState(TypedDict, total=False):
     output: Any
 
 
-WorkflowOutput = dict[str, CompletedStepState]
+TaskOutput = dict[str, CompletedStepState]
 
 
-class ProjectWorkflowDefaults(BaseModel):
+class ProjectTaskDefaults(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     agent: Optional[str] = Field(default=None, min_length=1)
@@ -102,7 +102,7 @@ class StepDefinitionModel(BaseModel):
         return self
 
 
-class WorkflowDefinitionModel(RootModel[dict[str, StepDefinitionModel]]):
+class TaskDefinitionModel(RootModel[dict[str, StepDefinitionModel]]):
     model_config = ConfigDict(strict=True)
 
 
@@ -187,7 +187,7 @@ class UsageInfo:
 @dataclass
 class StepResult:
     """
-    Result of executing one workflow step.
+    Result of executing one task step.
 
     Status values:
     - ``completed``: the step produced a valid completion payload, the agent session
@@ -197,9 +197,9 @@ class StepResult:
     When ``status`` is ``failed``, ``error_type`` identifies the failure class:
     - ``reference_resolution``: the step input referenced missing or invalid prior step data.
     - ``argument_validation``: the step provided invalid executor arguments.
-    - ``agent_resolution``: the executor could not resolve the configured workflow agent.
-    - ``agent_argv``: the executor could not build a valid argv for the configured workflow agent.
-    - ``agent_launch``: the workflow agent process could not be started.
+    - ``agent_resolution``: the executor could not resolve the configured task agent.
+    - ``agent_argv``: the executor could not build a valid argv for the configured task agent.
+    - ``agent_launch``: the task agent process could not be started.
     - ``timeout``: the PTY session became inactive before the step completed.
     - ``completion_missing``: the agent session ended without producing a structured result.
     - ``output_validation``: the completion payload content did not satisfy the authored output template.
@@ -227,8 +227,8 @@ class StepResult:
 
 
 @dataclass
-class WorkflowRunResult:
+class TaskRunResult:
     status: str
-    output: WorkflowOutput | None = None
+    output: TaskOutput | None = None
     failed_step_name: str | None = None
     error_message: str | None = None

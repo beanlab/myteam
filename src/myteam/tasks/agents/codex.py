@@ -44,7 +44,7 @@ def build_argv(
     if model is not None:
         extras = ["--model", model, *extras]
     if not interactive and fork:
-        raise ValueError("Codex non-interactive workflow steps do not support fork.")
+        raise ValueError("Codex non-interactive task steps do not support fork.")
     if not interactive and session_id is not None:
         return [EXEC, "exec", "resume", session_id, *extras, prompt_text]
     if session_id is not None and fork:

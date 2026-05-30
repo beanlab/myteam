@@ -32,11 +32,11 @@ The task layer is further split so each file stays narrow:
 From outside the package, the flow is:
 
 1. `commands.start(...)` resolves a task file path and either executes a Python task script or loads YAML.
-2. `tasks.definition.load_workflow(...)` loads authored YAML and delegates schema checks to `tasks.validation`.
-   `tasks.definition.load_markdown_workflow(...)` loads markdown task frontmatter and body text.
+2. `tasks.definition.load_task(...)` loads authored YAML and delegates schema checks to `tasks.validation`.
+   `tasks.definition.load_markdown_task(...)` loads markdown task frontmatter and body text.
    If the frontmatter declares required input and the caller did not supply it, `commands.start(...)`
    reports an error before launching the task.
-3. `tasks.execution.run_workflow(...)` executes steps in authored order.
+3. `tasks.execution.run_task(...)` executes steps in authored order.
 4. For each step, `tasks.execution.run_agent(...)`:
    - receives the resolved step values from the engine
    - resolves the configured agent runtime config
@@ -49,7 +49,7 @@ From outside the package, the flow is:
    - a completed task output mapping
    - or a failed result naming the first failed step
 
-The path-resolution rule for `commands.start(...)` and `tasks.execution.run_named_workflow(...)`
+The path-resolution rule for `commands.start(...)` and `tasks.execution.run_named_task(...)`
 is:
 
 - if no extension is provided, prefer `.py`, then `.md`, then `.yaml`, then `.yml`
@@ -78,7 +78,7 @@ The terminal contract is:
 ### Package Root
 
 - [__init__.py](__init__.py)
-  Exposes the main public task entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
+  Exposes the main public task entrypoints: `run_agent`, `load_task`, `load_markdown_task`, and `run_task`.
 
 - [definition/models.py](definition/models.py)
   Owns shared task types: authored step definitions, completed-step state, run results, and the pydantic models

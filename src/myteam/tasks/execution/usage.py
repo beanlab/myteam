@@ -16,7 +16,7 @@ def resolve_usage_tracking(
         return (
             None,
             "no_get_usage_info_implemented",
-            "workflow agent config does not implement get_usage_info",
+            "task agent config does not implement get_usage_info",
         )
 
     try:

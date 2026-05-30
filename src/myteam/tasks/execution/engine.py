@@ -10,32 +10,32 @@ from ..definition.models import (
     CompletedStepState,
     StepDefinition,
     StepResult,
-    WorkflowDefinition,
-    WorkflowOutput,
-    WorkflowRunResult,
+    TaskDefinition,
+    TaskOutput,
+    TaskRunResult,
 )
 from ..resolution.reference_resolver import resolve_references
 from .steps import run_agent
 
 
-def run_workflow(
-        workflow: WorkflowDefinition,
+def run_task(
+        task_definition: TaskDefinition,
         *,
         logger: Callable[[str], None] | None = None,
-) -> WorkflowRunResult:
+) -> TaskRunResult:
     """
-    Execute a workflow in authored order and stop at the first failing step.
+    Execute a task in authored order and stop at the first failing step.
 
     Pseudocode:
     1. Start with an empty completed-step output mapping.
     2. For each authored step, execute it with the accumulated prior step state.
     3. If a step fails, stop immediately and report the failing step name.
     4. If a step succeeds, store its completed step state under the authored step name.
-    5. After all steps succeed, return the final workflow output mapping.
+    5. After all steps succeed, return the final task output mapping.
     """
-    completed_steps: WorkflowOutput = {}
+    completed_steps: TaskOutput = {}
 
-    for step_name, step_definition in workflow.items():
+    for step_name, step_definition in task_definition.items():
         if logger is not None:
             logger(f"Starting step '{step_name}'")
         try:
@@ -46,7 +46,7 @@ def run_workflow(
         except ValueError as exc:
             if logger is not None:
                 logger(f"Step '{step_name}' failed: {exc}")
-            return WorkflowRunResult(
+            return TaskRunResult(
                 status="failed",
                 output=completed_steps or None,
                 failed_step_name=step_name,
@@ -70,7 +70,7 @@ def run_workflow(
                     logger(f"Step '{step_name}' failed: {step_result.error_message}")
                 else:
                     logger(f"Step '{step_name}' failed.")
-            return WorkflowRunResult(
+            return TaskRunResult(
                 status="failed",
                 output=completed_steps or None,
                 failed_step_name=step_name,
@@ -85,7 +85,7 @@ def run_workflow(
             logger(f"Completed step '{step_name}'")
             logger(yaml.safe_dump({"step_name": step_name, "output": step_result.output}, sort_keys=False).rstrip())
 
-    return WorkflowRunResult(status="completed", output=completed_steps)
+    return TaskRunResult(status="completed", output=completed_steps)
 
 
 def _build_completed_step_state(
@@ -94,7 +94,7 @@ def _build_completed_step_state(
         step_result: StepResult,
 ) -> CompletedStepState:
     """
-    Build the stored step state exposed to later workflow references.
+    Build the stored step state exposed to later task references.
 
     Pseudocode:
     1. Preserve the authored prompt.
@@ -117,7 +117,7 @@ def _build_completed_step_state(
 def _resolve_step_definition(
         *,
         step_definition: StepDefinition,
-        prior_steps: WorkflowOutput,
+        prior_steps: TaskOutput,
 ) -> StepDefinition:
     resolved_step_definition = deepcopy(step_definition)
     resolved_step_definition["agent"] = resolved_step_definition.get("agent", DEFAULT_AGENT)
@@ -131,7 +131,7 @@ def _resolve_step_definition(
 def _resolve_step_input(
         *,
         step_definition: StepDefinition,
-        prior_steps: WorkflowOutput,
+        prior_steps: TaskOutput,
 ):
     if "input" not in step_definition:
         return None

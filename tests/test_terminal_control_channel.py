@@ -23,7 +23,7 @@ def test_control_channel_accepts_child_task_request():
 
 def test_control_channel_rejects_invalid_token():
     with ControlChannel() as channel:
-        with pytest.raises(ValueError, match="Invalid workflow control token"):
+        with pytest.raises(ValueError, match="Invalid task control token"):
             submit_child_task_request(
                 "demo",
                 socket_path=channel.socket_path,

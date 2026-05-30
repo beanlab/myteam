@@ -1,18 +1,18 @@
-from .config import CONFIG_DIRNAME, CONFIG_FILENAME, load_project_workflow_defaults
+from .config import CONFIG_DIRNAME, CONFIG_FILENAME, load_project_task_defaults
 from .models import (
     AgentConfig,
     CompletedStepState,
     PreparedStep,
-    ProjectWorkflowDefaults,
+    ProjectTaskDefaults,
     RunState,
     StepDefinition,
     StepResult,
     UsageInfo,
-    WorkflowDefinition,
-    WorkflowOutput,
-    WorkflowRunResult,
+    TaskDefinition,
+    TaskOutput,
+    TaskRunResult,
 )
-from .parser import load_workflow
+from .parser import load_markdown_task, load_task
 
 __all__ = [
     "AgentConfig",
@@ -20,14 +20,15 @@ __all__ = [
     "CONFIG_DIRNAME",
     "CONFIG_FILENAME",
     "PreparedStep",
-    "ProjectWorkflowDefaults",
+    "ProjectTaskDefaults",
     "RunState",
     "StepDefinition",
     "StepResult",
     "UsageInfo",
-    "WorkflowDefinition",
-    "WorkflowOutput",
-    "WorkflowRunResult",
-    "load_project_workflow_defaults",
-    "load_workflow",
+    "TaskDefinition",
+    "TaskOutput",
+    "TaskRunResult",
+    "load_markdown_task",
+    "load_project_task_defaults",
+    "load_task",
 ]
