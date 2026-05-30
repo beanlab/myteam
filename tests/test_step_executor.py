@@ -462,6 +462,151 @@ def test_execute_step_returns_failed_result_when_mapping_output_is_not_mapping(m
     assert "output.summary must be a mapping" in (result.error_message or "")
 
 
+def test_execute_step_accepts_sequence_output_matching_item_template(monkeypatch):
+    def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
+        return {
+            "name": "fake-agent",
+            "argv": ["fake-agent"],
+            "exit_text": "/quit\n",
+        }
+
+    chunk = (
+        b'{"status":"OBJECTIVE_COMPLETE","content":{"items":['
+        b'{"title":"one","details":{"status":"ready"}},'
+        b'{"title":"two","details":{"status":"done"}}'
+        b']}}\n'
+    )
+
+    def fake_run_pty_session(
+        argv: list[str],
+        initial_input: str | None,
+        on_output,
+        *,
+        inactivity_timeout_seconds: int,
+        graceful_shutdown_timeout_seconds: int,
+    ) -> PtyRunResult:
+        on_output(chunk)
+        return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
+
+    monkeypatch.setattr("myteam.workflow.step_executor.get_agent_config", fake_get_agent_config)
+    monkeypatch.setattr("myteam.workflow.step_executor.run_pty_session", fake_run_pty_session)
+
+    result = execute_step(
+        "draft",
+        {
+            "prompt": "Write a summary.",
+            "output": {
+                "items": [
+                    {
+                        "title": "item title",
+                        "details": {
+                            "status": "item status",
+                        },
+                    }
+                ],
+            },
+        },
+        prior_steps={},
+    )
+
+    assert result.status == "completed"
+    assert result.output == {
+        "items": [
+            {"title": "one", "details": {"status": "ready"}},
+            {"title": "two", "details": {"status": "done"}},
+        ]
+    }
+
+
+def test_execute_step_returns_failed_result_when_sequence_output_is_not_sequence(monkeypatch):
+    def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
+        return {
+            "name": "fake-agent",
+            "argv": ["fake-agent"],
+            "exit_text": "/quit\n",
+        }
+
+    chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"items":{"title":"one"}}}\n'
+
+    def fake_run_pty_session(
+        argv: list[str],
+        initial_input: str | None,
+        on_output,
+        *,
+        inactivity_timeout_seconds: int,
+        graceful_shutdown_timeout_seconds: int,
+    ) -> PtyRunResult:
+        on_output(chunk)
+        return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
+
+    monkeypatch.setattr("myteam.workflow.step_executor.get_agent_config", fake_get_agent_config)
+    monkeypatch.setattr("myteam.workflow.step_executor.run_pty_session", fake_run_pty_session)
+
+    result = execute_step(
+        "draft",
+        {
+            "prompt": "Write a summary.",
+            "output": {
+                "items": [
+                    {
+                        "title": "item title",
+                    }
+                ],
+            },
+        },
+        prior_steps={},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "output_validation"
+    assert "output.items must be a sequence" in (result.error_message or "")
+
+
+def test_execute_step_returns_failed_result_when_sequence_item_key_is_missing(monkeypatch):
+    def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
+        return {
+            "name": "fake-agent",
+            "argv": ["fake-agent"],
+            "exit_text": "/quit\n",
+        }
+
+    chunk = b'{"status":"OBJECTIVE_COMPLETE","content":{"items":[{"title":"one"}]}}\n'
+
+    def fake_run_pty_session(
+        argv: list[str],
+        initial_input: str | None,
+        on_output,
+        *,
+        inactivity_timeout_seconds: int,
+        graceful_shutdown_timeout_seconds: int,
+    ) -> PtyRunResult:
+        on_output(chunk)
+        return PtyRunResult(exit_code=0, transcript=chunk.decode("utf-8"))
+
+    monkeypatch.setattr("myteam.workflow.step_executor.get_agent_config", fake_get_agent_config)
+    monkeypatch.setattr("myteam.workflow.step_executor.run_pty_session", fake_run_pty_session)
+
+    result = execute_step(
+        "draft",
+        {
+            "prompt": "Write a summary.",
+            "output": {
+                "items": [
+                    {
+                        "title": "item title",
+                        "body": "item body",
+                    }
+                ],
+            },
+        },
+        prior_steps={},
+    )
+
+    assert result.status == "failed"
+    assert result.error_type == "output_validation"
+    assert "output.items[0] is missing required key: body" in (result.error_message or "")
+
+
 def test_execute_step_returns_failed_result_when_agent_fails_after_valid_output(monkeypatch):
     def fake_get_agent_config(_name: str | None) -> dict[str, Any]:
         return {

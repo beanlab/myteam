@@ -280,6 +280,12 @@ Authoring rules that matter at the interface:
 - If `agent` is omitted, the default shipped agent is used.
 - The `output` field describes the required structure of the step's final result.
 - Nested objects in `output` require the same nested keys to appear in the final result.
+- Sequence values in `output` describe list-valued fields in the final result.
+- An empty sequence template only requires the final value to be a list.
+- A sequence template with one item applies that item as the structural template for every returned
+  list element.
+- Sequence templates with more than one item are invalid because list templates describe element
+  shape, not exact list length.
 - Output-template leaf values are descriptive placeholders and do not constrain the final JSON value type.
 - Workflow files are validated before execution begins.
 

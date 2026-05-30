@@ -33,13 +33,24 @@ def _validate_output_template(value: Any, *, context: str) -> None:
     if not isinstance(value, dict):
         raise ValueError(f"{context} must be a mapping.")
 
+    _validate_output_template_node(value, context=context)
+
+
+def _validate_output_template_node(value: Any, *, context: str) -> None:
+    if isinstance(value, list):
+        if len(value) > 1:
+            raise ValueError(f"{context} must contain at most one template item.")
+        for index, nested in enumerate(value):
+            _validate_output_template_node(nested, context=f"{context}[{index}]")
+        return
+
+    if not isinstance(value, dict):
+        return
+
     for key, nested in value.items():
         if not _is_identifier_key(key):
             raise ValueError(f"{context} contains non-identifier key: {key!r}")
-        if isinstance(nested, list):
-            raise ValueError(f"{context}.{key} must not contain a list.")
-        if isinstance(nested, dict):
-            _validate_output_template(nested, context=f"{context}.{key}")
+        _validate_output_template_node(nested, context=f"{context}.{key}")
 
 
 def _validate_step_definition(step_name: str, definition: Any) -> StepDefinition:

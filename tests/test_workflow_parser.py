@@ -113,7 +113,7 @@ def test_load_workflow_normalizes_missing_input_to_null(tmp_path: Path):
     assert workflow["step1"]["input"] is None
 
 
-def test_load_workflow_rejects_lists_in_output_templates(tmp_path: Path):
+def test_load_workflow_accepts_sequence_output_templates(tmp_path: Path):
     workflow_file = tmp_path / "lists.yaml"
     workflow_file.write_text(
         "step1:\n"
@@ -124,5 +124,22 @@ def test_load_workflow_rejects_lists_in_output_templates(tmp_path: Path):
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match=r"Workflow step 'step1'\.output\.items must not contain a list\."):
+    workflow = load_workflow(workflow_file)
+
+    assert workflow["step1"]["output"]["items"] == [{"title": "item title"}]
+
+
+def test_load_workflow_rejects_multi_item_sequence_output_templates(tmp_path: Path):
+    workflow_file = tmp_path / "multi-item-list.yaml"
+    workflow_file.write_text(
+        "step1:\n"
+        "  prompt: hello\n"
+        "  output:\n"
+        "    items:\n"
+        "      - title: first item title\n"
+        "      - title: second item title\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"Workflow step 'step1'\.output\.items must contain at most one template item\."):
         load_workflow(workflow_file)

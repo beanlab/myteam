@@ -403,6 +403,7 @@ Notes:
 
 - step names should use identifier-style names such as `gather_context`
 - `$step_name.output...` references pull data from earlier completed steps
+- output templates may use one-item YAML sequences to describe list-valued results
 - `myteam start` stops at the first failing step and does not continue to later steps
 - `--verbose` writes workflow lifecycle logs to standard error
 

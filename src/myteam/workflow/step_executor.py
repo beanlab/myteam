@@ -275,8 +275,18 @@ def _dump_yaml_block(value: Any) -> str:
 
 
 def _validate_output_node(template_node: Any, output_node: Any, *, path: str) -> None:
+    if isinstance(template_node, list):
+        if not isinstance(output_node, list):
+            raise ValueError(f"{path} must be a sequence.")
+        if template_node:
+            item_template = template_node[0]
+            for index, item in enumerate(output_node):
+                _validate_output_node(item_template, item, path=f"{path}[{index}]")
+        return
+
     if not isinstance(template_node, dict):
         return
+
     if not isinstance(output_node, dict):
         raise ValueError(f"{path} must be a mapping.")
 

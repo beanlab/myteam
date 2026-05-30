@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.2.12
+
+- Workflow output templates now support one-item YAML sequences to describe list-valued results.
+- Workflow execution validates returned list items against the authored sequence item template.
+
 ## 0.2.11
 
 - *Note: the workflows feature is experimental and may change in the future*
