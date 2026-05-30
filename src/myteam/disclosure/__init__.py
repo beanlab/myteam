@@ -556,28 +556,12 @@ def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
     _print_info("Team Members", folder, base_dir, ignore, is_role_dir, lambda role_dir: _get_folder_info(role_dir, "role"))
 
 
-def list_skills(
-    folder: Path,
-    base_dir: Path,
-    ignore: list[str],
-):
-    _print_named_info("Skills", _collect_skill_entries(folder, base_dir, ignore, include_info=False))
-
-
 def get_skills(folder: Path, base_dir: Path, ignore: list[str]):
     _print_named_info("Skills", _collect_skill_entries(folder, base_dir, ignore, include_info=True))
 
 
 def _is_task_file(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() in SUPPORTED_TASK_SUFFIXES and path.name.lower() not in NON_TASK_FILES
-
-
-def list_tasks(
-    folder: Path,
-    base_dir: Path,
-    ignore: list[str],
-):
-    _print_named_info("Tasks", _collect_task_entries(folder, base_dir, ignore, include_info=False))
 
 
 def get_tasks(folder: Path, base_dir: Path, ignore: list[str]):
