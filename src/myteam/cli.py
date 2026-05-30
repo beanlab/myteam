@@ -25,34 +25,37 @@ from .commands import (
     update_roster,
     version,
 )
-from .workflow.execution.cli_commands import (
-    workflow_result as workflow_result_command,
-    workflow_start as workflow_start_command,
+from .tasks.execution.cli_commands import (
+    task_result as task_result_command,
+    task_start as task_start_command,
 )
 
 
-def _run_workflow_start_cli(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="myteam workflow-start")
-    parser.add_argument("workflow")
-    parser.add_argument("--session-nonce", required=True)
-    parser.add_argument("--json")
-    parser.add_argument("--text")
-    args = parser.parse_args(argv)
-    workflow_start_command(
-        args.workflow,
-        json=args.json,
-        text=args.text,
-        session_nonce=args.session_nonce,
-    )
+def _run_task_cli(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(prog="myteam task")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
+    start_parser = subparsers.add_parser("start")
+    start_parser.add_argument("task")
+    start_parser.add_argument("--session-nonce", required=True)
+    start_parser.add_argument("--json")
+    start_parser.add_argument("--text")
 
-def _run_workflow_result_cli(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(prog="myteam workflow-result")
-    parser.add_argument("--session-nonce", required=True)
-    parser.add_argument("--json")
-    parser.add_argument("--text")
+    result_parser = subparsers.add_parser("result")
+    result_parser.add_argument("--session-nonce", required=True)
+    result_parser.add_argument("--json")
+    result_parser.add_argument("--text")
+
     args = parser.parse_args(argv)
-    workflow_result_command(
+    if args.command == "start":
+        task_start_command(
+            args.task,
+            json=args.json,
+            text=args.text,
+            session_nonce=args.session_nonce,
+        )
+        return
+    task_result_command(
         json=args.json,
         text=args.text,
         session_nonce=args.session_nonce,
@@ -61,11 +64,8 @@ def _run_workflow_result_cli(argv: list[str]) -> None:
 
 def main(argv: list[str] | None = None):
     args = sys.argv[1:] if argv is None else list(argv)
-    if args[:1] == ["workflow-start"]:
-        _run_workflow_start_cli(args[1:])
-        return 0
-    if args[:1] == ["workflow-result"]:
-        _run_workflow_result_cli(args[1:])
+    if args[:1] == ["task"]:
+        _run_task_cli(args[1:])
         return 0
 
     commands = {
@@ -91,8 +91,6 @@ def main(argv: list[str] | None = None):
         "update": update_roster,
         "list": list_available_rosters,
         "start": start,
-        "workflow-result": workflow_result_command,
-        "workflow-start": workflow_start_command,
         "changelog": changelog,
         "--version": version,
     }

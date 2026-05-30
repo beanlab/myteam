@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.agents.codex import build_argv as build_codex_argv
-from myteam.workflow.agents.codex import get_usage_info as get_codex_usage_info
-from myteam.workflow.agents.codex import get_session_info as get_codex_session_info
-from myteam.workflow.agents.pi import build_argv as build_pi_argv
-from myteam.workflow.agents.pi import get_usage_info as get_pi_usage_info
-from myteam.workflow.agents.pi import get_session_info as get_pi_session_info
-from myteam.workflow.agents.agent_utils import estimate_usage_cost
-from myteam.workflow.agents.runtime import AgentSessionContext
-from myteam.workflow.agents.runtime import resolve_agent_runtime_config
-from myteam.workflow.definition.parser import load_workflow
+from myteam.tasks.agents.codex import build_argv as build_codex_argv
+from myteam.tasks.agents.codex import get_usage_info as get_codex_usage_info
+from myteam.tasks.agents.codex import get_session_info as get_codex_session_info
+from myteam.tasks.agents.pi import build_argv as build_pi_argv
+from myteam.tasks.agents.pi import get_usage_info as get_pi_usage_info
+from myteam.tasks.agents.pi import get_session_info as get_pi_session_info
+from myteam.tasks.agents.agent_utils import estimate_usage_cost
+from myteam.tasks.agents.runtime import AgentSessionContext
+from myteam.tasks.agents.runtime import resolve_agent_runtime_config
+from myteam.tasks.definition.parser import load_workflow
 
 
 def agent_session_context(
@@ -47,7 +47,7 @@ def test_resolve_uses_packaged_default_without_creating_project_config(tmp_path:
     assert config.exec == "codex"
     assert not (tmp_path / ".myteam" / ".config").exists()
     assert any("not found" in line for line in logs)
-    assert any("packaged workflow agent config" in line for line in logs)
+    assert any("packaged task agent config" in line for line in logs)
 
 
 def test_resolve_uses_valid_local_override(tmp_path: Path, monkeypatch):
@@ -224,13 +224,13 @@ def test_resolve_falls_back_when_local_override_is_invalid(tmp_path: Path, monke
     assert config.name == "codex"
     assert config.exec == "codex"
     assert any("unusable" in line for line in logs)
-    assert any("packaged workflow agent config" in line for line in logs)
+    assert any("packaged task agent config" in line for line in logs)
 
 
 def test_resolve_rejects_unknown_agent(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(KeyError, match="Unknown workflow agent: missing"):
+    with pytest.raises(KeyError, match="Unknown task agent: missing"):
         resolve_agent_runtime_config(
             "missing",
             project_root=tmp_path,

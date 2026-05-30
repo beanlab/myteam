@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.workflow.resolution.session_resolution import resolve_session_id
+from myteam.tasks.resolution.session_resolution import resolve_session_id
 
 
 class _DummyAgentConfig:

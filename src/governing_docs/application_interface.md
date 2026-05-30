@@ -287,7 +287,7 @@ User-visible result:
   project-local tree commands.
 - Workflow execution mirrors the child session's terminal output to standard output as the workflow
   runs and reports command failures on standard error.
-- Successful completion does not currently emit an additional final workflow-result payload on
+- Successful completion does not currently emit an additional final task result payload on
   standard output.
 
 Failure conditions that matter at the interface:
@@ -300,31 +300,31 @@ Failure conditions that matter at the interface:
   steps, and exits with an error.
 - If a Python workflow exits non-zero, `myteam` exits with the same non-zero status.
 
-### `myteam workflow-start <workflow> --session-nonce <nonce> [--json <json> | --text <text>]`
+### `myteam task start <task> --session-nonce <nonce> [--json <json> | --text <text>]`
 
-Starts a nested workflow request for the active step.
+Starts a nested task request for the active step.
 
 Inputs:
 
-- `<workflow>` is the workflow name passed to the child workflow runner.
-- `--session-nonce <nonce>` identifies the active workflow step to submit to.
+- `<task>` is the task name passed to the child task runner.
+- `--session-nonce <nonce>` identifies the active task step to submit to.
 - `--json <json>` passes the payload directly as JSON text.
 - `--text <text>` wraps plain text as `{"text": <text>}`.
 - If neither flag is provided, the command reads JSON from standard input.
 - This command does not resolve filesystem paths itself. It submits the request to the active
-  workflow step, and the parent workflow runner resolves the requested workflow name.
+  task step, and the parent task runner resolves the requested task name.
 
 Expected outcome on success:
 
-- Resolves the workflow control socket path and token from the active session nonce.
+- Resolves the task control socket path and token from the active session nonce.
 - Validates the provided payload input.
-- Sends the workflow request once to the parent workflow runner for the active step.
+- Sends the task request once to the parent task runner for the active step.
 - Prints a short confirmation message.
 
 User-visible result:
 
-- This command is primarily intended for workflow agents, not direct human operation.
-- Workflow prompts can instruct the agent to call `myteam workflow-start` exactly once when it needs to spawn a child workflow.
+- This command is primarily intended for task agents, not direct human operation.
+- Task prompts can instruct the agent to call `myteam task start` exactly once when it needs to spawn a child task.
 
 Failure conditions that matter at the interface:
 
@@ -335,7 +335,7 @@ Failure conditions that matter at the interface:
 - If the parent runner rejects the payload or acknowledgement is invalid, the command exits with an
   error.
 
-### `myteam workflow-result --session-nonce <nonce> [--json <json> | --text <text>]`
+### `myteam task result --session-nonce <nonce> [--json <json> | --text <text>]`
 
 Submits the final structured result for the current workflow step.
 
@@ -356,7 +356,7 @@ Expected outcome on success:
 User-visible result:
 
 - This command is primarily intended for workflow agents, not direct human operation.
-- Workflow prompts can instruct the agent to call `myteam workflow-result` exactly once when the
+- Task prompts can instruct the agent to call `myteam task result` exactly once when the
   step is complete.
 
 Failure conditions that matter at the interface:
@@ -440,7 +440,7 @@ Authoring rules that matter at the interface:
 - Nested objects in `output` require the same nested keys to appear in the final result.
 - Output-template leaf values are descriptive placeholders and do not constrain the final JSON value type.
 - Workflow files are validated before execution begins.
-- The step agent must report the final structured result through `myteam workflow-result` rather
+- The step agent must report the final structured result through `myteam task result` rather
   than terminal markers or free-form prose.
 
 ### Python Workflow Execution

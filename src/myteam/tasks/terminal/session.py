@@ -6,7 +6,7 @@ from pathlib import Path
 import threading
 from typing import Any
 
-from .control_channel import ChildWorkflowRequest, ControlChannel
+from .control_channel import ChildTaskRequest, ControlChannel
 from .pty_session import PtySession
 from .recording import TerminalRecording
 from .result_channel import ResultChannel
@@ -17,7 +17,7 @@ class TerminalSessionResult:
     exit_code: int
     transcript: str
     payload: Any | None
-    control_request: ChildWorkflowRequest | None = None
+    control_request: ChildTaskRequest | None = None
 
 
 def run_terminal_session(

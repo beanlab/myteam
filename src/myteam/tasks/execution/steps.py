@@ -24,7 +24,7 @@ from .usage import (
     resolve_usage_tracking,
 )
 from ..terminal.session import TerminalSessionResult, run_terminal_session
-from ..terminal.control_channel import ChildWorkflowRequest
+from ..terminal.control_channel import ChildTaskRequest
 
 
 def _validate_output_node(template: Any, value: Any, *, path: str) -> None:
@@ -154,7 +154,7 @@ class AgentContext:
             )
             session_result = self._run_prepared_step(state=state, prepared=prepared)
             while session_result.control_request is not None:
-                prepared = self._handle_child_workflow_request(
+                prepared = self._handle_child_task_request(
                     state=state,
                     prepared=prepared,
                     request=session_result.control_request,
@@ -287,12 +287,12 @@ class AgentContext:
             kwargs["session_nonce"] = session_nonce
         return kwargs
 
-    def _handle_child_workflow_request(
+    def _handle_child_task_request(
         self,
         *,
         state: RunState,
         prepared: PreparedStep,
-        request: ChildWorkflowRequest,
+        request: ChildTaskRequest,
         original_output_template: dict[str, Any],
     ) -> PreparedStep:
         parent_session_id, session_path = resolve_session_id(
@@ -307,7 +307,7 @@ class AgentContext:
         from .runner import run_named_workflow
 
         try:
-            child_result = run_named_workflow(request.workflow, input=request.input)
+            child_result = run_named_workflow(request.task, input=request.input)
         except Exception as exc:
             child_payload = {
                 "status": "failed",
@@ -322,7 +322,7 @@ class AgentContext:
             }
 
         resume_prompt = build_child_resume_prompt(
-            child_workflow=request.workflow,
+            child_workflow=request.task,
             child_result=child_payload,
             skills=prepared.skills,
             tasks=prepared.tasks,

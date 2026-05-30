@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from myteam.paths import workflow_candidates
-from myteam.workflow.definition.models import WorkflowRunResult
-from myteam.workflow.definition.models import StepResult
+from myteam.tasks.definition.models import WorkflowRunResult
+from myteam.tasks.definition.models import StepResult
 
 
 def test_start_runs_workflow_from_yaml_file(run_myteam_inprocess, initialized_project: Path, monkeypatch):

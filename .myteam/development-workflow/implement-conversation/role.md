@@ -6,7 +6,7 @@ description: Approval-gated implementation conversation.
 1. Read the design and scenarios outlined in the issue body to understand the feature.
 2. Understand the codebase, and make a plan for implementation utilizing the principles below.
 3. Present it to the user for review; you must wait for explicit approval before calling the
-`workflow-result` command.
+`task result` command.
 4. Make changes as needed, and again wait for explicit approval.
 
 Issue context: `gh issue view <number-or-url> --json number,title,body,comments`; body is durable state, comments are context.

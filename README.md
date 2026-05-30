@@ -356,34 +356,34 @@ myteam start release/checklist --prefix .agents
 myteam start dev/frontend --verbose
 ```
 
-### `myteam workflow-result [--json <json> | --text <text>]`
+### `myteam task result [--json <json> | --text <text>]`
 
-Submits the structured result for the current workflow step.
+Submits the structured result for the current task step.
 
-This command is primarily agent-facing. Workflow prompts use it to report a final payload back to
-the parent workflow runner over the private result channel for that step.
+This command is primarily agent-facing. Task prompts use it to report a final payload back to
+the parent task runner over the private result channel for that step.
 
 Examples:
 
 ```bash
-myteam workflow-result --json '{"summary":"done"}'
-myteam workflow-result --text "done"
-printf '{"summary":"done"}\n' | myteam workflow-result
+myteam task result --json '{"summary":"done"}'
+myteam task result --text "done"
+printf '{"summary":"done"}\n' | myteam task result
 ```
 
-### `myteam workflow-start <workflow> --session-nonce <nonce> [--json <json> | --text <text>]`
+### `myteam task start <task> --session-nonce <nonce> [--json <json> | --text <text>]`
 
-Requests that the current workflow step start a child workflow by name.
+Requests that the current task step start a child task by name.
 
-This command is primarily agent-facing. Workflow prompts use it to ask the parent runner to launch
-another workflow over the private control channel for that step.
+This command is primarily agent-facing. Task prompts use it to ask the parent runner to launch
+another task over the private control channel for that step.
 
 Examples:
 
 ```bash
-myteam workflow-start follow-up --session-nonce abc123 --json '{"task":"review"}'
-myteam workflow-start follow-up --session-nonce abc123 --text "review"
-printf '{"task":"review"}\n' | myteam workflow-start follow-up --session-nonce abc123
+myteam task start follow-up --session-nonce abc123 --json '{"task":"review"}'
+myteam task start follow-up --session-nonce abc123 --text "review"
+printf '{"task":"review"}\n' | myteam task start follow-up --session-nonce abc123
 ```
 
 ### `myteam changelog`
@@ -496,8 +496,8 @@ Notes:
 
 - step names should use identifier-style names such as `gather_context`
 - `$step_name.output...` references pull data from earlier completed steps
-- the step agent reports its final structured result by calling `myteam workflow-result`
-- the step agent can request a nested workflow by calling `myteam workflow-start`
+- the step agent reports its final structured result by calling `myteam task result`
+- the step agent can request a nested task by calling `myteam task start`
 - `myteam start` stops at the first failing step and does not continue to later steps
 - `--verbose` writes workflow lifecycle logs to standard error
 - successful `myteam start` runs currently mirror workflow session terminal output; they do not yet

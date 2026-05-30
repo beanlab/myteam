@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from myteam.workflow.terminal.result_channel import ResultChannel
+from myteam.tasks.terminal.result_channel import ResultChannel
 
 
 def test_workflow_result_reads_json_from_stdin(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -11,10 +11,10 @@ def test_workflow_result_reads_json_from_stdin(run_myteam_inprocess, initialized
     with ResultChannel(session_nonce=nonce) as channel:
         monkeypatch.setattr("sys.stdin.read", lambda: '{"answer":"done"}')
 
-        result = run_myteam_inprocess(initialized_project, "workflow-result", "--session-nonce", nonce)
+        result = run_myteam_inprocess(initialized_project, "task", "result", "--session-nonce", nonce)
 
         assert result.exit_code == 0
-        assert "Workflow result accepted." in result.stdout
+        assert "Task result accepted." in result.stdout
         assert channel.wait(timeout=1) == {"answer": "done"}
 
 
@@ -30,7 +30,7 @@ def test_workflow_result_reports_output_format_mismatch(run_myteam_inprocess, in
     with ResultChannel(session_nonce=nonce, payload_validator=validate) as channel:
         monkeypatch.setattr("sys.stdin.read", lambda: '{"answer":"done"}')
 
-        result = run_myteam_inprocess(initialized_project, "workflow-result", "--session-nonce", nonce)
+        result = run_myteam_inprocess(initialized_project, "task", "result", "--session-nonce", nonce)
 
         assert result.exit_code == 1
         assert "output format mismatch" in result.stderr
@@ -39,7 +39,7 @@ def test_workflow_result_reports_output_format_mismatch(run_myteam_inprocess, in
 
 
 def test_workflow_result_help_shows_session_nonce_flag(run_myteam_inprocess, initialized_project: Path):
-    result = run_myteam_inprocess(initialized_project, "workflow-result", "--help")
+    result = run_myteam_inprocess(initialized_project, "task", "result", "--help")
 
     assert result.exit_code == 0
     assert "--session-nonce" in result.stdout

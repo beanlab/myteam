@@ -15,8 +15,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from myteam.workflow import run_agent
-from myteam.workflow.models import StepResult
+from myteam.tasks import StepResult, run_agent
 
 WORKFLOW_AGENT = "codex"
 
@@ -217,7 +216,7 @@ def backlog_step(feature_request: str | None = None) -> dict[str, Any]:
 def design_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="""Your role is 'development-workflow/design-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
+        prompt="""Your role is 'development-workflow/design-conversation'. You **MUST** obtain explicit approval from the user before calling the task result command.""",
         output=planning_conversation_output(
             next_step="design-conversation or design-artifact",
         ),
@@ -239,7 +238,7 @@ def design_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
 def scenario_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="""Your role is 'development-workflow/scenario-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
+        prompt="""Your role is 'development-workflow/scenario-conversation'. You **MUST** obtain explicit approval from the user before calling the task result command.""",
         output=planning_conversation_output(
             next_step="scenario_conversation or scenario_artifact",
         ),
@@ -266,7 +265,7 @@ def scenario_artifact_step(state: dict[str, Any]) -> dict[str, Any]:
 def implement_conversation_step(state: dict[str, Any]) -> dict[str, Any]:
     return run_step(
         input=with_issue_sections(state),
-        prompt="""Your role is 'development-workflow/implement-conversation'. You **MUST** obtain explicit approval from the user before calling the workflow-result command.""",
+        prompt="""Your role is 'development-workflow/implement-conversation'. You **MUST** obtain explicit approval from the user before calling the task result command.""",
         output=planning_conversation_output(
             next_step="implement-conversation or implement",
         ),

@@ -1,13 +1,24 @@
 """
-This is a template for creating a workflow definition.
-Current scaffolding allows for starting an agent with included usage and cost tracking.
+name: ""
+description: "Unimplemented task"
+# Optional task settings (will default to settings in .config.yaml)
+agent:
+model:
+output:
+input:
+interactive:
+session_id:
+fork:
+extra_args:
+usage_logging:
+timeout:
 """
 
-from myteam.workflow import AgentContext
+from myteam.tasks import AgentContext
 
 
 def main():
-    raise NotImplementedError(f"Workflow '{__name__}' has not been implemented yet.")
+    raise NotImplementedError(f"Task '{__name__}' has not been implemented yet.")
     with AgentContext(usage_logging="summary") as ctx:
         result = ctx.run_agent(
             prompt="Say 'Ready'",

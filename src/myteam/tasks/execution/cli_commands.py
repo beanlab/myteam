@@ -5,12 +5,12 @@ import json
 import sys
 from typing import Any, Callable
 
-from ..terminal.control_channel import submit_child_workflow_request
+from ..terminal.control_channel import submit_child_task_request
 from ..terminal.result_channel import submit_result_payload
 
 
-def workflow_start(
-    workflow: str,
+def task_start(
+    task: str,
     json: Any | None = None,
     text: str | None = None,
     session_nonce: str | None = None,
@@ -18,13 +18,13 @@ def workflow_start(
     raise SystemExit(
         _run_submission(
             payload_reader=lambda: _read_payload(json_text=json, text=text, allow_empty_stdin=True),
-            submitter=lambda payload: submit_child_workflow_request(workflow, payload, session_nonce=session_nonce),
-            success_message="Workflow start request accepted.",
+            submitter=lambda payload: submit_child_task_request(task, payload, session_nonce=session_nonce),
+            success_message="Task start request accepted.",
         )
     )
 
 
-def workflow_result(
+def task_result(
     json: str | None = None,
     text: str | None = None,
     session_nonce: str | None = None,
@@ -33,17 +33,17 @@ def workflow_result(
         _run_submission(
             payload_reader=lambda: _read_payload(json_text=json, text=text, allow_empty_stdin=False),
             submitter=lambda payload: submit_result_payload(payload, session_nonce=session_nonce),
-            success_message="Workflow result accepted.",
+            success_message="Task result accepted.",
         )
     )
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="myteam workflow")
+    parser = argparse.ArgumentParser(prog="myteam task")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start_parser = subparsers.add_parser("start")
-    start_parser.add_argument("workflow")
+    start_parser.add_argument("task")
     start_parser.add_argument("--session-nonce", required=True)
     start_parser.add_argument("--json")
     start_parser.add_argument("--text")
@@ -61,12 +61,12 @@ def main(argv: list[str] | None = None) -> int:
                 text=args.text,
                 allow_empty_stdin=True,
             ),
-            submitter=lambda payload: submit_child_workflow_request(
-                args.workflow,
+            submitter=lambda payload: submit_child_task_request(
+                args.task,
                 payload,
                 session_nonce=args.session_nonce,
             ),
-            success_message="Workflow start request accepted.",
+            success_message="Task start request accepted.",
         )
     return _run_submission(
         payload_reader=lambda: _read_payload(
@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
             allow_empty_stdin=False,
         ),
         submitter=lambda payload: submit_result_payload(payload, session_nonce=args.session_nonce),
-        success_message="Workflow result accepted.",
+        success_message="Task result accepted.",
     )
 
 

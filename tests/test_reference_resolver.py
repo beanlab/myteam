@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from myteam.workflow.resolution.reference_resolver import resolve_references
+from myteam.tasks.resolution.reference_resolver import resolve_references
 
 
 def test_resolve_references_substitutes_exact_string_references_recursively():

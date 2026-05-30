@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from myteam.workflow.agents.agent_utils import encode_input
-from myteam.workflow.terminal.pty_session import PtySession
-from myteam.workflow.terminal.recording import TerminalRecording
+from myteam.tasks.agents.agent_utils import encode_input
+from myteam.tasks.terminal.pty_session import PtySession
+from myteam.tasks.terminal.recording import TerminalRecording
 
 
 HELPER = Path(__file__).resolve().parent / "helpers" / "tty_child.py"

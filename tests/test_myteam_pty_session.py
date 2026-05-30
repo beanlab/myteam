@@ -2,8 +2,8 @@ import errno
 
 import pytest
 
-from myteam.workflow.terminal import pty_session
-from myteam.workflow.terminal.pty_session import PtySession
+from myteam.tasks.terminal import pty_session
+from myteam.tasks.terminal.pty_session import PtySession
 
 
 class _FakeProcess:

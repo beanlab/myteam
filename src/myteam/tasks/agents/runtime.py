@@ -63,48 +63,48 @@ def resolve_agent_runtime_config(
             local_error = exc
             _log(
                 logger,
-                f"Local workflow agent config '{local_path}' is unusable: {exc}. "
+                f"Local task agent config '{local_path}' is unusable: {exc}. "
                 "Falling back to packaged default.",
             )
         else:
-            _log(logger, f"Using local workflow agent config '{local_path}'.")
+            _log(logger, f"Using local task agent config '{local_path}'.")
             return config
     else:
-        _log(logger, f"Local workflow agent config '{local_path}' not found. Falling back to packaged default.")
+        _log(logger, f"Local task agent config '{local_path}' not found. Falling back to packaged default.")
 
     try:
-        module = importlib.import_module(f"myteam.workflow.agents.{agent_name}")
+        module = importlib.import_module(f"myteam.tasks.agents.{agent_name}")
         config = _config_from_module(
             agent_name,
             module,
-            source=f"myteam.workflow.agents.{agent_name}",
+            source=f"myteam.tasks.agents.{agent_name}",
             session_context=session_context,
         )
     except ModuleNotFoundError as exc:
-        if exc.name == f"myteam.workflow.agents.{agent_name}":
+        if exc.name == f"myteam.tasks.agents.{agent_name}":
             if local_error is not None:
                 raise KeyError(
-                    f"Invalid local workflow agent config for {agent_name}: {local_error}"
+                    f"Invalid local task agent config for {agent_name}: {local_error}"
                 ) from local_error
-            raise KeyError(f"Unknown workflow agent: {agent_name}") from exc
+            raise KeyError(f"Unknown task agent: {agent_name}") from exc
         raise
     except AgentConfigError as exc:
-        raise KeyError(f"Invalid packaged workflow agent config for {agent_name}: {exc}") from exc
+        raise KeyError(f"Invalid packaged task agent config for {agent_name}: {exc}") from exc
 
-    _log(logger, f"Using packaged workflow agent config for '{agent_name}'.")
+    _log(logger, f"Using packaged task agent config for '{agent_name}'.")
     return config
 
 
 def _require_agent_name(name: str | None) -> str:
     if not name:
-        raise KeyError("Unknown workflow agent: None")
+        raise KeyError("Unknown task agent: None")
     if not name.isidentifier():
-        raise KeyError(f"Unknown workflow agent: {name}")
+        raise KeyError(f"Unknown task agent: {name}")
     return name
 
 
 def _load_module_from_path(agent_name: str, path: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(f"_myteam_workflow_agent_{agent_name}", path)
+    spec = importlib.util.spec_from_file_location(f"_myteam_task_agent_{agent_name}", path)
     if spec is None or spec.loader is None:
         raise AgentConfigError("could not create import spec")
     module = importlib.util.module_from_spec(spec)

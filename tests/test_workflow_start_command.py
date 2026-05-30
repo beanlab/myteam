@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.workflow.terminal.control_channel import ControlChannel
+from myteam.tasks.terminal.control_channel import ControlChannel
 
 
 def test_workflow_start_reads_json_from_stdin(run_myteam_inprocess, initialized_project: Path, monkeypatch):
@@ -10,13 +10,13 @@ def test_workflow_start_reads_json_from_stdin(run_myteam_inprocess, initialized_
     with ControlChannel(session_nonce=nonce) as channel:
         monkeypatch.setattr("sys.stdin.read", lambda: '{"feature_request":"Build X"}')
 
-        result = run_myteam_inprocess(initialized_project, "workflow-start", "development", "--session-nonce", nonce)
+        result = run_myteam_inprocess(initialized_project, "task", "start", "development", "--session-nonce", nonce)
 
         assert result.exit_code == 0
-        assert "Workflow start request accepted." in result.stdout
+        assert "Task start request accepted." in result.stdout
         request = channel.wait(timeout=1)
         assert request is not None
-        assert request.workflow == "development"
+        assert request.task == "development"
         assert request.input == {"feature_request": "Build X"}
 
 
@@ -26,7 +26,8 @@ def test_workflow_start_accepts_json_flag(run_myteam_inprocess, initialized_proj
 
         result = run_myteam_inprocess(
             initialized_project,
-            "workflow-start",
+            "task",
+            "start",
             "development",
             "--session-nonce",
             nonce,
@@ -41,7 +42,7 @@ def test_workflow_start_accepts_json_flag(run_myteam_inprocess, initialized_proj
 
 
 def test_workflow_start_help_shows_session_nonce_flag(run_myteam_inprocess, initialized_project: Path):
-    result = run_myteam_inprocess(initialized_project, "workflow-start", "--help")
+    result = run_myteam_inprocess(initialized_project, "task", "start", "--help")
 
     assert result.exit_code == 0
     assert "--session-nonce" in result.stdout
@@ -51,7 +52,8 @@ def test_workflow_start_help_shows_session_nonce_flag(run_myteam_inprocess, init
 def test_workflow_start_rejects_underscore_session_nonce(run_myteam_inprocess, initialized_project: Path):
     result = run_myteam_inprocess(
         initialized_project,
-        "workflow-start",
+        "task",
+        "start",
         "development",
         "--session_nonce",
         "session-nonce-123",

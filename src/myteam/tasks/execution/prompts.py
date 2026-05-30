@@ -24,10 +24,10 @@ def build_step_prompt(
             [
                 f"Session nonce: {session_nonce}",
                 "",
-                "Use this nonce with both workflow commands.",
+                "Use this nonce with both task commands.",
                 "",
-                "If you are asked to launch a workflow, use this command:",
-                f"`myteam workflow-start <workflow> --session-nonce {session_nonce}`",
+                "If you are asked to launch a task, use this command:",
+                f"`myteam task start <workflow> --session-nonce {session_nonce}`",
                 "and pass any required input with `--json` as needed. Use JSON-safe quoting.",
                 "",
                 "Otherwise, perform the task yourself."
@@ -37,7 +37,7 @@ def build_step_prompt(
         sections.extend([
             "",
             "When you are ready to finish, use this command:",
-            f"`myteam workflow-result --session-nonce {session_nonce} --json '{json.dumps(output_template)}'`",
+            f"`myteam task result --session-nonce {session_nonce} --json '{json.dumps(output_template)}'`",
         ])
     if skills:
         sections.extend(["", format_named_info_block("Skills", skills)])
@@ -86,7 +86,7 @@ def build_child_resume_prompt(
             json.dumps(child_result, indent=2),
             "",
             "Continue your objective or summarize the result for the user if there",
-            "is no clear next step. Do not call workflow-result unless your objective",
+            "is no clear next step. Do not call task result unless your objective",
             "has been met.",
         ])
     return "\n".join(sections)

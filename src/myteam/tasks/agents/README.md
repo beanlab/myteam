@@ -3,7 +3,7 @@
 Each `<agent>.py` file describes how to operate one terminal-backed agent:
 
 - which executable to run and the command argv values
-- what command exits the agent after `myteam workflow-result` is accepted
+- what command exits the agent after `myteam task result` is accepted
 - how to discover the agent's session id
 
 Terminal input encoding is shared by the runtime through
@@ -20,7 +20,7 @@ Agent configs are resolved by
 1. Project-local override is prioritized:
    `.myteam/.config/<agent>.py`
 2. Otherwise it falls back on packaged default:
-   `myteam.workflow.agents.<agent>`
+   `myteam.tasks.agents.<agent>`
 
 Local configs are intentionally supported so a project can use an agent CLI that
 is not shipped with `myteam`, or override the default behavior of a packaged one.
@@ -88,7 +88,7 @@ def build_argv(
 ### `EXIT_COMMAND`
 
 `EXIT_COMMAND` is the command text sent after the workflow step has submitted a
-valid structured result through `myteam workflow-result`. The runtime encodes
+valid structured result through `myteam task result`. The runtime encodes
 it with the shared terminal encoding in `agent_utils.encode_input`.
 
 For example:
@@ -143,8 +143,8 @@ passing `agent="codex_mini"` into `run_agent`.
 ```python
 from __future__ import annotations
 
-from myteam.workflow.agents.codex import EXEC, EXIT_COMMAND, get_session_info
-from myteam.workflow.agents.codex import build_argv as build_codex_argv
+from myteam.tasks.agents.codex import EXEC, EXIT_COMMAND, get_session_info
+from myteam.tasks.agents.codex import build_argv as build_codex_argv
 
 
 def build_argv(
@@ -169,7 +169,7 @@ A custom Python workflow can then select the alias by passing the local config
 name as the `agent` value:
 
 ```python
-from myteam.workflow.execution.steps import run_agent
+from myteam.tasks.execution.steps import run_agent
 
 
 result = run_agent(

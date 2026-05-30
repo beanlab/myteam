@@ -1,13 +1,13 @@
-# Workflow Package
+# Task Package
 
 ## Purpose
 
-`src/myteam/workflow/` implements the `myteam start [workflow]` feature.
+`src/myteam/tasks/` implements the `myteam start [task]` feature.
 
 Its job is to:
 
-- load and validate authored workflow files
-- resolve workflow file paths for YAML, Python, and markdown task workflows
+- load and validate authored task files
+- resolve task file paths for YAML, Python, and markdown task definitions
 - resolve references between completed steps
 - run each step through an interactive terminal-backed agent session
 - collect the final structured step result through an out-of-band result channel
@@ -15,13 +15,13 @@ Its job is to:
 
 This package is intentionally split into two layers:
 
-- `workflow/` owns workflow semantics
-- `workflow/terminal/` owns terminal transport and result delivery
+- `tasks/` owns task semantics
+- `tasks/terminal/` owns terminal transport and result delivery
 
-The workflow layer is further split so each file stays narrow:
+The task layer is further split so each file stays narrow:
 
 - `definition/parser.py` loads authored YAML
-- `definition/models.py` owns the workflow schema models and execution-time step models
+- `definition/models.py` owns the task schema models and execution-time step models
 - `resolution/reference_resolver.py` resolves `$step.path` references
 - `execution/engine.py` handles multi-step orchestration
 - `execution/steps.py` handles single-step execution and prompt/argv construction
@@ -31,25 +31,25 @@ The workflow layer is further split so each file stays narrow:
 
 From outside the package, the flow is:
 
-1. `commands.start(...)` resolves a workflow file path and either executes a Python workflow script or loads YAML.
-2. `workflow.definition.load_workflow(...)` loads authored YAML and delegates schema checks to `workflow.validation`.
-   `workflow.definition.load_markdown_workflow(...)` loads markdown task frontmatter and body text.
+1. `commands.start(...)` resolves a task file path and either executes a Python task script or loads YAML.
+2. `tasks.definition.load_workflow(...)` loads authored YAML and delegates schema checks to `tasks.validation`.
+   `tasks.definition.load_markdown_workflow(...)` loads markdown task frontmatter and body text.
    If the frontmatter declares required input and the caller did not supply it, `commands.start(...)`
-   reports an error before launching the workflow.
-3. `workflow.execution.run_workflow(...)` executes steps in authored order.
-4. For each step, `workflow.execution.run_agent(...)`:
+   reports an error before launching the task.
+3. `tasks.execution.run_workflow(...)` executes steps in authored order.
+4. For each step, `tasks.execution.run_agent(...)`:
    - receives the resolved step values from the engine
    - resolves the configured agent runtime config
    - builds the prompt
    - runs or resumes an interactive terminal session
-   - waits for the agent to call `myteam workflow-result` over the private result channel
+   - waits for the agent to call `myteam task result` over the private result channel
    - validates the returned payload against the authored output shape
 5. The engine stores completed step state for later `$step.path` references.
 6. The engine returns either:
-   - a completed workflow output mapping
+   - a completed task output mapping
    - or a failed result naming the first failed step
 
-The path-resolution rule for `commands.start(...)` and `workflow.execution.run_named_workflow(...)`
+The path-resolution rule for `commands.start(...)` and `tasks.execution.run_named_workflow(...)`
 is:
 
 - if no extension is provided, prefer `.py`, then `.md`, then `.yaml`, then `.yml`
@@ -57,8 +57,8 @@ is:
   brief warning
 - if an explicit extension is not one of `.py`, `.md`, `.yaml`, or `.yml`, treat it as an error
 
-`workflow.execution.cli_commands.workflow_start(...)` is different: it only submits a child-workflow
-request over the control channel. The parent workflow runner resolves the requested child workflow
+`tasks.execution.cli_commands.task_start(...)` is different: it only submits a child-task
+request over the control channel. The parent task runner resolves the requested child task
 name when it handles that request.
 
 The terminal contract is:
@@ -66,11 +66,11 @@ The terminal contract is:
 - terminal output is for user-visible interaction and diagnostics
 - structured workflow results are not scraped from terminal output
 - the child reports its final result over a private Unix socket keyed by the step's session nonce
-- `myteam workflow-result` and `myteam workflow-start` take `--session-nonce` so the agent can 
+- `myteam task result` and `myteam task start` take `--session-nonce` so the agent can 
   submit against the active step without relying on hidden env state
-- Python workflow authors can pass `session_id` to `run_agent(...)` to resume, set `fork=True`
+- Python task authors can pass `session_id` to `run_agent(...)` to resume, set `fork=True`
   to fork that session, and read `StepResult.session_id` from completed steps that return one
-- `run_agent(...)` launches agents from the detected project root by default; Python workflow
+- `run_agent(...)` launches agents from the detected project root by default; Python task
   authors can pass `cwd` to override the launch directory for a specific agent run
 
 ## File-Level Ownership
@@ -78,14 +78,14 @@ The terminal contract is:
 ### Package Root
 
 - [__init__.py](__init__.py)
-  Exposes the main public workflow entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
+  Exposes the main public task entrypoints: `run_agent`, `load_workflow`, and `run_workflow`.
 
 - [definition/models.py](definition/models.py)
-  Owns shared workflow types: authored step definitions, completed-step state, run results, and the pydantic models
+  Owns shared task types: authored step definitions, completed-step state, run results, and the pydantic models
   used to validate authored YAML step definitions.
 
 - [definition/parser.py](definition/parser.py)
-  Owns workflow-file loading and top-level orchestration around workflow schema validation.
+  Owns task-file loading and top-level orchestration around task schema validation.
 
 - [resolution/reference_resolver.py](resolution/reference_resolver.py)
   Owns `$step.path` reference resolution against prior completed steps.
@@ -100,13 +100,13 @@ The terminal contract is:
   Owns usage-tracking helpers and usage-summary formatting.
 
 - [execution/cli_commands.py](execution/cli_commands.py)
-  Owns the child-facing `myteam workflow-start` and `myteam workflow-result` command implementations.
+  Owns the child-facing `myteam task start` and `myteam task result` command implementations.
 
 - [execution/errors.py](execution/errors.py)
-  Owns workflow execution error types.
+  Owns task execution error types.
 
 - [execution/prompts.py](execution/prompts.py)
-  Owns prompt-building helpers for single-step execution and child-workflow resumes.
+  Owns prompt-building helpers for single-step execution and child-task resumes.
 
 - [resolution/session_resolution.py](resolution/session_resolution.py)
   Owns session id and project-root resolution helpers.
@@ -140,11 +140,11 @@ The terminal contract is:
   Owns the out-of-band result socket, token validation, acknowledgement handling, and payload submission helper.
 
 - [terminal/session.py](terminal/session.py)
-  Owns orchestration of `PtySession`, `TerminalRecording`, and `ResultChannel` into one terminal session result for a workflow step.
+  Owns orchestration of `PtySession`, `TerminalRecording`, and `ResultChannel` into one terminal session result for a task step.
 
 ## Design Constraints
 
 - `PtySession.events()` is observation-only and yields raw `bytes`.
 - Input injection uses `enqueue_input(...)`, not generator `.send(...)`.
 - Structured results come from the result channel, not terminal scraping.
-- `workflow/terminal/` should stay minimal and transport-focused.
+- `tasks/terminal/` should stay minimal and transport-focused.

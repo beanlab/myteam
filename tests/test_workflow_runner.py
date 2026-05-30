@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from myteam.workflow.definition.models import StepResult
+from myteam.tasks.definition.models import StepResult
 from myteam.disclosure import resolve_skill_entry, resolve_task_entry
-from myteam.workflow.execution.steps import run_agent
-from myteam.workflow.execution.runner import run_named_workflow
+from myteam.tasks.execution.steps import run_agent
+from myteam.tasks.execution.runner import run_named_workflow
 
 
 def test_python_child_workflow_main_return_value_becomes_output(initialized_project: Path, monkeypatch):
@@ -73,7 +73,7 @@ def test_python_child_workflow_exception_returns_structured_failure(initialized_
 def test_python_child_workflow_can_return_step_result(initialized_project: Path, monkeypatch):
     workflow_file = initialized_project / ".myteam" / "child.py"
     workflow_file.write_text(
-        "from myteam.workflow.definition.models import StepResult\n"
+        "from myteam.tasks.definition.models import StepResult\n"
         "\n"
         "def main():\n"
         "    return StepResult(status='completed', output={'answer': 'ok'}, agent_name='codex')\n",
@@ -108,7 +108,7 @@ def test_markdown_child_workflow_uses_prompt_body_and_frontmatter(initialized_pr
         seen["kwargs"] = kwargs
         return StepResult(status="completed", output={"answer": "ok"})
 
-    monkeypatch.setattr("myteam.workflow.execution.runner.run_default_workflow", fake_run_default_workflow)
+    monkeypatch.setattr("myteam.tasks.execution.runner.run_default_workflow", fake_run_default_workflow)
     monkeypatch.chdir(initialized_project)
 
     result = run_named_workflow("child")
@@ -171,7 +171,7 @@ def test_run_agent_returns_structured_failure_for_unexpected_exception(initializ
     def boom(self, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._prepare_step", boom)
+    monkeypatch.setattr("myteam.tasks.execution.steps.AgentContext._prepare_step", boom)
 
     result = run_agent(prompt="Say hello", cwd=initialized_project)
 
@@ -210,9 +210,9 @@ def test_run_agent_accepts_single_string_or_list_context_values(initialized_proj
     def fake_update_state(self, **kwargs):
         return StepResult(status="completed", output={"status": "ok"}, agent_name="codex")
 
-    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._prepare_step", fake_prepare_step)
-    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._run_prepared_step", fake_run_prepared_step)
-    monkeypatch.setattr("myteam.workflow.execution.steps.AgentContext._update_state", fake_update_state)
+    monkeypatch.setattr("myteam.tasks.execution.steps.AgentContext._prepare_step", fake_prepare_step)
+    monkeypatch.setattr("myteam.tasks.execution.steps.AgentContext._run_prepared_step", fake_run_prepared_step)
+    monkeypatch.setattr("myteam.tasks.execution.steps.AgentContext._update_state", fake_update_state)
 
     result = run_agent(
         prompt="Say hello",

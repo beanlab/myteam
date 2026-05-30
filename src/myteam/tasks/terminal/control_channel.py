@@ -14,8 +14,8 @@ from .session_registry import load_channel_details, register_channel, unregister
 
 
 @dataclass(frozen=True)
-class ChildWorkflowRequest:
-    workflow: str
+class ChildTaskRequest:
+    task: str
     input: Any | None = None
 
 
@@ -23,7 +23,7 @@ class ControlChannel:
     def __init__(self, *, session_nonce: str | None = None) -> None:
         self.socket_path = ""
         self.token = secrets.token_urlsafe(18)
-        self.request: ChildWorkflowRequest | None = None
+        self.request: ChildTaskRequest | None = None
         self.closed = threading.Event()
         self._request_ready = threading.Event()
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
@@ -63,7 +63,7 @@ class ControlChannel:
         if self._tmpdir is not None:
             self._tmpdir.cleanup()
 
-    def wait(self, timeout: float | None = None) -> ChildWorkflowRequest | None:
+    def wait(self, timeout: float | None = None) -> ChildTaskRequest | None:
         if not self._request_ready.wait(timeout):
             return None
         return self.request
@@ -92,26 +92,26 @@ class ControlChannel:
 
         if not isinstance(message, dict):
             return {"ok": False, "error": "Control message must be a JSON object."}
-        if message.get("version") != 1 or message.get("kind") != "child_workflow_request":
+        if message.get("version") != 1 or message.get("kind") != "child_task_request":
             return {"ok": False, "error": "Unsupported control message."}
         if message.get("token") != self.token:
             return {"ok": False, "error": "Invalid workflow control token."}
-        workflow = message.get("workflow")
-        if not isinstance(workflow, str) or not workflow:
-            return {"ok": False, "error": "Missing child workflow name."}
+        task = message.get("task")
+        if not isinstance(task, str) or not task:
+            return {"ok": False, "error": "Missing child task name."}
         if self._request_ready.is_set():
-            return {"ok": False, "error": "Child workflow request already recorded."}
+            return {"ok": False, "error": "Child task request already recorded."}
 
-        self.request = ChildWorkflowRequest(
-            workflow=workflow,
+        self.request = ChildTaskRequest(
+            task=task,
             input=message["input"] if "input" in message else None,
         )
         self._request_ready.set()
         return {"ok": True}
 
 
-def submit_child_workflow_request(
-    workflow: str,
+def submit_child_task_request(
+    task: str,
     input: Any | None = None,
     *,
     session_nonce: str | None = None,
@@ -132,9 +132,9 @@ def submit_child_workflow_request(
 
     message = {
         "version": 1,
-        "kind": "child_workflow_request",
+        "kind": "child_task_request",
         "token": resolved_token,
-        "workflow": workflow,
+        "task": task,
     }
     if session_nonce is not None:
         message["nonce"] = session_nonce
@@ -150,10 +150,10 @@ def submit_child_workflow_request(
     try:
         ack = json.loads(response.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("Workflow runner returned an invalid acknowledgement.") from exc
+        raise ValueError("Task runner returned an invalid acknowledgement.") from exc
 
     if not ack.get("ok"):
-        raise ValueError(str(ack.get("error") or "Workflow runner rejected the child workflow request."))
+        raise ValueError(str(ack.get("error") or "Task runner rejected the child task request."))
 
 
 def _resolve_channel_details(session_nonce: str, *, kind: str) -> tuple[str, str]:
