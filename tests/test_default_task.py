@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam.disclosure import WorkflowStepSettings
-from myteam.tasks.definition.default_workflow import run_default_workflow
+from myteam.tasks.definition.default_task import run_default_workflow
 from myteam.tasks.definition.models import StepResult
 
 
@@ -25,7 +25,7 @@ def test_run_default_workflow_uses_prompt_only_without_workflow_settings(tmp_pat
             seen["run_agent_kwargs"] = kwargs
             return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.tasks.definition.default_workflow.AgentContext", FakeAgentContext)
+    monkeypatch.setattr("myteam.tasks.definition.default_task.AgentContext", FakeAgentContext)
 
     result = run_default_workflow(prompt, cwd=tmp_path)
 
@@ -69,7 +69,7 @@ def test_run_default_workflow_forwards_workflow_settings(tmp_path: Path, monkeyp
             seen["run_agent_kwargs"] = kwargs
             return StepResult(status="completed")
 
-    monkeypatch.setattr("myteam.tasks.definition.default_workflow.AgentContext", FakeAgentContext)
+    monkeypatch.setattr("myteam.tasks.definition.default_task.AgentContext", FakeAgentContext)
 
     result = run_default_workflow(
         prompt,

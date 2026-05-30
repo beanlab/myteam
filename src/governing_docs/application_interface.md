@@ -142,44 +142,23 @@ Failure conditions that matter at the interface:
 
 ### `myteam new task <path> [--prefix <path>]`
 
-Creates a new markdown-defined single-step workflow below the selected local tree root.
+Creates a new task file below the selected local tree root. The file extension determines the scaffold or file contents.
 
 Inputs:
 
-- `<path>` is slash-delimited and may describe a nested task such as `research/summary`.
+- `<path>` is slash-delimited and must include an extension such as `research/summary.md`, `agent.py`, or `ops/pipeline.yaml`.
 
 Expected outcome on success:
 
 - Creates any missing parent directories under the selected local root.
-- Creates a `.md` task file at the target path.
-- Uses the repository's task scaffold contents for the new file.
+- Creates a task file at the target path.
+- `.py` files use the repository's Python task scaffold contents.
+- `.md` files use the repository's markdown task scaffold contents.
+- `.yaml` and `.yml` files are created as blank task files.
 
 User-visible result:
 
 - The new task file can later be executed with `myteam start <path>`.
-
-Failure conditions that matter at the interface:
-
-- If the target file already exists, the command exits with an error and does not overwrite it.
-
-### `myteam new workflow [path] [--prefix <path>]`
-
-Creates a new Python workflow file below the selected local tree root.
-
-Inputs:
-
-- With no `path`, the command creates the default `agent.py` file at the selected local root.
-- With a `path`, it creates a nested workflow file such as `<prefix>/automation/daily.py`.
-
-Expected outcome on success:
-
-- Creates any missing parent directories under the selected local root.
-- Creates a `.py` workflow file at the target path.
-- Uses the repository's default workflow scaffold contents for the new file.
-
-User-visible result:
-
-- The new workflow file can later be executed with `myteam start <path>`.
 
 Failure conditions that matter at the interface:
 

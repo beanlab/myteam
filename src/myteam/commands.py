@@ -29,6 +29,7 @@ from .paths import (
     BUILTIN_ROOT_NAME,
     DEFAULT_LOCAL_ROOT,
     ENCODING,
+    SUPPORTED_WORKFLOW_SUFFIXES,
     agents_root,
     base_dir,
     role_dir,
@@ -37,7 +38,7 @@ from .paths import (
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
-from .tasks.definition.default_workflow import run_default_workflow
+from .tasks.definition.default_task import run_default_workflow
 from .tasks.definition.parser import load_markdown_workflow, load_workflow
 from .tasks.execution.cli_commands import task_result as submit_task_result
 from .tasks.execution.cli_commands import task_start as submit_task_start
@@ -120,49 +121,38 @@ def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     )
 
 
-def new_workflow(workflow: str = "agent", prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    _new_workflow_file(
-        workflow,
-        prefix=prefix,
-        suffix=".py",
-        template_name="workflow_definition_template.py",
-        label="Workflow",
-    )
-
-
 def new_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    _new_workflow_file(
-        task,
-        prefix=prefix,
-        suffix=".md",
-        template_name="task_definition_template.md",
-        label="Task",
-    )
-
-
-def _new_workflow_file(
-    workflow: str,
-    *,
-    prefix: str,
-    suffix: str,
-    template_name: str,
-    label: str,
-) -> None:
-    workflow_root = _selected_root(prefix)
-    workflow_path = workflow_root.joinpath(*workflow.split("/")).with_suffix(suffix)
-    if workflow_path.exists():
-        print(f"{label} '{workflow}' already exists at {workflow_path}", file=sys.stderr)
+    task_path = Path(task)
+    suffix = task_path.suffix
+    if not suffix:
+        print(
+            f"Task '{task}' must include a file extension: .py, .md, .yaml, or .yml.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if suffix not in SUPPORTED_WORKFLOW_SUFFIXES:
+        print(f"Task '{task}' has unsupported extension '{suffix}'.", file=sys.stderr)
         raise SystemExit(1)
 
-    ensure_dir(workflow_path.parent)
-    template = get_template(template_name)
+    task_root = _selected_root(prefix)
+    task_path = task_root.joinpath(*task_path.parts)
+    if task_path.exists():
+        print(f"Task '{task}' already exists at {task_path}", file=sys.stderr)
+        raise SystemExit(1)
+
+    ensure_dir(task_path.parent)
     if suffix == ".py":
+        template = get_template("task_definition_template.py")
         template = template.removesuffix("\n")
-        write_py_script(workflow_path, template)
+        write_py_script(task_path, template)
+        return
+    if suffix == ".md":
+        template = get_template("task_definition_template.md")
+        template = _set_template_name(template, task_path.relative_to(task_root).with_suffix("").as_posix())
+        task_path.write_text(template, encoding=ENCODING)
         return
 
-    template = _set_template_name(template, workflow)
-    workflow_path.write_text(template, encoding=ENCODING)
+    task_path.write_text("", encoding=ENCODING)
 
 
 def _set_template_name(template: str, name: str) -> str:
@@ -471,7 +461,6 @@ __all__ = [
     "new_role",
     "new_skill",
     "new_task",
-    "new_workflow",
     "remove",
     "start",
     "task_result",

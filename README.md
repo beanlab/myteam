@@ -242,20 +242,21 @@ myteam new skill research/literature-review
 myteam new skill python/testing --prefix .agents
 ```
 
-### `myteam new workflow [path] [--prefix <path>]`
+### `myteam new task <path.ext> [--prefix <path>]`
 
-Creates a new Python workflow file under the selected local root.
+Creates a new task file under the selected local root. The file extension selects the scaffold:
 
-- omit `path` to create the default `agent.py` at the selected local root
-- use slash-delimited paths for nested workflows such as `automation/daily`
-- the scaffolded file contents match the repository's default `.myteam/agent.py`
+- `.py` creates a Python task from the repository template
+- `.md` creates a markdown task from the repository template
+- `.yaml` and `.yml` create a blank YAML task file
 
 Examples:
 
 ```bash
-myteam new workflow
-myteam new workflow automation/daily
-myteam new workflow --prefix .agents
+myteam new task agent.py
+myteam new task research/summary.md
+myteam new task workflows/daily.yaml
+myteam new task workflows/daily.yml --prefix .agents
 ```
 
 ### `myteam get role [path] [--prefix <path>]`

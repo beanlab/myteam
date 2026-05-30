@@ -57,22 +57,24 @@ def test_new_skill_accepts_custom_prefix(run_myteam, tmp_path: Path):
     assert (tmp_path / ".agents" / "python" / "testing" / "load.py").exists()
 
 
-def test_new_workflow_creates_default_agent_script(run_myteam, initialized_project: Path):
-    result = run_myteam(initialized_project, "new", "workflow")
+def test_new_task_creates_python_task_script(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "agent.py")
 
     assert result.exit_code == 0
     assert (initialized_project / ".myteam" / "agent.py").exists()
+    text = (initialized_project / ".myteam" / "agent.py").read_text(encoding="utf-8")
+    assert "NotImplementedError" in text
 
 
-def test_new_workflow_accepts_nested_paths(run_myteam, initialized_project: Path):
-    result = run_myteam(initialized_project, "new", "workflow", "automation/daily")
+def test_new_task_accepts_nested_python_paths(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "automation/daily.py")
 
     assert result.exit_code == 0
     assert (initialized_project / ".myteam" / "automation" / "daily.py").exists()
 
 
-def test_new_task_creates_markdown_workflow(run_myteam, initialized_project: Path):
-    result = run_myteam(initialized_project, "new", "task", "research/summary")
+def test_new_task_creates_markdown_task(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "research/summary.md")
 
     task_file = initialized_project / ".myteam" / "research" / "summary.md"
     assert result.exit_code == 0
@@ -87,19 +89,51 @@ def test_new_task_creates_markdown_workflow(run_myteam, initialized_project: Pat
     assert body.strip()
 
 
+def test_new_task_creates_blank_yaml_task(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "ops/pipeline.yaml")
+
+    task_file = initialized_project / ".myteam" / "ops" / "pipeline.yaml"
+    assert result.exit_code == 0
+    assert task_file.exists()
+    assert task_file.read_text(encoding="utf-8") == ""
+
+
+def test_new_task_creates_blank_yml_task(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "ops/pipeline.yml")
+
+    task_file = initialized_project / ".myteam" / "ops" / "pipeline.yml"
+    assert result.exit_code == 0
+    assert task_file.exists()
+    assert task_file.read_text(encoding="utf-8") == ""
+
+
 def test_new_task_accepts_custom_prefix(run_myteam, tmp_path: Path):
     init_result = run_myteam(tmp_path, "init", "--prefix", ".agents")
     assert init_result.exit_code == 0
 
-    result = run_myteam(tmp_path, "new", "task", "research/summary", "--prefix", ".agents")
+    result = run_myteam(tmp_path, "new", "task", "research/summary.md", "--prefix", ".agents")
 
     assert result.exit_code == 0
     assert (tmp_path / ".agents" / "research" / "summary.md").exists()
 
 
-def test_creating_existing_workflow_fails_clearly(run_myteam, initialized_project: Path):
-    first = run_myteam(initialized_project, "new", "workflow")
-    second = run_myteam(initialized_project, "new", "workflow")
+def test_new_task_requires_a_file_extension(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "research/summary")
+
+    assert result.exit_code == 1
+    assert "must include a file extension" in result.stderr
+
+
+def test_new_task_rejects_unsupported_extension(run_myteam, initialized_project: Path):
+    result = run_myteam(initialized_project, "new", "task", "research/summary.txt")
+
+    assert result.exit_code == 1
+    assert "unsupported extension" in result.stderr
+
+
+def test_creating_existing_task_fails_clearly(run_myteam, initialized_project: Path):
+    first = run_myteam(initialized_project, "new", "task", "research/summary.md")
+    second = run_myteam(initialized_project, "new", "task", "research/summary.md")
 
     assert first.exit_code == 0
     assert second.exit_code == 1

@@ -14,7 +14,7 @@ from ...disclosure import (
     format_required_input_shape,
 )
 from ...paths import DEFAULT_LOCAL_ROOT, agents_root, base_dir, workflow_candidates
-from ..definition.default_workflow import run_default_workflow
+from ..definition.default_task import run_default_workflow
 from ..definition.models import StepResult
 from ..definition.parser import load_markdown_workflow, load_workflow
 from .engine import run_workflow

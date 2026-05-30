@@ -19,7 +19,6 @@ from .commands import (
     new_role,
     new_skill,
     new_task,
-    new_workflow,
     remove,
     start,
     update_roster,
@@ -74,7 +73,6 @@ def main(argv: list[str] | None = None):
             "role": new_role,
             "skill": new_skill,
             "task": new_task,
-            "workflow": new_workflow,
         },
         "remove": remove,
         "get": {
