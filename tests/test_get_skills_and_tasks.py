@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam import list_skills, list_tasks
+from myteam.tasks import list_skills, list_tasks
 
 
 def test_list_skills_returns_directory_names(monkeypatch, capsys, initialized_project: Path):
@@ -118,6 +118,29 @@ def test_get_tasks_lists_supported_workflow_files(run_myteam, initialized_projec
     assert "workflows/daily.py" in result.stdout
     assert "workflows/summary.yaml" in result.stdout
     assert "workflows/notes.yml" in result.stdout
+
+
+def test_get_tasks_reads_python_module_docstring_metadata(run_myteam, initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "workflows"
+    task_dir.mkdir()
+    (task_dir / "daily.py").write_text(
+        '"""\n'
+        'name: workflows/daily\n'
+        'description: Run the daily workflow\n'
+        '# Optional task settings\n'
+        'agent: coder\n'
+        '"""\n'
+        "\n"
+        "def main() -> None:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(initialized_project, "get_tasks", "workflows")
+
+    assert result.exit_code == 0
+    assert "workflows/daily.py" in result.stdout
+    assert "Run the daily workflow" in result.stdout
 
 
 def test_get_task_prints_task_detail(run_myteam, initialized_project: Path):

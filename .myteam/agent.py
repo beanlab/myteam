@@ -1,5 +1,9 @@
-from myteam.tasks import AgentContext
-from myteam import list_tasks, list_skills
+"""
+name: "Test Agent"
+description: "This is a test agent task"
+"""
+
+from myteam.tasks import AgentContext, StepResult, list_tasks, list_skills
 
 
 def main():

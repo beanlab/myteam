@@ -257,3 +257,25 @@ def test_resolve_skill_and_task_entries_include_descriptions(initialized_project
         "research/summary.md",
         "Summarize the current state of the project",
     )
+
+
+def test_resolve_python_task_entry_uses_module_docstring_metadata(initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "workflows"
+    task_dir.mkdir()
+    (task_dir / "daily.py").write_text(
+        '"""\n'
+        'name: workflows/daily\n'
+        'description: Run the daily workflow\n'
+        '# Optional task settings\n'
+        'agent: coder\n'
+        '"""\n'
+        "\n"
+        "def main() -> None:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+
+    assert resolve_task_entry(initialized_project, "workflows/daily") == (
+        "workflows/daily.py",
+        "Run the daily workflow",
+    )

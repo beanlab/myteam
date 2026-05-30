@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 from fnmatch import fnmatch
@@ -110,7 +111,22 @@ def is_skill_dir(folder: Path) -> bool:
 def _parse_yaml_frontmatter(file: Path) -> dict[str, Any]:
     if not file.exists():
         return {}
+    if file.suffix == ".py":
+        return _parse_python_module_docstring(file)
     return parse_yaml_frontmatter(file.read_text(encoding="utf-8"))
+
+
+def _parse_python_module_docstring(file: Path) -> dict[str, Any]:
+    try:
+        module = ast.parse(file.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return {}
+
+    docstring = ast.get_docstring(module, clean=False)
+    if not docstring:
+        return {}
+
+    return parse_yaml_frontmatter(f"---\n{docstring}\n---\n")
 
 
 def parse_yaml_frontmatter(text: str) -> dict[str, Any]:

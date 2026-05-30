@@ -78,7 +78,8 @@ The terminal contract is:
 ### Package Root
 
 - [__init__.py](__init__.py)
-  Exposes the main public task entrypoints: `run_agent`, `load_task`, `load_markdown_task`, and `run_task`.
+  Exposes the main public task entrypoints and discovery helpers:
+  `run_agent`, `load_task`, `load_markdown_task`, `run_task`, `list_tasks`, and `list_skills`.
 
 - [definition/models.py](definition/models.py)
   Owns shared task types: authored step definitions, completed-step state, run results, and the pydantic models

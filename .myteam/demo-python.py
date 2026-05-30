@@ -1,12 +1,24 @@
+"""
+name: "Demo Python"
+description: "This is a short demo of a multi-step task"
+agent: codex
+model:
+output:
+input:
+interactive:
+session_id:
+fork:
+extra_args:
+usage_logging:
+timeout:
+"""
+
 #!/usr/bin/env python3
 from __future__ import annotations
 
 from typing import Any
 
-from myteam.tasks import AgentContext
-from myteam.tasks import StepResult
-
-WORKFLOW_AGENT = "codex"
+from myteam.tasks import AgentContext, StepResult
 
 
 def main() -> dict[str, Any]:
@@ -19,7 +31,6 @@ def main() -> dict[str, Any]:
 
 def generate_poems(ctx: AgentContext) -> StepResult:
     return ctx.run_agent(
-        agent=WORKFLOW_AGENT,
         prompt=(
             "Generate 3 poems on topics provided by the user. Ask them for the topics."
         ),
@@ -33,7 +44,6 @@ def generate_poems(ctx: AgentContext) -> StepResult:
 
 def rank_poems(ctx: AgentContext, poems: dict[str, Any]) -> StepResult:
     return ctx.run_agent(
-        agent=WORKFLOW_AGENT,
         input=poems,
         prompt=(
             "Rank the provided poems by how well each poem captures the essence of its style"
