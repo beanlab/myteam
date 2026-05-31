@@ -376,7 +376,7 @@ def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, i
     return entries
 
 
-def _collect_skill_names(folder: Path, base_dir: Path, ignore: list[str]) -> list[str]:
+def collect_skill_names(folder: Path, base_dir: Path, ignore: list[str]) -> list[str]:
     return [name for name, _ in _collect_skill_entries(folder, base_dir, ignore, include_info=False)]
 
 
@@ -407,7 +407,7 @@ def _collect_task_entries(folder: Path, base_dir: Path, ignore: list[str], *, in
     return entries
 
 
-def _collect_task_names(folder: Path, base_dir: Path, ignore: list[str]) -> list[str]:
+def collect_task_names(folder: Path, base_dir: Path, ignore: list[str]) -> list[str]:
     effective_ignore = {name.lower() for name in ignore}
     names: list[str] = []
     if not folder.exists():

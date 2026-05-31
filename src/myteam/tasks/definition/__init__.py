@@ -13,6 +13,7 @@ from .models import (
     TaskRunResult,
 )
 from .parser import load_markdown_task, load_task
+from .default_task import run_default_task
 
 __all__ = [
     "AgentConfig",
@@ -31,4 +32,5 @@ __all__ = [
     "load_markdown_task",
     "load_project_task_defaults",
     "load_task",
+    "run_default_task",
 ]

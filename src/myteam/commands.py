@@ -38,8 +38,7 @@ from .paths import (
 from .rosters import download_roster, list_available_rosters, update_roster
 from .templates import get_template
 from .upgrade import packaged_changelog_text, write_tracked_version
-from .tasks.definition.default_task import run_default_task
-from .tasks.definition.parser import load_markdown_task, load_task
+from .tasks.definition import run_default_task, load_markdown_task, load_task
 from .tasks.execution.cli_commands import task_result as submit_task_result
 from .tasks.execution.cli_commands import task_start as submit_task_start
 from .tasks.execution.engine import run_task
