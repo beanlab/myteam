@@ -49,7 +49,7 @@ From outside the package, the flow is:
    - a completed task output mapping
    - or a failed result naming the first failed step
 
-The path-resolution rule for `commands.start(...)` and `tasks.execution.run_named_task(...)`
+The path-resolution rule for `commands.start(...)` and `tasks.execution.run_child_task(...)`
 is:
 
 - if no extension is provided, prefer `.py`, then `.md`, then `.yaml`, then `.yml`

@@ -28,7 +28,7 @@ class NamedTaskRunResult:
     failed_step_name: str | None = None
 
 
-def run_named_task(
+def run_child_task(
     task: str,
     *,
     input: Any = None,

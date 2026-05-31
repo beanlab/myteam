@@ -304,10 +304,10 @@ class AgentContext:
         )
         state.session_path = session_path
 
-        from .runner import run_named_task
+        from .runner import run_child_task
 
         try:
-            child_result = run_named_task(request.task, input=request.input)
+            child_result = run_child_task(request.task, input=request.input)
         except Exception as exc:
             child_payload = {
                 "status": "failed",

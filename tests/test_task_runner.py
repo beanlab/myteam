@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from myteam.tasks.definition.models import StepResult
 from myteam.disclosure import resolve_skill_entry, resolve_task_entry
 from myteam.tasks.execution.steps import run_agent
-from myteam.tasks.execution.runner import run_named_task
+from myteam.tasks.execution.runner import run_child_task
 
 
 def test_python_child_task_main_return_value_becomes_output(initialized_project: Path, monkeypatch):
@@ -18,7 +18,7 @@ def test_python_child_task_main_return_value_becomes_output(initialized_project:
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child", input={"feature_request": "build x"})
+    result = run_child_task("child", input={"feature_request": "build x"})
 
     assert result.status == "completed"
     assert result.output == {"answer": "BUILD X"}
@@ -34,7 +34,7 @@ def test_python_child_task_resolves_from_nested_myteam_cwd(initialized_project: 
     monkeypatch.setenv("MYTEAM_PROJECT_ROOT", str(initialized_project / ".myteam"))
     monkeypatch.chdir(initialized_project / ".myteam")
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
@@ -49,7 +49,7 @@ def test_python_child_task_none_return_gets_completion_output(initialized_projec
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "completed"
     assert result.output == {"status": "completed"}
@@ -64,7 +64,7 @@ def test_python_child_task_exception_returns_structured_failure(initialized_proj
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "failed"
     assert "boom" in (result.error_message or "")
@@ -81,7 +81,7 @@ def test_python_child_task_can_return_step_result(initialized_project: Path, mon
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
@@ -111,7 +111,7 @@ def test_markdown_child_task_uses_prompt_body_and_frontmatter(initialized_projec
     monkeypatch.setattr("myteam.tasks.execution.runner.run_default_task", fake_run_default_task)
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "ok"}
@@ -139,7 +139,7 @@ def test_markdown_child_task_requires_caller_input_when_frontmatter_declares_it(
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "failed"
     assert result.error_message is not None
@@ -161,7 +161,7 @@ def test_named_task_prefers_task_file_over_role_directory(initialized_project: P
     )
     monkeypatch.chdir(initialized_project)
 
-    result = run_named_task("child")
+    result = run_child_task("child")
 
     assert result.status == "completed"
     assert result.output == {"answer": "file"}
