@@ -2,15 +2,29 @@
 
 ## 0.2.27
 
-- Added `myteam new task` for scaffolding markdown-defined single-step workflows from a template.
-- Markdown task workflows load the file body as the prompt and use YAML frontmatter for optional
-  workflow settings.
-  - the `input` field can be used to format the prompt and the values may be passed in using
-    `myteam start <path> --input <dict>`.
-- Allow workflows to start nested workflows using `myteam workflow-start`.
-- Refactored workflow commands to rely on session nonce instead of environment variables to
-  allow for concurrency.
+- Renamed workflows to tasks.
+- Added support for a task to start a subtask by using `myteam task start`.
+- Renamed `myteam workflow-result` to `myteam task result` for consistency.
+- New command `myteam new task <name>.<ext>` creates a task from a template supporting `.py`, 
+  `.md`, `.yaml`, `.yml`.
+- `run_agent` now accepts `skills` and `tasks` argument to allow progressive disclosure within a 
+  task.
+  - Added `list_skills` and `list_tasks` helper functions in `myteam.tasks` to return a list of 
+    all skills/tasks in a provided directory for ease of use.
+- Refactored task commands to rely on session nonce instead of environment variables to allow for
+  concurrency.
 - Removed support for tools
+
+### Changes to `myteam start`
+
+- Runs a built-in default task if no argument is present.
+- `myteam start <name>.<ext>` is now supported, but continues to work if no extension is provided.
+  - If no extension is provided, it prioritizes matches in this order: `.py`, `.md`, `.yaml`, 
+    `.yml`.
+- Markdown tasks allow for an optional input field in the frontmatter, and may be executed with:
+  - `myteam start <name>.<ext> --input <JSON input values>`
+  - `myteam task start <name>.<ext> --input <JSON input values>`
+
 
 ## 0.2.26
 
