@@ -95,7 +95,12 @@ def test_new_task_creates_blank_yaml_task(run_myteam, initialized_project: Path)
     task_file = initialized_project / ".myteam" / "ops" / "pipeline.yaml"
     assert result.exit_code == 0
     assert task_file.exists()
-    assert task_file.read_text(encoding="utf-8") == ""
+    assert task_file.read_text(encoding="utf-8").startswith(
+        "name:\n"
+        "description:\n"
+        "# Define your task under 'steps'\n"
+        "steps:\n"
+    )
 
 
 def test_new_task_creates_blank_yml_task(run_myteam, initialized_project: Path):
@@ -104,7 +109,12 @@ def test_new_task_creates_blank_yml_task(run_myteam, initialized_project: Path):
     task_file = initialized_project / ".myteam" / "ops" / "pipeline.yml"
     assert result.exit_code == 0
     assert task_file.exists()
-    assert task_file.read_text(encoding="utf-8") == ""
+    assert task_file.read_text(encoding="utf-8").startswith(
+        "name:\n"
+        "description:\n"
+        "# Define your task under 'steps'\n"
+        "steps:\n"
+    )
 
 
 def test_new_task_accepts_custom_prefix(run_myteam, tmp_path: Path):

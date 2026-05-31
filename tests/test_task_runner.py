@@ -279,3 +279,21 @@ def test_resolve_python_task_entry_uses_module_docstring_metadata(initialized_pr
         "workflows/daily.py",
         "Run the daily workflow",
     )
+
+
+def test_resolve_yaml_task_entry_uses_top_level_metadata(initialized_project: Path):
+    task_dir = initialized_project / ".myteam" / "workflows"
+    task_dir.mkdir()
+    (task_dir / "daily.yaml").write_text(
+        'name: workflows/daily\n'
+        'description: Run the daily workflow\n'
+        'steps:\n'
+        '  step1:\n'
+        '    prompt: hello\n',
+        encoding="utf-8",
+    )
+
+    assert resolve_task_entry(initialized_project, "workflows/daily") == (
+        "workflows/daily.yaml",
+        "Run the daily workflow",
+    )

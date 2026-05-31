@@ -255,17 +255,34 @@ def test_load_task_accepts_project_local_agent(tmp_path: Path, monkeypatch):
     )
     workflow_file = tmp_path / "workflow.yaml"
     workflow_file.write_text(
-        "step1:\n"
-        "  agent: custom\n"
-        "  prompt: hello\n"
-        "  output:\n"
-        "    message: hi\n",
+        "name: workflow\n"
+        "description: Example workflow\n"
+        "steps:\n"
+        "  step1:\n"
+        "    agent: custom\n"
+        "    prompt: hello\n"
+        "    output:\n"
+        "      message: hi\n",
         encoding="utf-8",
     )
 
     workflow = load_task(workflow_file)
 
     assert workflow["step1"]["agent"] == "custom"
+
+
+def test_load_task_accepts_empty_steps_section(tmp_path: Path):
+    workflow_file = tmp_path / "workflow.yaml"
+    workflow_file.write_text(
+        "name: workflow\n"
+        "description: Example workflow\n"
+        "steps:\n",
+        encoding="utf-8",
+    )
+
+    workflow = load_task(workflow_file)
+
+    assert workflow == {}
 
 
 def test_codex_build_argv_supports_session_modes():

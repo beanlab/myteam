@@ -113,7 +113,24 @@ def _parse_yaml_frontmatter(file: Path) -> dict[str, Any]:
         return {}
     if file.suffix == ".py":
         return _parse_python_module_docstring(file)
-    return parse_yaml_frontmatter(file.read_text(encoding="utf-8"))
+    text = file.read_text(encoding="utf-8")
+    parsed = parse_yaml_frontmatter(text)
+    if parsed:
+        return parsed
+
+    if file.suffix.lower() in {".yaml", ".yml"}:
+        try:
+            loaded = yaml.safe_load(text)
+        except yaml.YAMLError:
+            return {}
+        if isinstance(loaded, dict):
+            data: dict[str, Any] = {}
+            for key, value in loaded.items():
+                if value is None:
+                    continue
+                data[str(key).lower()] = value
+            return data
+    return {}
 
 
 def _parse_python_module_docstring(file: Path) -> dict[str, Any]:

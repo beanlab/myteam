@@ -151,6 +151,9 @@ def new_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
         template = _set_template_name(template, task_path.relative_to(task_root).with_suffix("").as_posix())
         task_path.write_text(template, encoding=ENCODING)
         return
+    if suffix in {".yaml", ".yml"}:
+        task_path.write_text(get_template("task_definition_template.yaml"), encoding=ENCODING)
+        return
 
     task_path.write_text("", encoding=ENCODING)
 

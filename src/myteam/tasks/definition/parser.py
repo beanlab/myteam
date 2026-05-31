@@ -12,10 +12,16 @@ from .models import TaskDefinition, TaskDefinitionModel
 def load_task(path: Path) -> TaskDefinition:
     loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
-        raise ValueError("Task file must contain a top-level mapping of step names to step definitions.")
+        raise ValueError("Task file must contain a top-level mapping with a 'steps' section.")
+
+    steps = loaded.get("steps")
+    if steps is None:
+        steps = {}
+    if not isinstance(steps, dict):
+        raise ValueError("Task file 'steps' section must be a mapping of step names to step definitions.")
 
     try:
-        task_definition = TaskDefinitionModel.model_validate(loaded)
+        task_definition = TaskDefinitionModel.model_validate(steps)
     except ValidationError as exc:
         raise ValueError(f"Task file at {path} is invalid: {exc}") from exc
 
