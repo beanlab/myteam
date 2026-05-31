@@ -2,29 +2,22 @@
 
 ## 0.2.27
 
-- Renamed workflows to tasks.
-- Added support for a task to start a subtask by using `myteam task start`.
-- Renamed `myteam workflow-result` to `myteam task result` for consistency.
-- New command `myteam new task <name>.<ext>` creates a task from a template supporting `.py`, 
-  `.md`, `.yaml`, `.yml`.
-- `run_agent` now accepts `skills` and `tasks` argument to allow progressive disclosure within a 
-  task.
-  - Added `list_skills` and `list_tasks` helper functions in `myteam.tasks` to return a list of 
-    all skills/tasks in a provided directory for ease of use.
-- Refactored task commands to rely on session nonce instead of environment variables to allow for
-  concurrency.
-- Removed support for tools
+- Renamed workflow commands and docs to tasks.
+- Tasks can now start subtasks with `myteam task start`.
+- Renamed `myteam workflow-result` to `myteam task result`.
+- `myteam new task <name>.<ext>` create `.py`, `.md`, `.yaml`, or `.yml` task templates.
+- Task definitions can now progressively disclose skills and subtasks using `skills` and
+  `tasks` arguments. 
+- Task commands now use the session nonce instead of environment variables, enabling
+  concurrent runs.
+- Removed task tool support.
 
-### Changes to `myteam start`
+### myteam start behavior
 
-- Runs a built-in default task if no argument is present.
-- `myteam start <name>.<ext>` is now supported, but continues to work if no extension is provided.
-  - If no extension is provided, it prioritizes matches in this order: `.py`, `.md`, `.yaml`, 
-    `.yml`.
-- Markdown tasks allow for an optional input field in the frontmatter, and may be executed with:
-  - `myteam start <name>.<ext> --input <JSON input values>`
-  - `myteam task start <name>.<ext> --input <JSON input values>`
-
+- `myteam start` runs a built-in default task when called without arguments.
+- `myteam start` and `myteam task start` now accept `<name>.<ext>`.
+  - Extensionless names with multiple matches resolve in `.py`, `.md`, `.yaml`, `.yml` order.
+- Markdown tasks can define optional frontmatter input and accept it with `--input <JSON>`.
 
 ## 0.2.26
 
