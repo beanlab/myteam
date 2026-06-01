@@ -116,24 +116,6 @@ def _parse_yaml_frontmatter(file: Path) -> dict[str, Any]:
 
 
 
-def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
-    lines: list[str] = []
-
-    description = frontmatter.get("description")
-    if isinstance(description, str) and description.strip():
-        lines.append(description.strip())
-
-    input_value = frontmatter.get("input")
-    if input_value is not None:
-        lines.append("input:")
-        if isinstance(input_value, dict):
-            for key, value in input_value.items():
-                lines.append(f"  {key}: {value}")
-        else:
-            lines.append(f"  {input_value}")
-
-    return "\n".join(lines)
-
 
 def resolve_skill_entry(project_root: Path, skill: str) -> tuple[str, str]:
     if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
@@ -527,7 +509,7 @@ def explain_skills():
     _print_block(get_template("explain_skills.md"))
 
 
-def explain_tasks():
+def explain_workflows():
     _print_block(get_template("explain_tasks.md"))
 
 
