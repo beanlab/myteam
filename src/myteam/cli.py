@@ -6,7 +6,7 @@ import functools
 import fire
 
 from .disclosure import explain_skills, explain_workflows
-from prefix import _set_global_prefix_env_var
+from .prefix import _set_global_prefix_env_var
 from .commands import (
     changelog,
     download_roster,
