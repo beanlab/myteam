@@ -3,13 +3,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from ...disclosure import PROJECT_ROOT_ENV_VAR
+from ...disclosure import MYTEAM_ROOT_DIR_ENV_VAR_NAME
 from ..execution.errors import StepExecutionError
 from ..agents.runtime import AgentRuntimeConfig
 
 
 def resolve_project_root(cwd: Path | None = None) -> Path:
-    configured_agent_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    configured_agent_root = os.environ.get(MYTEAM_ROOT_DIR_ENV_VAR_NAME)
     if configured_agent_root:
         return Path(configured_agent_root).resolve().parent
 

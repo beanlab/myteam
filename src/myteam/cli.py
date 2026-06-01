@@ -49,15 +49,15 @@ def main():
             "workflow": new_workflow,
         },
         "explain": {
-            "skills": explain_skills,
-            "workflows": explain_workflows,
+            "skills": lambda: print(explain_skills()),
+            "workflows": lambda: print(explain_workflows()),
         },
         "get": {
-            "skills": get_skills,
+            "skills": lambda: print(get_skills()),
             "workflows": get_workflows,
         },
         "start": start_workflow,
-        "load": load_skill,
+        "load": print_load_skill,
 
         "remove": remove,  # TODO - keep?
 

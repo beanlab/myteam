@@ -1,0 +1,138 @@
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import TypedDict, Literal, Any
+
+from .config import WorkflowDefaults, load_workflow_defaults
+from .frontmatter import split_yaml_frontmatter, parse_python_module_docstring
+from .prefix import resolve_prefix, relative_to_myteam
+from .templates import get_template
+from ..prefix import get_myteam_root, resolve_target
+from ..templates import get_template_file
+
+
+class AgentSettings(TypedDict):
+    agent: str
+    model: str
+    extra_args: tuple[str, ...]
+    interactive: bool
+    session_id: str
+    fork: bool
+
+
+class MarkdownWorkflowInfo(AgentSettings):
+    type: Literal['markdown']
+    name: str
+    """Name by which this workflow is identified"""
+    description: str
+    input: dict
+    """Schema describing input shape"""
+    prompt: str
+    output: dict
+    """Schema describing output shape"""
+
+
+class PythonWorkflowInfo(AgentSettings):
+    type: Literal['python']
+    name: str
+    description: str
+    input: dict
+    output: dict
+
+
+WorkflowInfo = MarkdownWorkflowInfo | PythonWorkflowInfo
+
+
+def new_workflow(workflow_name: str):
+    pass
+
+
+def explain_workflows() -> str:
+    return get_template('explain_workflows.md')
+
+
+def resolve_agent_settings(explicit_settings: AgentSettings, defaults: WorkflowDefaults) -> AgentSettings:
+    return AgentSettings(
+        **{
+            field: explicit_settings.get(field, getattr(defaults, field))
+            for field in AgentSettings.__annotations__.keys()
+        }
+    )
+
+
+def _parse_markdown_workflow_info(
+        workflow_name: str, frontmatter: dict, content: str,
+        defaults: WorkflowDefaults
+) -> WorkflowInfo:
+    # noinspection PyTypeChecker
+    # frontmatter is AgentSettings + a few fields
+    return MarkdownWorkflowInfo(
+        name=workflow_name,
+        description=frontmatter.pop('description'),
+        input=frontmatter.pop('input'),
+        prompt=content,
+        output=frontmatter.pop('output'),
+        **resolve_agent_settings(frontmatter, defaults)
+    )
+
+
+def get_workflows(prefix: str) -> str:
+    """List the workflow headers for all workflows under `prefix`"""
+    workflow_defaults = load_workflow_defaults(get_myteam_root())
+
+    workflow_infos = []
+    for file in resolve_prefix(prefix).glob('*'):
+        if file.is_dir():
+            continue
+
+        if file.suffix == '.md':
+            frontmatter, content = split_yaml_frontmatter(file.read_text())
+            if frontmatter.get('type') == 'workflow':
+                workflow_name = relative_to_myteam(file)
+                info = _parse_markdown_workflow_info(workflow_name, frontmatter, content, workflow_defaults)
+                workflow_infos.append(info)
+
+        elif file.suffix == '.py':
+            frontmatter = parse_python_module_docstring(file.read_text())
+            if frontmatter.get('type') == 'workflow':
+                workflow_name = relative_to_myteam(file)
+                info = _parse_python_workflow_info(workflow_name, frontmatter)
+                workflow_infos.append(info)
+        else:
+            continue
+
+    return workflow_infos
+
+
+def _start_markdown_workflow(workflow_file: Path, workflow_input_json: str):
+    # TODO - common way to run subpython scripts?
+    result = subprocess.run(
+        [
+            sys.executable,
+            get_template_file('workflow_markdown_wrapper.py'),
+            str(workflow_file),
+            workflow_input_json
+        ],
+        cwd=workflow_file.parent,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+    )
+    # TODO - do something with stderr?
+    return result.stdout
+
+
+def start_workflow(workflow_name: str, workflow_input_json: str):
+    # TODO - check: are we starting the engine, or messaging to the engine?
+    
+    workflow_file = resolve_target(workflow_name)
+
+    if workflow_file.suffix == '.md':
+        _start_markdown_workflow(workflow_file, workflow_input_json)
+
+    elif workflow_file.suffix == '.py':
+        _start_python_workflow(workflow_file)
+
+    else:
+        raise NotImplementedError(workflow_file.suffix)

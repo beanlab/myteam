@@ -40,23 +40,9 @@ class TaskStepSettings(BaseModel):
             return tuple(value)
         return value
 
-PROJECT_ROOT_ENV_VAR = "MYTEAM_PROJECT_ROOT"
-
-
-def get_myteam_root(cur_dir: Path):
-    configured_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
-    if configured_root:
-        return Path(configured_root)
-    d = cur_dir
-    while d.parent != d:
-        if d.name == ".myteam":
-            return d
-        d = d.parent
-    return cur_dir
-
 
 def get_active_myteam_root(cur_dir: Path) -> Path:
-    configured_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
+    configured_root = os.environ.get(MYTEAM_ROOT_DIR_ENV_VAR_NAME)
     if configured_root:
         return Path(configured_root)
     return get_myteam_root(cur_dir)
@@ -73,7 +59,7 @@ def _strip_yaml_frontmatter(text: str) -> str:
 
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
-            body = "\n".join(lines[i + 1 :])
+            body = "\n".join(lines[i + 1:])
             if text.endswith("\n"):
                 body += "\n"
             return body
@@ -85,7 +71,7 @@ def print_text_block(text: str) -> None:
 
 
 def print_instructions(base: Path):
-    for file in ["role.md", "ROLE.md", "skill.md", "SKILL.md"]:
+    for file in ["skill.md", "SKILL.md"]:
         instructions_file = base / file
         if instructions_file.exists():
             print_definition_text(instructions_file.read_text(encoding="utf-8"))
@@ -98,10 +84,6 @@ def _get_definition_file(folder: Path, definition_stem: str) -> Path | None:
         if definition_file.exists():
             return definition_file
     return None
-
-
-def is_role_dir(folder: Path) -> bool:
-    return folder.is_dir() and _get_definition_file(folder, "role") is not None
 
 
 def is_skill_dir(folder: Path) -> bool:
@@ -132,56 +114,6 @@ def _parse_yaml_frontmatter(file: Path) -> dict[str, Any]:
             return data
     return {}
 
-
-def _parse_python_module_docstring(file: Path) -> dict[str, Any]:
-    try:
-        module = ast.parse(file.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
-        return {}
-
-    docstring = ast.get_docstring(module, clean=False)
-    if not docstring:
-        return {}
-
-    return parse_yaml_frontmatter(f"---\n{docstring}\n---\n")
-
-
-def parse_yaml_frontmatter(text: str) -> dict[str, Any]:
-    frontmatter, _ = split_yaml_frontmatter(text)
-    return frontmatter
-
-
-def split_yaml_frontmatter(text: str) -> tuple[dict[str, Any], str]:
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}, text
-
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
-    if end is None:
-        return {}, text
-
-    frontmatter = "\n".join(lines[1:end])
-    try:
-        loaded = yaml.safe_load(frontmatter)
-    except yaml.YAMLError:
-        return {}, text
-
-    if not isinstance(loaded, dict):
-        return {}, text
-
-    data: dict[str, Any] = {}
-    for key, value in loaded.items():
-        if value is None:
-            continue
-        data[str(key).lower()] = value
-    body = "\n".join(lines[end + 1 :])
-    if text.endswith("\n"):
-        body += "\n"
-    return data, body
 
 
 def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
@@ -225,7 +157,8 @@ def resolve_task_entry(project_root: Path, task: str) -> tuple[str, str]:
     return task_file.relative_to(root).as_posix(), format_frontmatter_info(_parse_yaml_frontmatter(task_file))
 
 
-def resolve_skill_entries(project_root: Path, skills: list[str] | tuple[str, ...] | None) -> list[tuple[str, str]] | None:
+def resolve_skill_entries(project_root: Path, skills: list[str] | tuple[str, ...] | None) -> list[tuple[
+    str, str]] | None:
     if skills is None:
         return None
     return [resolve_skill_entry(project_root, skill) for skill in skills]
@@ -310,12 +243,12 @@ def _is_py_file(file: Path) -> bool:
 
 
 def _print_info(
-    header: str,
-    folder: Path,
-    base_dir: Path,
-    ignore: list[str],
-    is_relevant: Callable[[Path], bool],
-    get_info: Callable[[Path], str],
+        header: str,
+        folder: Path,
+        base_dir: Path,
+        ignore: list[str],
+        is_relevant: Callable[[Path], bool],
+        get_info: Callable[[Path], str],
 ):
     relevant = list(sorted((p for p in folder.iterdir() if is_relevant(p) and p.name not in ignore)))
     if not relevant:
@@ -353,7 +286,8 @@ def format_named_info_block(header: str, entries: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[tuple[str, str]]:
+def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[
+    tuple[str, str]]:
     effective_ignore = list(ignore)
     entries: list[tuple[str, str]] = []
     if folder == base_dir and not _is_under_builtin_root(folder):
@@ -361,16 +295,18 @@ def _collect_skill_entries(folder: Path, base_dir: Path, ignore: list[str], *, i
 
     if folder.exists():
         for skill_dir in sorted(
-            (path for path in folder.iterdir() if is_skill_dir(path) and path.name not in effective_ignore),
-            key=lambda path: path.name,
+                (path for path in folder.iterdir() if is_skill_dir(path) and path.name not in effective_ignore),
+                key=lambda path: path.name,
         ):
             name = skill_dir.relative_to(base_dir).as_posix()
             entries.append((name, _get_folder_info(skill_dir, "skill") if include_info else ""))
 
-    if include_info and folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
+    if include_info and folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(
+            BUILTIN_ROOT_NAME):
         entries.append((BUILTIN_ROOT_NAME, _builtin_root_info()))
 
-    if not include_info and folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(BUILTIN_ROOT_NAME):
+    if not include_info and folder == base_dir and not _is_under_builtin_root(folder) and has_builtin_skill(
+            BUILTIN_ROOT_NAME):
         entries.append((BUILTIN_ROOT_NAME, ""))
 
     return entries
@@ -380,7 +316,8 @@ def collect_skill_names(folder: Path, base_dir: Path, ignore: list[str]) -> list
     return [name for name, _ in _collect_skill_entries(folder, base_dir, ignore, include_info=False)]
 
 
-def _collect_task_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[tuple[str, str]]:
+def _collect_task_entries(folder: Path, base_dir: Path, ignore: list[str], *, include_info: bool) -> list[
+    tuple[str, str]]:
     effective_ignore = {name.lower() for name in ignore}
     entries: list[tuple[str, str]] = []
 
@@ -503,13 +440,13 @@ def _is_git_ignored_tree_path(path: Path, root: Path, ignored_paths: set[str]) -
 
 
 def _collect_tree_entries(
-    root: Path,
-    folder: Path,
-    glob: str,
-    max_levels: int | None,
-    level: int,
-    exclude: tuple[str, ...],
-    ignored_paths: set[str],
+        root: Path,
+        folder: Path,
+        glob: str,
+        max_levels: int | None,
+        level: int,
+        exclude: tuple[str, ...],
+        ignored_paths: set[str],
 ) -> list[tuple[Path, list[tuple[Path, list]]]]:
     entries: list[tuple[Path, list[tuple[Path, list]]]] = []
     children = sorted(folder.iterdir(), key=lambda path: (not path.is_dir(), path.name.lower(), path.name))
@@ -551,12 +488,12 @@ def _print_tree_entries(entries: list[tuple[Path, list[tuple[Path, list]]]], pre
 
 
 def print_directory_tree(
-    root: Path,
-    glob: str = "*",
-    max_levels: int | None = None,
-    exclude: tuple[str, ...] = (".*", "_*"),
-    use_gitignore: bool = True,
-    relative_to: Path | None = None,
+        root: Path,
+        glob: str = "*",
+        max_levels: int | None = None,
+        exclude: tuple[str, ...] = (".*", "_*"),
+        use_gitignore: bool = True,
+        relative_to: Path | None = None,
 ) -> None:
     root = root.resolve()
     header = root.name or root.as_posix()
@@ -570,7 +507,8 @@ def print_directory_tree(
 
 
 def list_roles(folder: Path, base_dir: Path, ignore: list[str]):
-    _print_info("Team Members", folder, base_dir, ignore, is_role_dir, lambda role_dir: _get_folder_info(role_dir, "role"))
+    _print_info("Team Members", folder, base_dir, ignore, is_role_dir,
+                lambda role_dir: _get_folder_info(role_dir, "role"))
 
 
 def get_skills(folder: Path, base_dir: Path, ignore: list[str]):

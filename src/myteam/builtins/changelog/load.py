@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam.upgrade import print_release_notes
-from myteam.utils import builtin_skill_dir, get_active_myteam_root, get_skills, list_roles, print_instructions
+from myteam.frontmatter import builtin_skill_dir, get_active_myteam_root, get_skills, list_roles, print_instructions
 
 
 def main() -> int:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import print_instructions, get_active_myteam_root, explain_skills, explain_tasks, explain_roles, get_skills, \
+from myteam.frontmatter import print_instructions, get_active_myteam_root, explain_skills, explain_tasks, explain_roles, get_skills, \
     list_roles, list_tasks, print_directory_tree
 
 

@@ -12,18 +12,6 @@ from typing import Any
 import yaml
 
 from . import __version__
-from .disclosure import (
-    PROJECT_ROOT_ENV_VAR,
-    builtin_skill_dir,
-    format_required_input_shape,
-    is_role_dir,
-    is_skill_dir,
-    print_definition_text,
-    split_yaml_frontmatter,
-    get_skills as disclose_get_skills,
-    get_tasks as disclose_get_tasks,
-    TaskStepSettings,
-)
 from .paths import (
     APP_NAME,
     BUILTIN_ROOT_NAME,
@@ -36,19 +24,19 @@ from .paths import (
     task_candidates,
 )
 from .rosters import download_roster, list_available_rosters, update_roster
-from .templates import get_template
-from .upgrade import packaged_changelog_text, write_tracked_version
 from .tasks.definition import run_default_task, load_markdown_task, load_task
 from .tasks.execution.cli_commands import task_result as submit_task_result
 from .tasks.execution.cli_commands import task_start as submit_task_start
 from .tasks.execution.engine import run_task
+from .templates import get_template
+from .upgrade import packaged_changelog_text, write_tracked_version
 
 
-def ensure_dir(path: Path) -> None:
+def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def write_py_script(path: Path, contents: str) -> None:
+def _write_py_script(path: Path, contents: str) -> None:
     path.write_text(contents, encoding=ENCODING)
 
 
@@ -60,7 +48,7 @@ def _selected_root(prefix: str | None) -> Path:
         raise SystemExit(1)
 
 
-def new_dir(
+def _new_dir(
         base: Path,
         dir_type: str,
         name_parts: list[str],
@@ -73,16 +61,16 @@ def new_dir(
         print(f"{dir_type.title()} '{name}' already exists at {name_dir}", file=sys.stderr)
         raise SystemExit(1)
 
-    ensure_dir(name_dir)
+    _ensure_dir(name_dir)
     rendered_instruction = _set_template_name(instruction_text, name)
     (name_dir / f"{dir_type}.md").write_text(rendered_instruction, encoding=ENCODING)
-    write_py_script(name_dir / "load.py", load_text)
+    _write_py_script(name_dir / "load.py", load_text)
 
 
 def init(prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Initialize the myteam directory with default role."""
     root = _selected_root(prefix)
-    new_dir(
+    _new_dir(
         base_dir(),
         "role",
         list(root.relative_to(base_dir()).parts),
@@ -96,22 +84,11 @@ def init(prefix: str = DEFAULT_LOCAL_ROOT) -> None:
         agents_md.write_text(get_template("agents_md_template.md"), encoding=ENCODING)
 
 
-def new_role(role: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Create a new role directory with placeholder files."""
-    new_dir(
-        _selected_root(prefix),
-        "role",
-        role.split("/"),
-        get_template("role_definition_template.md"),
-        get_template("role_load_template.py"),
-    )
-
-
 def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
         print(f"Skill path '{skill}' uses the reserved built-in namespace '{BUILTIN_ROOT_NAME}'.", file=sys.stderr)
         raise SystemExit(1)
-    new_dir(
+    _new_dir(
         _selected_root(prefix),
         "skill",
         skill.split("/"),
@@ -120,30 +97,30 @@ def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     )
 
 
-def new_task(task: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    task_path = Path(task)
+def new_workflow(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+    task_path = Path(workflow)
     suffix = task_path.suffix
     if not suffix:
         print(
-            f"Task '{task}' must include a file extension: .py, .md, .yaml, or .yml.",
+            f"Task '{workflow}' must include a file extension: .py, .md, .yaml, or .yml.",
             file=sys.stderr,
         )
         raise SystemExit(1)
     if suffix not in SUPPORTED_TASK_SUFFIXES:
-        print(f"Task '{task}' has unsupported extension '{suffix}'.", file=sys.stderr)
+        print(f"Task '{workflow}' has unsupported extension '{suffix}'.", file=sys.stderr)
         raise SystemExit(1)
 
     task_root = _selected_root(prefix)
     task_path = task_root.joinpath(*task_path.parts)
     if task_path.exists():
-        print(f"Task '{task}' already exists at {task_path}", file=sys.stderr)
+        print(f"Task '{workflow}' already exists at {task_path}", file=sys.stderr)
         raise SystemExit(1)
 
-    ensure_dir(task_path.parent)
+    _ensure_dir(task_path.parent)
     if suffix == ".py":
         template = get_template("task_definition_template.py")
         template = template.removesuffix("\n")
-        write_py_script(task_path, template)
+        _write_py_script(task_path, template)
         return
     if suffix == ".md":
         template = get_template("task_definition_template.md")
@@ -182,91 +159,7 @@ def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
         raise SystemExit(1)
 
 
-def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path) -> None:
-    try:
-        result = _run_load_py(dir_type, name_dir, name, project_root=project_root)
-    except OSError as exc:
-        print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-
-    if result.stdout:
-        sys.stdout.write(result.stdout)
-    raise SystemExit(result.returncode)
-
-
-def _run_load_py(
-        dir_type: str,
-        name_dir: Path,
-        name: str | None,
-        *,
-        project_root: Path,
-) -> subprocess.CompletedProcess[str]:
-    if not name_dir.exists():
-        print(
-            f"{dir_type.title()} '{name}' not found. Run 'myteam new {dir_type} {name}' to create it.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
-    load_py = name_dir / "load.py"
-    if not load_py.exists():
-        print(f"No load.py found for {dir_type} '{name}'.", file=sys.stderr)
-        raise SystemExit(1)
-
-    env = dict(os.environ)
-    env[PROJECT_ROOT_ENV_VAR] = str(project_root)
-    return subprocess.run(
-        [sys.executable, str(load_py)],
-        cwd=name_dir,
-        env=env,
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-    )
-
-
-def get_role(role: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Print the instructions for the given role if available."""
-    project_root = _selected_root(prefix)
-    folder = project_root
-    if role is not None:
-        folder = folder.joinpath(*role.split("/"))
-
-    if not is_role_dir(folder):
-        print(f"Not a role: {role}", file=sys.stderr)
-        raise SystemExit(1)
-    get_name("role", folder, role, project_root=project_root)
-
-
-def get_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Print the instructions for the given skill if available."""
-    project_root = _selected_root(prefix)
-    if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
-        folder = builtin_skill_dir(skill)
-        if not is_skill_dir(folder):
-            print(f"Not a skill: {skill}", file=sys.stderr)
-            raise SystemExit(1)
-        get_name("skill", folder, skill, project_root=project_root)
-
-    folder = project_root.joinpath(*skill.split("/"))
-    if is_skill_dir(folder):
-        get_name("skill", folder, skill, project_root=project_root)
-    print(f"Not a skill: {skill}", file=sys.stderr)
-    raise SystemExit(1)
-
-
-def get_skills(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Print detailed information for skills available in a directory."""
-    project_root = _selected_root(prefix)
-    folder = project_root if directory is None else project_root.joinpath(*directory.split("/"))
-    if not folder.is_dir():
-        print(f"Not a directory: {folder}", file=sys.stderr)
-        raise SystemExit(1)
-
-    disclose_get_skills(folder, project_root, [])
-
-
-def get_tasks(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
+def get_workflows(directory: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
     """Print detailed information for tasks available in a directory."""
     project_root = _selected_root(prefix)
     folder = project_root if directory is None else project_root.joinpath(*directory.split("/"))
@@ -303,7 +196,7 @@ def _log(message: str) -> None:
 
 def _run_python_task(path: Path, *, project_root: Path) -> int:
     env = dict(os.environ)
-    env[PROJECT_ROOT_ENV_VAR] = str(project_root)
+    env[MYTEAM_ROOT_DIR_ENV_VAR_NAME] = str(project_root)
     result = subprocess.run([sys.executable, str(path)], cwd=path.parent, env=env, check=False)
     return result.returncode
 
@@ -371,7 +264,7 @@ def _run_markdown_start_task(path: Path, *, task: str, input: Any, logger) -> No
     logger(f"Task '{task}' completed successfully.")
 
 
-def start(
+def start_workflow(
         task: str = "agent",
         prefix: str = DEFAULT_LOCAL_ROOT,
         verbose: bool = False,
@@ -435,10 +328,10 @@ def task_result(json: str | None = None, text: str | None = None, session_nonce:
 
 
 def task_start(
-    task: str,
-    json: Any | None = None,
-    text: str | None = None,
-    session_nonce: str | None = None,
+        task: str,
+        json: Any | None = None,
+        text: str | None = None,
+        session_nonce: str | None = None,
 ) -> None:
     submit_task_start(task, json=json, text=text, session_nonce=session_nonce)
 
@@ -454,17 +347,17 @@ def changelog() -> str:
 __all__ = [
     "download_roster",
     "get_role",
-    "get_skill",
+    "load_skill",
     "get_skills",
-    "get_tasks",
+    "get_workflows",
     "get_task",
     "init",
     "list_available_rosters",
     "new_role",
     "new_skill",
-    "new_task",
+    "new_workflow",
     "remove",
-    "start",
+    "start_workflow",
     "task_result",
     "update_roster",
     "changelog",

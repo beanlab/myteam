@@ -114,16 +114,14 @@ class AgentContext:
         self,
         *,
         prompt: str,
-        output: dict[str, Any] | None = None,
         input: Any = None,
+        output: dict[str, Any] | None = None,
         agent: str | None = None,
         model: str | None = None,
         interactive: bool | None = None,
-        session_id: str | None = None,
         fork: bool | None = None,
         extra_args: tuple[str, ...] | None = None,
-        skills: list[str] | str | None = None,
-        tasks: list[str] | str | None = None,
+        session_id: str | None = None,
     ) -> StepResult:
         state = RunState()
         try:

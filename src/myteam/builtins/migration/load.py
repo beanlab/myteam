@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from myteam.upgrade import print_pending_migrations
-from myteam.utils import (
+from myteam.frontmatter import (
     builtin_skill_dir,
     get_active_myteam_root,
     get_skills,

@@ -36,30 +36,6 @@ class CompletedStepState(TypedDict, total=False):
 TaskOutput = dict[str, CompletedStepState]
 
 
-class ProjectTaskDefaults(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    agent: Optional[str] = Field(default=None, min_length=1)
-    model: Optional[str] = Field(default=None, min_length=1)
-    interactive: Optional[bool] = None
-    session_id: Optional[str] = Field(default=None, min_length=1)
-    fork: Optional[bool] = Field(default=None)
-    extra_args: Optional[tuple[str, ...]] = Field(default=None)
-    usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
-    timeout: Optional[PositiveInt] = Field(default=None)
-
-    @field_validator("extra_args", mode="before")
-    @classmethod
-    def _coerce_extra_args(cls, value: Any) -> tuple[str, ...] | None:
-        if value is None:
-            return None
-        if isinstance(value, tuple):
-            return value
-        if isinstance(value, list):
-            return tuple(value)
-        return value
-
-
 class StepDefinitionModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 

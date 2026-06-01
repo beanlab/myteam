@@ -9,7 +9,7 @@ from types import ModuleType
 from typing import Any, Iterator
 
 from ...disclosure import (
-    PROJECT_ROOT_ENV_VAR,
+    MYTEAM_ROOT_DIR_ENV_VAR_NAME,
     TaskStepSettings,
     format_required_input_shape,
 )
@@ -192,14 +192,14 @@ def _load_module_from_path(path: Path) -> ModuleType:
 @contextmanager
 def _temporary_python_task_context(path: Path, *, project_root: Path) -> Iterator[None]:
     previous_cwd = Path.cwd()
-    previous_project_root = os.environ.get(PROJECT_ROOT_ENV_VAR)
-    os.environ[PROJECT_ROOT_ENV_VAR] = str(project_root)
+    previous_project_root = os.environ.get(MYTEAM_ROOT_DIR_ENV_VAR_NAME)
+    os.environ[MYTEAM_ROOT_DIR_ENV_VAR_NAME] = str(project_root)
     os.chdir(path.parent)
     try:
         yield
     finally:
         os.chdir(previous_cwd)
         if previous_project_root is None:
-            os.environ.pop(PROJECT_ROOT_ENV_VAR, None)
+            os.environ.pop(MYTEAM_ROOT_DIR_ENV_VAR_NAME, None)
         else:
-            os.environ[PROJECT_ROOT_ENV_VAR] = previous_project_root
+            os.environ[MYTEAM_ROOT_DIR_ENV_VAR_NAME] = previous_project_root
