@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -145,9 +146,17 @@ def _start_markdown_workflow(workflow_file: Path, workflow_input_json: str):
     return result.stdout
 
 
+def _start_python_workflow(workflow_file: Path, workflow_input_json: str):
+    pass
+
+
 def start_workflow(workflow_name: str, workflow_input_json: str):
-    # TODO - check: are we starting the engine, or messaging to the engine?
-    
+    # if env var is set, it's a child workflow
+    # if it's part of a regular agent session, is_cli will be false
+    is_cli = (sys.stdin.isatty() or sys.stdout.isatty() or sys.stderr.isatty())
+    if not os.environ.get("SESSION_NONCE") and not is_cli:
+        raise RuntimeError("Workflows may only be started from the CLI or from another workflow.")
+
     workflow_file = resolve_target(workflow_name)
 
     if workflow_file.suffix == '.md':
