@@ -147,10 +147,20 @@ def _start_markdown_workflow(workflow_file: Path, workflow_input_json: str):
 
 
 def _start_python_workflow(workflow_file: Path, workflow_input_json: str):
-    pass
+    args = [sys.executable, str(workflow_file)]
+    if workflow_input_json:
+        args.extend(["--json", workflow_input_json])
+    result = subprocess.run(
+        args,
+        cwd=workflow_file.parent,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+    )
+    return result.stdout
 
 
-def start_workflow(workflow_name: str, workflow_input_json: str):
+def start_workflow(workflow_name: str, workflow_input_json: str | None = None):
     # if env var is set, it's a child workflow
     # if it's part of a regular agent session, is_cli will be false
     is_cli = (sys.stdin.isatty() or sys.stdout.isatty() or sys.stderr.isatty())
@@ -163,7 +173,7 @@ def start_workflow(workflow_name: str, workflow_input_json: str):
         _start_markdown_workflow(workflow_file, workflow_input_json)
 
     elif workflow_file.suffix == '.py':
-        _start_python_workflow(workflow_file)
+        _start_python_workflow(workflow_file, workflow_input_json)
 
     else:
         raise NotImplementedError(workflow_file.suffix)
