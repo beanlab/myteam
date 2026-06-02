@@ -44,7 +44,14 @@ WorkflowInfo = MarkdownWorkflowInfo | PythonWorkflowInfo
 
 
 def new_workflow(workflow_name: str):
-    pass
+    workflow_path = Path(workflow_name)
+    if workflow_path.exists():
+        raise RuntimeError(f"Task '{workflow_name}' already exists")
+    if workflow_path.suffix == ".md":
+        resolve_prefix(workflow_name).write_text(get_template('new_workflow.md'))
+    if workflow_path.suffix == ".py" or not workflow_path.suffix:
+        resolve_prefix(workflow_name).write_text(get_template('new_workflow.py'))
+    raise NotImplementedError(f"Workflow type '{workflow_path.suffix}' not supported")
 
 
 def explain_workflows() -> str:
