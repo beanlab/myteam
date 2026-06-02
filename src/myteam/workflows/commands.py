@@ -1,13 +1,12 @@
-import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import TypedDict, Literal, Any
+from typing import TypedDict, Literal
 
 from .config import WorkflowDefaults, load_workflow_defaults
-from .frontmatter import split_yaml_frontmatter, parse_python_module_docstring
-from .prefix import resolve_prefix, relative_to_myteam
-from .templates import get_template
+from ..frontmatter import split_markdown_frontmatter, parse_python_frontmatter
+from ..prefix import resolve_prefix, relative_to_myteam
+from ..templates import get_template
 from ..prefix import get_myteam_root, resolve_target
 from ..templates import get_template_file
 
@@ -68,10 +67,26 @@ def _parse_markdown_workflow_info(
     # noinspection PyTypeChecker
     # frontmatter is AgentSettings + a few fields
     return MarkdownWorkflowInfo(
+        type='markdown',
         name=workflow_name,
         description=frontmatter.pop('description'),
         input=frontmatter.pop('input'),
         prompt=content,
+        output=frontmatter.pop('output'),
+        **resolve_agent_settings(frontmatter, defaults)
+    )
+
+
+def _parse_python_workflow_info(
+        workflow_name: str, frontmatter: dict, defaults: WorkflowDefaults
+) -> WorkflowInfo:
+    # noinspection PyTypeChecker
+    # frontmatter is AgentSettings + a few fields
+    return PythonWorkflowInfo(
+        type='python',
+        name=workflow_name,
+        description=frontmatter.pop('description'),
+        input=frontmatter.pop('input'),
         output=frontmatter.pop('output'),
         **resolve_agent_settings(frontmatter, defaults)
     )
@@ -87,14 +102,14 @@ def get_workflows(prefix: str) -> str:
             continue
 
         if file.suffix == '.md':
-            frontmatter, content = split_yaml_frontmatter(file.read_text())
+            frontmatter, content = split_markdown_frontmatter(file.read_text())
             if frontmatter.get('type') == 'workflow':
                 workflow_name = relative_to_myteam(file)
                 info = _parse_markdown_workflow_info(workflow_name, frontmatter, content, workflow_defaults)
                 workflow_infos.append(info)
 
         elif file.suffix == '.py':
-            frontmatter = parse_python_module_docstring(file.read_text())
+            frontmatter = parse_python_frontmatter(file.read_text())
             if frontmatter.get('type') == 'workflow':
                 workflow_name = relative_to_myteam(file)
                 info = _parse_python_workflow_info(workflow_name, frontmatter)
