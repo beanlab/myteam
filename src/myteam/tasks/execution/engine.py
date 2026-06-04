@@ -5,7 +5,6 @@ from copy import deepcopy
 
 import yaml
 
-from ..agents import DEFAULT_AGENT
 from ..definition.models import (
     CompletedStepState,
     StepDefinition,
@@ -16,6 +15,7 @@ from ..definition.models import (
 )
 from ..resolution.reference_resolver import resolve_references
 from .steps import run_agent
+from ...workflows.agents import DEFAULT_AGENT
 
 
 def run_task(

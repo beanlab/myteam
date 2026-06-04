@@ -5,9 +5,9 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from ...disclosure import TaskStepSettings, split_yaml_frontmatter
+from ...disclosure import TaskStepSettings
 from .models import TaskDefinition, TaskDefinitionModel
-
+from ...frontmatter import split_markdown_frontmatter
 
 def load_task(path: Path) -> TaskDefinition:
     loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -30,7 +30,7 @@ def load_task(path: Path) -> TaskDefinition:
 
 def load_markdown_task(path: Path) -> tuple[str, TaskStepSettings | None]:
     text = path.read_text(encoding="utf-8")
-    frontmatter, prompt = split_yaml_frontmatter(text)
+    frontmatter, prompt = split_markdown_frontmatter(text)
     if text.startswith("---") and prompt == text:
         raise ValueError(f"Markdown task file at {path} has invalid frontmatter.")
     task_settings = _task_settings_from_frontmatter(frontmatter, path=path)
