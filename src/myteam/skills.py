@@ -58,6 +58,11 @@ def get_skills(prefix: str) -> str:
     return _format_skills(infos)
 
 
+@functools.wraps(get_skills)
+def print_get_skills(*args, **kwargs):
+    print(get_skills(*args, **kwargsargs))
+
+
 def _load_markdown_skill(skill_file: Path) -> str:
     frontmatter, content = split_markdown_frontmatter(skill_file.read_text())
     return content

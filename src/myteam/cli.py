@@ -5,23 +5,18 @@ import functools
 
 import fire
 
-from .skills import explain_skills, print_load_skill
-from .prefix import _set_global_prefix_env_var
 from .commands import (
     changelog,
     download_roster,
-    load_skill,
-    get_skills,
-    get_workflows,
     init,
     list_available_rosters,
-    new_skill,
-    new_workflow,
     remove,
-    start_workflow,
     update_roster,
     version,
 )
+from .prefix import _set_global_prefix_env_var
+from .skills import explain_skills, print_load_skill, new_skill, print_get_skills
+from .workflows.commands import explain_workflows, new_workflow, get_workflows, start_workflow
 
 
 def delegate_commands(command_map):
@@ -53,7 +48,7 @@ def main():
             "workflows": lambda: print(explain_workflows()),
         },
         "get": {
-            "skills": lambda: print(get_skills()),
+            "skills": print_get_skills,
             "workflows": get_workflows,
         },
         "start": start_workflow,
@@ -74,7 +69,7 @@ def main():
             _set_global_prefix_env_var(prefix)
 
     fire.Fire(MyTeam)
-    
+
 
 if __name__ == "__main__":
     main()

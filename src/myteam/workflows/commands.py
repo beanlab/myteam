@@ -6,9 +6,9 @@ from typing import TypedDict, Literal
 
 from .config import WorkflowDefaults, load_workflow_defaults
 from ..frontmatter import split_markdown_frontmatter, parse_python_frontmatter
+from ..prefix import get_myteam_root, resolve_target
 from ..prefix import resolve_prefix, relative_to_myteam
 from ..templates import get_template
-from ..prefix import get_myteam_root, resolve_target
 from ..templates import get_template_file
 
 
@@ -100,8 +100,7 @@ def _parse_python_workflow_info(
     )
 
 
-def get_workflows(prefix: str) -> str:
-    """List the workflow headers for all workflows under `prefix`"""
+def get_workflow_infos(prefix: str) -> list[WorkflowInfo]:
     workflow_defaults = load_workflow_defaults(get_myteam_root())
 
     workflow_infos = []
@@ -126,6 +125,18 @@ def get_workflows(prefix: str) -> str:
             continue
 
     return workflow_infos
+
+
+def get_workflows(prefix: str) -> str:
+    """List the workflow headers for all workflows under `prefix`"""
+    infos = get_workflow_infos(prefix)
+    return '\n'.join(
+        f'{info["name"].center(40, "-")}\n'
+        f'{info["description"]}\n'
+        f'**Input Schema**\n{info["input"]}\n'
+        f'**Output Schema**\n{info["output"]}'
+        for info in infos
+    )
 
 
 def _start_markdown_workflow(workflow_file: Path, workflow_input_json: str):
