@@ -13,13 +13,6 @@ Skills are units of discoverable information that can be loaded on-demand by an 
 - progressive discovery of hierarchical skills
 - dynamic skill-content definition (as opposed to static `.md` files, a python script prints the skill content and can thus bring together or build information at load-time.) 
 
-### Commands
-
-- `myteam explain skills`
-- `myteam get skills [prefix]`
-- `myteam load <skill>`
-- `myteam new skill <skill>`
-
 ## Workflows
 
 Workflows are chained agent sessions with input/output schema enforcement and session management.
@@ -33,20 +26,13 @@ Workflows are chained agent sessions with input/output schema enforcement and se
 - agent TTY sessions preserved  
 - per-session configuration of model, reasoning, and other agent parameters
 
-### Commands
-
-- `myteam explain workflows`
-- `myteam get workflows [prefix]`
-- `myteam start <workflow>`
-- `myteam new workflow <workflow>`
-
 ## Additional Features
 
 In support of these primary concerns, `myteam` also supports:
 
 - `myteam init` - initializing harness configuration (`.myteam` folder)
-- `myteam list`, `myteam download` - list and download predefined skills and workflows
-- `myteam update` - refresh downloaded content
+- `myteam rosters list`, `myteam rosters download` - list and download predefined skills and workflows
+- `myteam rosters update` - refresh downloaded content
 - `myteam version` - display version
 
 ## Scenarios
