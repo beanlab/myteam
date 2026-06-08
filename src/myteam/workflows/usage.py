@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from ..agents.runtime import AgentRuntimeConfig
-from ..definition.models import UsageInfo
+from .agents.runtime import AgentRuntimeConfig
+from src.myteam.tasks.definition.models import UsageInfo
 
 
 def resolve_usage_tracking(
