@@ -2,14 +2,12 @@
 
 `myteam` resources contain YAML frontmatter.
 
-Required frontmatter fields:
-
-- `type`: `skill` or `workflow`
-- `description`: instructions about how and when an agent should use the resource
-
+The `type` field in the frontmatter is required. Its values can be `skill` or `workflow`.
 Files without the `type` field in the frontmatter will not be treated as `myteam` resources.
 
-`myteam` resources missing the `description` field will result in an error.
+The `description` field is encouraged but optional. It provides instructions about how and when an agent should use the resource
+
+`myteam` resources missing the `description` field will have an empty description when listed.
 
 In Markdown files, the frontmatter is in the standard `---` block at the beginning of the file.
 

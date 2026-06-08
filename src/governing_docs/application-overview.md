@@ -4,6 +4,8 @@
 
 It provides infrastructure support for **skills** and **workflows**.
 
+These documents describe the **interface** and **user experience** of the application. They do not describe how the interface is implemented. 
+
 ## Skills
 
 Skills are units of discoverable information that can be loaded on-demand by an agent.
@@ -15,12 +17,12 @@ Skills are units of discoverable information that can be loaded on-demand by an 
 
 ## Workflows
 
-Workflows are chained agent sessions with input/output schema enforcement and session management.
+Workflows are chained, managed agent sessions.
 
 `myteam` supports:
 
 - discoverable, hierarchical workflows (similar to skills)
-- output schema enforcement
+- input/output schemas 
 - session reuse and forking
 - multiple agent CLIs
 - agent TTY sessions preserved  

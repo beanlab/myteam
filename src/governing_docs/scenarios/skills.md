@@ -24,7 +24,7 @@ If the Python process exits non-zero, `myteam load` should print stderr and exit
 
 Python skills do not support command-line arguments.
 
-`myteam load ...` does not validate the YAML frontmatter. It simply attempts to load the specified file according to its extension.
+`myteam load ...` does not validate the YAML frontmatter. It simply attempts to load the specified file according to its extension. So it is possible to load a file that is not formatted with valid frontmatter.
 
 `myteam load <folder>` should raise an error explaining that `myteam list <folder>` should be used instead.
 

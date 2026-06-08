@@ -58,8 +58,8 @@ Directory setup:
 ----skill: .myteam/foo/bar.md----
 <description from bar.md>
 
-----skill: .myteam/foo/baz.md----
-<description from baz.md>
+----skill: .myteam/foo/baz.py----
+<description from baz.py>
 
 ----workflow: .myteam/foo/yep.py----
 <description from yep.py>
