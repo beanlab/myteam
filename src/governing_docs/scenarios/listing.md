@@ -21,7 +21,7 @@ Each workflow entry should contain:
 
 Because skills and workflows are organized hierarchically, `prefix` controls the scope for which the items are listed.
 
-If `prefix` is not specified, it defaults to empty, meaning the top level of the `.myteam` folder.
+If `prefix` is not specified, it defaults to empty, meaning the current working directory.
 
 ### Examples
 
@@ -39,35 +39,35 @@ Directory setup:
   go.py    # workflow
 ```
 
-`myteam list` should print something to the effect of:
+`myteam list .myteam` should print something to the effect of:
 
 ```
-----foo/----
+----.myteam/foo/----
 <content from description.md>
 
-----workflow: go.py----
+----workflow: .myteam/go.py----
 <description field from go.py frontmatter>
 
-----skill: quux.md----
+----skill: .myteam/quux.md----
 <description field from quux.md frontmatter>
 ```
 
-`myteam list foo` or `myteam list foo/` should print:
+`myteam list .myteam/foo` or `myteam list .myteam/foo/` should print:
 
 ```text
-----skill: bar.md----
+----skill: .myteam/foo/bar.md----
 <description from bar.md>
 
-----skill: baz.md----
+----skill: .myteam/foo/baz.md----
 <description from baz.md>
 
-----workflow: yep.py----
+----workflow: .myteam/foo/yep.py----
 <description from yep.py>
 ```
 
 `myteam list nonsense` should report an error like "Not a skill folder: nonsense".
 
-The root `.myteam` folder is always a valid listing prefix. A non-root prefix is valid if it resolves to a directory under `.myteam` containing `description.md`.
+Any folder can be the prefix in `myteam list`. However, only folders containing `description.md` will be printed as skill folders in the output.
 
 ### Listing Python files
 
