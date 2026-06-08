@@ -10,6 +10,8 @@ The body of the Markdown file becomes the content of the skill.
 
 The stdout of the invoked Python script becomes the content of the skill.
 
+The `description` field is encouraged, but optional. 
+
 ## Load skill
 
 `myteam load <skill>` should load the specified skill by printing the skill content to stdout.
@@ -24,7 +26,7 @@ Python skills do not support command-line arguments.
 
 `myteam load ...` does not validate the YAML frontmatter. It simply attempts to load the specified file according to its extension.
 
-`myteam load <folder>` should raise an error explaining that `myteam list skills <folder>` should be used instead.
+`myteam load <folder>` should raise an error explaining that `myteam list <folder>` should be used instead.
 
 ## New skill
 
