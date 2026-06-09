@@ -18,17 +18,6 @@ class ResourceInfo:
     description: str
 
 
-def explain_resources() -> str:
-    return (
-        "# Resources\n\n"
-        "`myteam list [prefix]` shows namespaces, skills, and workflows under the given prefix.\n\n"
-        "Namespaces are folders with a `description.md` file. Skills and workflows are Markdown or Python "
-        "files with frontmatter declaring `type: skill` or `type: workflow`.\n\n"
-        "Use `myteam list` to discover resources, `myteam get skill <skill>` to load a skill, and "
-        "`myteam start <workflow>` to run a workflow."
-    )
-
-
 def list_resources(prefix: str | None = None) -> str:
     root = Path.cwd().resolve()
     prefix_path = _resolve_prefix_path(root, prefix)
@@ -147,7 +136,6 @@ def _format_info(info: ResourceInfo) -> str:
 
 __all__ = [
     "ResourceInfo",
-    "explain_resources",
     "list_resource_entries",
     "list_resources",
     "read_folder_description",
