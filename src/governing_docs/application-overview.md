@@ -32,10 +32,8 @@ Workflows are chained, managed agent sessions.
 
 In support of these primary concerns, `myteam` also supports:
 
-- `myteam init` - initializing harness configuration (`.myteam` folder)
-- `myteam rosters list`, `myteam rosters download` - list and download predefined skills and workflows
-- `myteam rosters update` - refresh downloaded content
 - `myteam version` - display version
+- `myteam rosters list`, `myteam rosters download`,`myteam rosters update` - list, download, and update predefined skills and workflows
 
 ## Scenarios
 

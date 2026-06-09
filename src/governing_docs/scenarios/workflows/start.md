@@ -22,7 +22,7 @@ You can supply input to workflows that define an input schema using the `--input
 
 ## Output
 
-When a `myteam start` process completes, it will print the JSON output of the workflow on the last line of stdout. 
+When a `myteam start` process completes, it will print the JSON output of the workflow on the last line of stdout (i.e. the `output` field of the workflow-level `SessionResult`). 
 
 It will print the usage information of the workflow to stderr. 
 

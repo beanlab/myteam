@@ -2,6 +2,8 @@
 
 `myteam list [prefix]` displays a list of the skills and workflows available under the specified prefix.
 
+A user or agent references a `myteam` resource by the path displayed when listed. 
+
 Entries are listed in alphabetical order by name with folders, files, and workflows sorted together.
 
 Each folder entry should contain:
@@ -23,12 +25,14 @@ Because skills and workflows are organized hierarchically, `prefix` controls the
 
 If `prefix` is not specified, it defaults to empty, meaning the current working directory.
 
+Note that the `description` field is only used for listing resources; it is not used in loading skills or invoking workflows. 
+
 ### Examples
 
 Directory setup:
 
 ```
-.myteam/
+agents/
   foo/
     description.md
     bar.md  # skill
@@ -39,29 +43,29 @@ Directory setup:
   go.py    # workflow
 ```
 
-`myteam list .myteam` should print something to the effect of:
+`myteam list agents` should print something to the effect of:
 
 ```
-----.myteam/foo/----
+----agents/foo/----
 <content from description.md>
 
-----workflow: .myteam/go.py----
+----workflow: agents/go.py----
 <description field from go.py frontmatter>
 
-----skill: .myteam/quux.md----
+----skill: agents/quux.md----
 <description field from quux.md frontmatter>
 ```
 
-`myteam list .myteam/foo` or `myteam list .myteam/foo/` should print:
+`myteam list agents/foo` or `myteam list agents/foo/` should print:
 
 ```text
-----skill: .myteam/foo/bar.md----
+----skill: agents/foo/bar.md----
 <description from bar.md>
 
-----skill: .myteam/foo/baz.py----
+----skill: agents/foo/baz.py----
 <description from baz.py>
 
-----workflow: .myteam/foo/yep.py----
+----workflow: agents/foo/yep.py----
 <description from yep.py>
 ```
 

@@ -5,6 +5,6 @@
 If you want to use your own template, make that template and simply copy it to make a new resource.
 
 ```bash
-cp templates/my-skill.md .myteam/foo.md
+cp templates/my-skill.md agents/foo.md
 ```
 

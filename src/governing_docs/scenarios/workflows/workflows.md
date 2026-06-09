@@ -64,7 +64,7 @@ frontmatter, body = split_markdown(markdown_file_text)
 prompt = jinja.render(body, **runtime_input)
 ```
 
-Note that the frontmatter is completely ignored when a Markdown file is invoked as a workflow.
+Additional `run_agent` parameters specified in the frontmatter (e.g. `agent`, `model`, `reasoning`, or `interactive`) will be passed to the underlying invocation of `run_agent`. 
 
 #### Example
 
