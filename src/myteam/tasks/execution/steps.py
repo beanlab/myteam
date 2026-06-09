@@ -9,13 +9,14 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from ..agents import resolve_agent_runtime_config
-from ..agents.runtime import AgentRuntimeConfig, AgentSessionContext
+# from ..agents import resolve_agent_runtime_config
+# from ..agents.runtime import AgentRuntimeConfig, AgentSessionContext
 from ..definition.config import load_project_task_defaults
 from ..definition.models import ProjectTaskDefaults, StepExecutionArgs, StepResult, UsageInfo, PreparedStep, RunState
 from .errors import StepExecutionError
 from .prompts import build_child_resume_prompt, build_step_prompt
-from ..resolution.session_resolution import resolve_project_root, resolve_session_id
+# from ..resolution.session_resolution import resolve_project_root, resolve_session_id
+from ..resolution.session_resolution import resolve_session_id
 from ...disclosure import resolve_skill_entries, resolve_task_entries
 from .usage import (
     print_aggregated_usage_summary,

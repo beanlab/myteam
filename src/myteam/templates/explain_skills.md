@@ -19,7 +19,7 @@ do their parts.
 
 If a skill is relevant to an aspect of your task, please run:
 
-`myteam get skill <skillname>`
+`myteam load <skillname>`
 
 Skills can be hierarchical and are named in Posix-path style, 
 with `/` as the delimiter (regardless of OS).
