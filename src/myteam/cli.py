@@ -5,70 +5,40 @@ import functools
 
 import fire
 
-from .commands import (
-    changelog,
-    download_roster,
-    init,
-    list_available_rosters,
-    remove,
-    update_roster,
-    version,
-)
-from .prefix import _set_global_prefix_env_var
-from .skills import explain_skills, print_load_skill, new_skill, print_get_skills
-from .workflows.commands import explain_workflows, new_workflow, get_workflows, start_workflow
+from .commands import changelog, version
+from .rosters import download_roster, list_available_rosters, update_roster
+from .listing import list_resources
+from .explain import explain_resources
+from .skills import explain_skills, new_skill, load_skill
+from .workflows.commands import explain_workflows, new_workflow, start_workflow
 
 
-def delegate_commands(command_map):
-    def decorate(cls):
-        for name, fn in command_map.items():
-            def make_wrapper(f):
-                @functools.wraps(f)
-                def wrapper(self, *args, **kwargs):
-                    return f(*args, **kwargs)
-
-                return wrapper
-
-            setattr(cls, name, make_wrapper(fn))
-
-        return cls
-
-    return decorate
+def printed(func):
+    def new_func(*args, **kwargs):
+        print(func(*args, **kwargs))
+    return new_func
 
 
 def main():
     commands = {
-        "init": init,
+        "explain": printed(explain_resources),
+        "list": printed(list_resources),
+        "load": printed(load_skill),
+        "start": printed(start_workflow),
         "new": {
             "skill": new_skill,
-            "workflow": new_workflow,
+            "workflow": new_workflow
         },
-        "explain": {
-            "skills": lambda: print(explain_skills()),
-            "workflows": lambda: print(explain_workflows()),
-        },
-        "get": {
-            "skills": print_get_skills,
-            "workflows": get_workflows,
-        },
-        "start": start_workflow,
-        "load": print_load_skill,
-
-        "remove": remove,  # TODO - keep?
-
-        "download": download_roster,  # TODO - bundle these?
-        "update": update_roster,
-        "list": list_available_rosters,
+        "version": version,
         "changelog": changelog,
-        "--version": version,
+        "rosters": {
+            "list": printed(list_available_rosters),
+            "download": download_roster,
+            "update": update_roster,
+        }
     }
 
-    @delegate_commands(commands)
-    class MyTeam:
-        def __init__(self, prefix: str = ".myteam"):
-            _set_global_prefix_env_var(prefix)
-
-    fire.Fire(MyTeam)
+    fire.Fire(commands)
 
 
 if __name__ == "__main__":
