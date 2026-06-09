@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from . import __version__
+from .rosters import download_roster, list_available_rosters, update_roster
 from .paths import (
     APP_NAME,
     BUILTIN_ROOT_NAME,
@@ -23,7 +24,6 @@ from .paths import (
     role_dir,
     task_candidates,
 )
-from .rosters import download_roster, list_available_rosters, update_roster
 from .tasks.definition import run_default_task, load_markdown_task, load_task
 from .tasks.execution.cli_commands import task_result as submit_task_result
 from .tasks.execution.cli_commands import task_start as submit_task_start
