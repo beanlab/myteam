@@ -1,17 +1,8 @@
 ---
-name: ""
-description: "Unimplemented task"
-# Optional task settings (will default to settings in .config.yaml)
-agent:
-model:
-output:
+type: workflow
+description: "This workflow has not yet been implemented; if you see this, please inform the user of the error."
 input:
-interactive:
-session_id:
-fork:
-extra_args:
-usage_logging:
-timeout:
+output:
 ---
 
 Write the prompt here.

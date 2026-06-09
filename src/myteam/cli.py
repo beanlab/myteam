@@ -9,7 +9,6 @@ from .commands import changelog, version
 from .rosters import download_roster, list_available_rosters, update_roster
 from .explain import explain_resources
 from .listing import list_resources
-# from .skills import explain_skills
 from .skills import new_skill, load_skill
 # from .workflows.commands import new_workflow, start_workflow
 
