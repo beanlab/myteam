@@ -1,6 +1,5 @@
 """Workflow-related modules for myteam."""
 from __future__ import annotations
 
-from . import commands, execution, results
-
-__all__ = ["commands", "execution", "results"]
+from .commands import new_workflow, start_workflow
+from .results import report_result

@@ -10,7 +10,7 @@ from .commands import changelog, version
 from .explain import explain_resources
 from .listing import list_resources
 from .skills import new_skill, load_skill
-# from .workflows.commands import new_workflow, start_workflow
+from .workflows import new_workflow, start_workflow, report_result
 
 
 def printed(func):
@@ -24,12 +24,13 @@ def main():
     commands = {
         "explain": printed(explain_resources),
         "list": printed(list_resources),
-        "load": printed(load_skill),
-        # "start": printed(start_workflow),
         "new": {
             "skill": new_skill,
-            # "workflow": new_workflow
+            "workflow": new_workflow
         },
+        "load": printed(load_skill),
+        "start": printed(start_workflow),
+        "result": report_result,
         "version": version,
         "changelog": changelog,
         "rosters": {

@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 from myteam.frontmatter import split_markdown_frontmatter
-from myteam.prefix import get_myteam_root
 from myteam.tasks import AgentContext
 from myteam.workflows.commands import resolve_agent_settings
 from myteam.workflows.config import load_workflow_defaults
@@ -13,9 +12,10 @@ from myteam.workflows.config import load_workflow_defaults
 
 def main(
         markdown_file: Path,
-        workflow_inputs: str
+        workflow_inputs: str,
+        workflow_defaults: Path
 ):
-    workflow_defaults = load_workflow_defaults(get_myteam_root())
+    workflow_defaults = load_workflow_defaults(workflow_defaults)
     usage_logging = workflow_defaults.usage_logging if workflow_defaults is not None else None
     timeout = workflow_defaults.timeout if workflow_defaults is not None else None
 
@@ -29,12 +29,12 @@ def main(
     ) as ctx:
         args = resolve_agent_settings(frontmatter, workflow_defaults)
 
-        args['prompt'] = content.format(**winputs)
+        args['prompt'] = content.format(**winputs)  # TODO - use jinja2 instead
 
         result = ctx.run_agent(**args)
 
-        print(json.dumps(result.output, indent=2))
+        print(json.dumps(result.output))
 
 
 if __name__ == '__main__':
-    main(Path(sys.argv[1]), sys.argv[2])
+    main(Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3]))
