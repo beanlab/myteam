@@ -86,13 +86,14 @@ def _start_python_workflow(workflow_file: Path, workflow_input_json: str):
 
 
 def start_workflow(workflow_name: str | None = None, *args: str, workflow_input_json: str | None = None):
-    """Prototype nested TTY session entrypoint.
-
-    The prototype lives in `myteam.proto`: if no mothership is present this
-    starts one, then uses the same RPC path as nested calls to launch the first
-    session. If a mothership is already present this acts as the blocking
-    client/shim and returns the child session's JSON result.
-    """
+    """Start a workflow invocation under the prototype mothership supervisor."""
     from ..proto import start
 
     return start(workflow_name, *args, workflow_input_json=workflow_input_json)
+
+
+def run_agent(**kwargs):
+    """Start an agent session through the active prototype mothership supervisor."""
+    from ..proto import run_agent as proto_run_agent
+
+    return proto_run_agent(**kwargs)

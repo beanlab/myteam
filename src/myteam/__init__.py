@@ -5,7 +5,9 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import tomllib
 
-__all__ = ["__version__"]
+from .workflows import SessionResult, UsageInfo, run_agent
+
+__all__ = ["__version__", "run_agent", "SessionResult", "UsageInfo"]
 
 
 def _project_version() -> str:

@@ -1,7 +1,8 @@
-"""Prototype mothership: coordinates RPC, PTY sessions, and TTY switching."""
+"""Prototype mothership: coordinates RPC, PTY sessions, workflows, and TTY switching."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import os
 from queue import Empty, Queue
 import secrets
@@ -11,15 +12,34 @@ import subprocess
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from .protocol import ENV_SESSION_ID, ENV_SOCKET, json_response, load_json_object, read_all, safe_unlink
+from .protocol import (
+    ENV_AGENT_INPUT_JSON,
+    ENV_AGENT_OUTPUT_JSON,
+    ENV_AGENT_PROMPT,
+    ENV_REQUEST_ID,
+    ENV_SESSION_ID,
+    ENV_SESSION_NONCE,
+    ENV_SOCKET,
+    ENV_WORKFLOW_INPUT_JSON,
+    ENV_WORKFLOW_INVOCATION_ID,
+    KIND_ACK_RESULT,
+    KIND_POLL_RESULT,
+    KIND_REPORT_RESULT,
+    KIND_START_AGENT_SESSION,
+    KIND_START_WORKFLOW,
+    json_response,
+    load_json_object,
+    read_all,
+    safe_unlink,
+)
 from .pty_process import ManagedPtyProcess
 from .terminal import RealTerminal, Winsize
 
 
 @dataclass
-class StartCommand:
+class StartWorkflowCommand:
     request_id: str
     argv: list[str]
     parent_session_id: str | None
@@ -28,32 +48,73 @@ class StartCommand:
 
 
 @dataclass
+class StartAgentSessionCommand:
+    request_id: str
+    argv: list[str]
+    cwd: str | None
+    prompt: str
+    input: dict[str, Any] | None
+    output: dict[str, Any] | None
+    agent: str | None
+    model: str | None
+    reasoning: str | None
+    interactive: bool | None
+    agent_session_id: str | None
+    fork: bool | None
+    parent_session_id: str | None
+
+
+@dataclass
 class ReportCommand:
+    request_id: str
     session_id: str
+    status: str
+    output: Any
+
+
+@dataclass
+class WorkflowCompletedCommand:
+    request_id: str
     status: str
     result: Any
 
 
-class Mothership:
-    """A deliberately small PTY multiplexer for nested `myteam start` calls.
+Command = StartWorkflowCommand | StartAgentSessionCommand | ReportCommand | WorkflowCompletedCommand
 
-    The mothership owns the real terminal and the RPC socket. Individual child
-    commands are represented by `ManagedPtyProcess`; terminal raw-mode handling
-    is isolated in `RealTerminal`.
+
+@dataclass
+class RequestRecord:
+    request_id: str
+    kind: Literal["workflow", "agent_session"]
+    status: Literal["pending", "running", "ok", "error", "exited"] = "pending"
+    parent_session_id: str | None = None
+    session_id: str | None = None
+    result: Any = None
+
+
+class Mothership:
+    """A deliberately small workflow supervisor and PTY multiplexer.
+
+    The mothership owns the real terminal and the control socket for one
+    workflow invocation. Workflows run as ordinary subprocesses. Calls to
+    `run_agent` from those workflows are delegated back to this supervisor,
+    which launches interactive agent sessions under PTYs.
     """
 
     def __init__(self) -> None:
         self.socket_path = ""
+        self.requests: dict[str, RequestRecord] = {}
         self.results: dict[str, dict[str, Any]] = {}
         self.active: ManagedPtyProcess | None = None
         self.stack: list[ManagedPtyProcess] = []
         self.sessions: dict[str, ManagedPtyProcess] = {}
+        self.workflow_threads: dict[str, threading.Thread] = {}
 
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
         self._server: socket.socket | None = None
         self._server_thread: threading.Thread | None = None
         self._closed = threading.Event()
-        self._commands: Queue[StartCommand | ReportCommand] = Queue()
+        self._commands: Queue[Command] = Queue()
         self._wakeup_r = -1
         self._wakeup_w = -1
         self._terminal = RealTerminal(on_resize=self._resize_sessions)
@@ -85,6 +146,8 @@ class Mothership:
         for session in list(self.sessions.values()):
             session.terminate()
             session.close()
+        for thread in list(self.workflow_threads.values()):
+            thread.join(timeout=1)
         for fd in (self._wakeup_r, self._wakeup_w):
             if fd >= 0:
                 try:
@@ -96,6 +159,21 @@ class Mothership:
         if self._tmpdir is not None:
             self._tmpdir.cleanup()
 
+    def start_top_level_workflow(self, *, argv: list[str], cwd: str | None, input_json: str | None) -> str:
+        request_id = self._new_request_id()
+        self.requests[request_id] = RequestRecord(request_id=request_id, kind="workflow", status="pending")
+        self._commands.put(
+            StartWorkflowCommand(
+                request_id=request_id,
+                argv=argv,
+                parent_session_id=None,
+                cwd=cwd,
+                input_json=input_json,
+            )
+        )
+        self._wake()
+        return request_id
+
     def run_until_complete(self, top_request_id: str) -> dict[str, Any] | None:
         """Forward the real terminal until the top-level request finishes."""
 
@@ -106,7 +184,12 @@ class Mothership:
 
                 if top_request_id in self.results:
                     return self.results[top_request_id]
-                if self.active is None and not self.stack and self._commands.empty():
+                if (
+                    self.active is None
+                    and not self.stack
+                    and self._commands.empty()
+                    and not self._has_running_workflows()
+                ):
                     return None
 
                 read_fds = [self._wakeup_r]
@@ -150,15 +233,23 @@ class Mothership:
             try:
                 message = load_json_object(read_all(connection))
                 kind = message.get("kind")
-                if kind == "start_session":
-                    response, command = self._accept_start_session(message)
+                if kind == KIND_START_WORKFLOW:
+                    response, command = self._accept_start_workflow(message)
                     connection.sendall(json_response(**response))
                     self._commands.put(command)
                     self._wake()
                     return
-                if kind == "poll_result":
+                if kind == KIND_START_AGENT_SESSION:
+                    response, command = self._accept_start_agent_session(message)
+                    connection.sendall(json_response(**response))
+                    self._commands.put(command)
+                    self._wake()
+                    return
+                if kind == KIND_POLL_RESULT:
                     response = self._poll_result(message)
-                elif kind == "report_result":
+                elif kind == KIND_ACK_RESULT:
+                    response = self._ack_result(message)
+                elif kind == KIND_REPORT_RESULT:
                     response, command = self._accept_report_result(message)
                     connection.sendall(json_response(**response))
                     self._commands.put(command)
@@ -173,10 +264,8 @@ class Mothership:
             except OSError:
                 pass
 
-    def _accept_start_session(self, message: dict[str, Any]) -> tuple[dict[str, Any], StartCommand]:
-        argv = message.get("argv")
-        if not isinstance(argv, list) or not argv or not all(isinstance(item, str) for item in argv):
-            raise ValueError("start_session requires a non-empty argv list.")
+    def _accept_start_workflow(self, message: dict[str, Any]) -> tuple[dict[str, Any], StartWorkflowCommand]:
+        argv = self._require_argv(message, KIND_START_WORKFLOW)
         parent_session_id = message.get("parent_session_id")
         if parent_session_id is not None and not isinstance(parent_session_id, str):
             raise ValueError("parent_session_id must be a string or null.")
@@ -187,14 +276,51 @@ class Mothership:
         if input_json is not None and not isinstance(input_json, str):
             raise ValueError("input_json must be a string or null.")
 
-        request_id = secrets.token_urlsafe(12)
-        command = StartCommand(
+        request_id = self._new_request_id()
+        self.requests[request_id] = RequestRecord(
+            request_id=request_id,
+            kind="workflow",
+            status="pending",
+            parent_session_id=parent_session_id,
+        )
+        command = StartWorkflowCommand(
             request_id=request_id,
             argv=argv,
             parent_session_id=parent_session_id,
             cwd=cwd,
             input_json=input_json,
         )
+        return {"ok": True, "request_id": request_id}, command
+
+    def _accept_start_agent_session(self, message: dict[str, Any]) -> tuple[dict[str, Any], StartAgentSessionCommand]:
+        argv = self._require_argv(message, KIND_START_AGENT_SESSION)
+        cwd = message.get("cwd")
+        if cwd is not None and not isinstance(cwd, str):
+            raise ValueError("cwd must be a string or null.")
+        prompt = message.get("prompt")
+        if not isinstance(prompt, str) or not prompt:
+            raise ValueError("start_agent_session requires prompt.")
+
+        request_id = self._new_request_id()
+        self.requests[request_id] = RequestRecord(request_id=request_id, kind="agent_session", status="pending")
+        command = StartAgentSessionCommand(
+            request_id=request_id,
+            argv=argv,
+            cwd=cwd,
+            prompt=prompt,
+            input=message.get("input") if isinstance(message.get("input"), dict) else None,
+            output=message.get("output") if isinstance(message.get("output"), dict) else None,
+            agent=message.get("agent") if isinstance(message.get("agent"), str) else None,
+            model=message.get("model") if isinstance(message.get("model"), str) else None,
+            reasoning=message.get("reasoning") if isinstance(message.get("reasoning"), str) else None,
+            interactive=message.get("interactive") if isinstance(message.get("interactive"), bool) else None,
+            agent_session_id=message.get("session_id") if isinstance(message.get("session_id"), str) else None,
+            fork=message.get("fork") if isinstance(message.get("fork"), bool) else None,
+            parent_session_id=message.get("parent_session_id") if isinstance(message.get("parent_session_id"), str) else None,
+        )
+        if command.parent_session_id is not None:
+            record = self.requests[request_id]
+            record.parent_session_id = command.parent_session_id
         return {"ok": True, "request_id": request_id}, command
 
     def _poll_result(self, message: dict[str, Any]) -> dict[str, Any]:
@@ -205,14 +331,30 @@ class Mothership:
             return {"ok": True, "ready": False}
         return {"ok": True, "ready": True, **self.results[request_id]}
 
+    def _ack_result(self, message: dict[str, Any]) -> dict[str, Any]:
+        request_id = message.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("ack_result requires request_id.")
+        self.results.pop(request_id, None)
+        self.requests.pop(request_id, None)
+        return {"ok": True}
+
     def _accept_report_result(self, message: dict[str, Any]) -> tuple[dict[str, Any], ReportCommand]:
+        request_id = message.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("report_result requires request_id.")
         session_id = message.get("session_id")
         if not isinstance(session_id, str) or not session_id:
             raise ValueError("report_result requires session_id.")
         status = message.get("status", "ok")
         if not isinstance(status, str) or not status:
             raise ValueError("status must be a string.")
-        return {"ok": True}, ReportCommand(session_id=session_id, status=status, result=message.get("result"))
+        return {"ok": True}, ReportCommand(
+            request_id=request_id,
+            session_id=session_id,
+            status=status,
+            output=message.get("output"),
+        )
 
     def _drain_commands(self) -> None:
         while True:
@@ -220,30 +362,120 @@ class Mothership:
                 command = self._commands.get_nowait()
             except Empty:
                 return
-            if isinstance(command, StartCommand):
-                self._start_session(command)
+            if isinstance(command, StartWorkflowCommand):
+                self._start_workflow(command)
+            elif isinstance(command, StartAgentSessionCommand):
+                self._start_agent_session(command)
+            elif isinstance(command, WorkflowCompletedCommand):
+                self._complete_workflow(command)
             else:
-                self._complete_session(command)
+                self._complete_agent_session(command)
 
-    def _start_session(self, command: StartCommand) -> None:
-        if self.active is not None:
+    def _start_workflow(self, command: StartWorkflowCommand) -> None:
+        record = self.requests[command.request_id]
+        record.status = "running"
+
+        if command.parent_session_id is not None:
+            if self.active is None or self.active.session_id != command.parent_session_id:
+                self._store_result(
+                    command.request_id,
+                    status="error",
+                    result={"message": "Parent session is not the active managed session."},
+                )
+                return
             self.active.suspend()
             self.stack.append(self.active)
+            self.active = None
+            self._terminal.clear()
 
-        session = self._launch_session(command)
+        thread = threading.Thread(
+            target=self._run_workflow_process,
+            args=(command,),
+            name=f"myteam-workflow-{command.request_id}",
+            daemon=True,
+        )
+        self.workflow_threads[command.request_id] = thread
+        thread.start()
+
+    def _run_workflow_process(self, command: StartWorkflowCommand) -> None:
+        env = {
+            **os.environ,
+            ENV_SOCKET: self.socket_path,
+            ENV_WORKFLOW_INVOCATION_ID: command.request_id,
+        }
+        if command.input_json is not None:
+            env[ENV_WORKFLOW_INPUT_JSON] = command.input_json
+
+        try:
+            completed = subprocess.run(
+                command.argv,
+                cwd=command.cwd,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if completed.returncode == 0:
+                status = "ok"
+                result = _parse_workflow_stdout(completed.stdout)
+            else:
+                status = "exited"
+                result = {
+                    "exit_code": completed.returncode,
+                    "stdout": completed.stdout,
+                    "stderr": completed.stderr,
+                }
+        except Exception as exc:
+            status = "error"
+            result = {"message": str(exc)}
+
+        self._commands.put(WorkflowCompletedCommand(command.request_id, status, result))
+        self._wake()
+
+    def _start_agent_session(self, command: StartAgentSessionCommand) -> None:
+        if command.parent_session_id is not None:
+            if self.active is None or self.active.session_id != command.parent_session_id:
+                self._store_result(
+                    command.request_id,
+                    status="error",
+                    result={"message": "Parent session is not the active managed session."},
+                )
+                return
+            self.active.suspend()
+            self.stack.append(self.active)
+            self.active = None
+        elif self.active is not None:
+            self._store_result(
+                command.request_id,
+                status="error",
+                result={"message": "Another agent session is already active."},
+            )
+            return
+
+        session = self._launch_agent_session(command)
         self.sessions[session.session_id] = session
+        record = self.requests[command.request_id]
+        record.status = "running"
+        record.session_id = session.session_id
         self.active = session
         self._terminal.clear()
 
-    def _launch_session(self, command: StartCommand) -> ManagedPtyProcess:
+    def _launch_agent_session(self, command: StartAgentSessionCommand) -> ManagedPtyProcess:
         session_id = secrets.token_urlsafe(10)
+        nonce = secrets.token_urlsafe(16)
         env = {
             **os.environ,
             ENV_SOCKET: self.socket_path,
             ENV_SESSION_ID: session_id,
+            ENV_REQUEST_ID: command.request_id,
+            ENV_SESSION_NONCE: nonce,
+            ENV_AGENT_PROMPT: command.prompt,
         }
-        if command.input_json is not None:
-            env["MYTEAM_WORKFLOW_INPUT_JSON"] = command.input_json
+        if command.input is not None:
+            env[ENV_AGENT_INPUT_JSON] = json.dumps(command.input)
+        if command.output is not None:
+            env[ENV_AGENT_OUTPUT_JSON] = json.dumps(command.output)
 
         return ManagedPtyProcess.launch(
             session_id=session_id,
@@ -252,17 +484,35 @@ class Mothership:
             env=env,
             cwd=command.cwd,
             winsize=self._terminal.winsize(),
-            parent_session_id=command.parent_session_id,
+            parent_session_id=None,
+            nonce=nonce,
         )
 
-    def _complete_session(self, command: ReportCommand) -> None:
+    def _complete_agent_session(self, command: ReportCommand) -> None:
         session = self.sessions.get(command.session_id)
-        if session is None:
+        if session is None or session.request_id != command.request_id:
             return
-        self.results[session.request_id] = {"status": command.status, "result": command.result}
+        self._store_result(
+            session.request_id,
+            status=command.status,
+            result=self._session_result_payload(session, command.output),
+        )
         session.terminate()
         self._remove_session(session)
-        self._resume_previous_session()
+        record = self.requests.get(command.request_id)
+        if record is not None and record.parent_session_id is not None:
+            self._resume_previous_session()
+        else:
+            self._wake()
+
+    def _complete_workflow(self, command: WorkflowCompletedCommand) -> None:
+        self.workflow_threads.pop(command.request_id, None)
+        self._store_result(command.request_id, status=command.status, result=command.result)
+        record = self.requests.get(command.request_id)
+        if record is not None and record.parent_session_id is not None:
+            self._resume_previous_session()
+        else:
+            self._wake()
 
     def _handle_session_exit(self, session: ManagedPtyProcess) -> None:
         code = session.poll()
@@ -271,12 +521,17 @@ class Mothership:
                 code = session.wait(timeout=0.1)
             except subprocess.TimeoutExpired:
                 code = None
-        self.results.setdefault(
+        self._store_result(
             session.request_id,
-            {"status": "exited", "result": {"exit_code": code}},
+            status="exited",
+            result=self._session_result_payload(session, {"exit_code": code}),
         )
         self._remove_session(session)
-        self._resume_previous_session()
+        record = self.requests.get(session.request_id)
+        if record is not None and record.parent_session_id is not None:
+            self._resume_previous_session()
+        else:
+            self._wake()
 
     def _reap_exited_active_session(self) -> None:
         if self.active is not None and self.active.poll() is not None:
@@ -301,6 +556,36 @@ class Mothership:
         for session in self.sessions.values():
             session.resize(winsize)
 
+    def _store_result(self, request_id: str, *, status: str, result: Any) -> None:
+        self.results[request_id] = {"status": status, "result": result}
+        record = self.requests.get(request_id)
+        if record is not None:
+            record.status = status if status in {"ok", "error", "exited"} else "ok"
+            record.result = result
+
+    def _session_result_payload(self, session: ManagedPtyProcess, output: Any) -> dict[str, Any]:
+        if not isinstance(output, dict):
+            output = {"value": output}
+        return {
+            "output": output,
+            "usage": [],
+            "transcript": session.recording.snapshot(),
+            "session_id": session.session_id,
+            "nonce": session.nonce,
+        }
+
+    def _has_running_workflows(self) -> bool:
+        return any(thread.is_alive() for thread in self.workflow_threads.values())
+
+    def _require_argv(self, message: dict[str, Any], kind: str) -> list[str]:
+        argv = message.get("argv")
+        if not isinstance(argv, list) or not argv or not all(isinstance(item, str) for item in argv):
+            raise ValueError(f"{kind} requires a non-empty argv list.")
+        return argv
+
+    def _new_request_id(self) -> str:
+        return secrets.token_urlsafe(12)
+
     def _wake(self) -> None:
         try:
             os.write(self._wakeup_w, b"x")
@@ -313,3 +598,14 @@ class Mothership:
                 pass
         except (BlockingIOError, OSError):
             pass
+
+
+def _parse_workflow_stdout(stdout: str) -> Any:
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    if not lines:
+        return None
+    last_line = lines[-1]
+    try:
+        return json.loads(last_line)
+    except json.JSONDecodeError:
+        return stdout

@@ -25,6 +25,7 @@ class ManagedPtyProcess:
     master_fd: int
     process: subprocess.Popen[bytes]
     parent_session_id: str | None = None
+    nonce: str | None = None
     recording: TerminalRecording = field(default_factory=TerminalRecording)
 
     @classmethod
@@ -38,6 +39,7 @@ class ManagedPtyProcess:
         cwd: str | None,
         winsize: Winsize,
         parent_session_id: str | None = None,
+        nonce: str | None = None,
     ) -> "ManagedPtyProcess":
         master_fd, slave_fd = pty.openpty()
         set_winsize(master_fd, winsize)
@@ -62,6 +64,7 @@ class ManagedPtyProcess:
             master_fd=master_fd,
             process=process,
             parent_session_id=parent_session_id,
+            nonce=nonce,
         )
 
     def poll(self) -> int | None:
