@@ -39,9 +39,9 @@ These templates should have the basic structure of what is needed to list and lo
   - This should be in a `"""` module docstring for Python files
 - Markdown skills should have a simple "Not implemented yet" body
 - Python skills should have a defined `main()` and `if __name__...` block.
-  - `main` should print('Not implemented yet')
+  - `main` should print('Not implemented yet. Tell the user.') or something similar
 
-`myteam new skill` will create parent directories as needed, each new directory created with a stubbed `description.md` (existing directories and descriptions are unchanged). 
+`myteam new skill <skill> --parents` will create parent directories as needed. Each new directory created with a stubbed `description.md` (existing directories and descriptions are unchanged). 
 
 If the target skill file already exists, `myteam new skill` raises an error.
 

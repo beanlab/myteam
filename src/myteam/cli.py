@@ -6,7 +6,7 @@ import functools
 import fire
 
 from .commands import changelog, version
-from .rosters import download_roster, list_available_rosters, update_roster
+# from .rosters import download_roster, list_available_rosters, update_roster
 from .explain import explain_resources
 from .listing import list_resources
 from .skills import new_skill, load_skill
@@ -14,6 +14,7 @@ from .skills import new_skill, load_skill
 
 
 def printed(func):
+    @functools.wraps(func)
     def new_func(*args, **kwargs):
         print(func(*args, **kwargs))
     return new_func
@@ -32,9 +33,9 @@ def main():
         "version": version,
         "changelog": changelog,
         "rosters": {
-            "list": printed(list_available_rosters),
-            "download": download_roster,
-            "update": update_roster,
+            # "list": printed(list_available_rosters),
+            # "download": download_roster,
+            # "update": update_roster,
         }
     }
 

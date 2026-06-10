@@ -1,13 +1,14 @@
 """Helpers for tracking and explaining `.myteam` upgrades."""
 from __future__ import annotations
 
-from importlib.resources import files
 import re
+from importlib.resources import files
 from pathlib import Path
 
 from . import __version__
-from .paths import BUILTIN_ROOT_NAME, ENCODING
 
+BUILTIN_ROOT_NAME = 'builtin'
+ENCODING = 'utf-8'
 TRACKED_VERSION_FILENAME = ".myteam-version"
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _CHANGELOG_HEADING_RE = re.compile(r"^##\s+(\d+\.\d+\.\d+)\s*$")
@@ -61,12 +62,13 @@ def available_migration_versions(current_version: str = __version__) -> list[str
 
 
 def pending_migration_versions(
-    tracked_version: str | None,
-    current_version: str = __version__,
+        tracked_version: str | None,
+        current_version: str = __version__,
 ) -> list[str]:
     current = _parse_version(current_version)
     if tracked_version is None:
-        return [version for version in available_migration_versions(current_version) if _parse_version(version) <= current]
+        return [version for version in available_migration_versions(current_version) if
+                _parse_version(version) <= current]
     tracked = _parse_version(tracked_version)
     return [
         version
