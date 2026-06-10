@@ -1,7 +1,7 @@
-"""Prototype mothership: coordinates RPC, PTY sessions, workflows, and TTY switching."""
+"""Workflow supervisor: coordinates RPC, PTY sessions, workflows, and TTY switching."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import json
 import os
 from queue import Empty, Queue
@@ -36,6 +36,8 @@ from .protocol import (
 )
 from .pty_process import ManagedPtyProcess
 from .terminal import RealTerminal, Winsize
+from ..agents.registry import DEFAULT_AGENT
+from ..agents.runtime import AgentSessionContext, resolve_agent_runtime_config
 
 
 @dataclass
@@ -62,6 +64,7 @@ class StartAgentSessionCommand:
     agent_session_id: str | None
     fork: bool | None
     parent_session_id: str | None
+    session_nonce: str | None
 
 
 @dataclass
@@ -257,7 +260,7 @@ class Mothership:
                     return
                 else:
                     response = {"ok": False, "error": f"Unsupported RPC kind: {kind!r}"}
-            except Exception as exc:  # prototype: return friendly errors over the socket
+            except Exception as exc:  # return friendly errors over the socket
                 response = {"ok": False, "error": str(exc)}
             try:
                 connection.sendall(json_response(**response))
@@ -317,6 +320,7 @@ class Mothership:
             agent_session_id=message.get("session_id") if isinstance(message.get("session_id"), str) else None,
             fork=message.get("fork") if isinstance(message.get("fork"), bool) else None,
             parent_session_id=message.get("parent_session_id") if isinstance(message.get("parent_session_id"), str) else None,
+            session_nonce=message.get("session_nonce") if isinstance(message.get("session_nonce"), str) else None,
         )
         if command.parent_session_id is not None:
             record = self.requests[request_id]
@@ -463,7 +467,7 @@ class Mothership:
 
     def _launch_agent_session(self, command: StartAgentSessionCommand) -> ManagedPtyProcess:
         session_id = secrets.token_urlsafe(10)
-        nonce = secrets.token_urlsafe(16)
+        nonce = command.session_nonce or secrets.token_urlsafe(16)
         env = {
             **os.environ,
             ENV_SOCKET: self.socket_path,
@@ -486,6 +490,7 @@ class Mothership:
             winsize=self._terminal.winsize(),
             parent_session_id=None,
             nonce=nonce,
+            agent_name=command.agent,
         )
 
     def _complete_agent_session(self, command: ReportCommand) -> None:
@@ -566,11 +571,35 @@ class Mothership:
     def _session_result_payload(self, session: ManagedPtyProcess, output: Any) -> dict[str, Any]:
         if not isinstance(output, dict):
             output = {"value": output}
+
+        native_session_id = session.session_id
+        usage: list[dict[str, Any]] = []
+        if session.nonce:
+            try:
+                cwd = Path(session.cwd or os.getcwd()).resolve()
+                runtime_config = resolve_agent_runtime_config(
+                    session.agent_name or DEFAULT_AGENT,
+                    project_root=cwd,
+                    session_context=AgentSessionContext(
+                        home=Path.home().resolve(),
+                        project_root=cwd,
+                        launch_cwd=cwd,
+                    ),
+                )
+                native_session_id, session_path = runtime_config.get_session_info(session.nonce)
+                if runtime_config.get_usage_info is not None:
+                    usage_info = runtime_config.get_usage_info(session_path)
+                    if usage_info is not None:
+                        usage.append(asdict(usage_info))
+            except Exception:
+                native_session_id = session.session_id
+                usage = []
+
         return {
             "output": output,
-            "usage": [],
+            "usage": usage,
             "transcript": session.recording.snapshot(),
-            "session_id": session.session_id,
+            "session_id": native_session_id,
             "nonce": session.nonce,
         }
 

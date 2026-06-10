@@ -1,4 +1,4 @@
-"""Tiny transcript recorder for prototype PTY sessions."""
+"""Tiny transcript recorder for PTY-backed workflow sessions."""
 from __future__ import annotations
 
 

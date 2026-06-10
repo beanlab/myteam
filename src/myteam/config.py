@@ -41,10 +41,10 @@ def load_workflow_defaults(myteam_folder: Path) -> WorkflowDefaults | None:
     try:
         loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        raise ValueError(f"Failed to parse task project config at {config_path}: {exc}") from exc
+        raise ValueError(f"Failed to parse workflow project config at {config_path}: {exc}") from exc
 
     try:
         return WorkflowDefaults.model_validate(loaded)
     except ValidationError as exc:
-        raise ValueError(f"Task project config at {config_path} is invalid: {exc}") from exc
+        raise ValueError(f"Workflow project config at {config_path} is invalid: {exc}") from exc
 

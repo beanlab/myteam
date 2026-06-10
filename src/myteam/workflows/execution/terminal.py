@@ -1,4 +1,4 @@
-"""Real terminal handling for the prototype mothership."""
+"""Real terminal handling for the workflow supervisor."""
 from __future__ import annotations
 
 from collections.abc import Callable

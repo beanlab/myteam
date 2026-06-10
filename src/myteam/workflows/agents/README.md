@@ -20,7 +20,7 @@ Agent configs are resolved by
 1. Project-local override is prioritized:
    `.myteam/.config/<agent>.py`
 2. Otherwise it falls back on packaged default:
-   `myteam.tasks.agents.<agent>`
+   `myteam.workflows.agents.<agent>`
 
 Local configs are intentionally supported so a project can use an agent CLI that
 is not shipped with `myteam`, or override the default behavior of a packaged one.
@@ -143,8 +143,8 @@ passing `agent="codex_mini"` into `run_agent`.
 ```python
 from __future__ import annotations
 
-from myteam.tasks.agents.codex import EXEC, EXIT_COMMAND, get_session_info
-from myteam.tasks.agents.codex import build_argv as build_codex_argv
+from myteam.workflows.agents.codex import EXEC, EXIT_COMMAND, get_session_info
+from myteam.workflows.agents.codex import build_argv as build_codex_argv
 
 
 def build_argv(
@@ -169,7 +169,7 @@ A custom Python workflow can then select the alias by passing the local config
 name as the `agent` value:
 
 ```python
-from myteam.tasks.execution.steps import run_agent
+from myteam.workflows import run_agent
 
 
 result = run_agent(

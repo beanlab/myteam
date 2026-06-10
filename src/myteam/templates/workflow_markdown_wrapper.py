@@ -3,38 +3,40 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from myteam.frontmatter import split_markdown_frontmatter
-from myteam.tasks import AgentContext
+from myteam.workflows import run_agent
 from myteam.workflows.commands import resolve_agent_settings
-from myteam.workflows.config import load_workflow_defaults
 
 
-def main(
-        markdown_file: Path,
-        workflow_inputs: str,
-        workflow_defaults: Path
-):
-    workflow_defaults = load_workflow_defaults(workflow_defaults)
-    usage_logging = workflow_defaults.usage_logging if workflow_defaults is not None else None
-    timeout = workflow_defaults.timeout if workflow_defaults is not None else None
+def main(markdown_file: Path, workflow_inputs: str = "{}") -> None:
+    input_values = _load_json_object(workflow_inputs)
+    frontmatter, content = split_markdown_frontmatter(markdown_file.read_text(encoding="utf-8"))
 
-    winputs = json.loads(workflow_inputs)
-    frontmatter, content = split_markdown_frontmatter(markdown_file.read_text())
-    # TODO - ensure provided workflow inputs matches schema in frontmatter
-    frontmatter.pop('input')
+    settings = resolve_agent_settings(frontmatter)
+    prompt = content.format(**input_values) if input_values else content
 
-    with AgentContext(
-            usage_logging=usage_logging, timeout=timeout
-    ) as ctx:
-        args = resolve_agent_settings(frontmatter, workflow_defaults)
+    output_schema = frontmatter.get("output")
+    input_schema = frontmatter.get("input")
 
-        args['prompt'] = content.format(**winputs)  # TODO - use jinja2 instead
-
-        result = ctx.run_agent(**args)
-
-        print(json.dumps(result.output))
+    result = run_agent(
+        prompt=prompt,
+        input=input_values if input_schema is not None else None,
+        output=output_schema if isinstance(output_schema, dict) else None,
+        **settings,
+    )
+    print(json.dumps(result.output))
 
 
-if __name__ == '__main__':
-    main(Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3]))
+def _load_json_object(value: str) -> dict[str, Any]:
+    if not value.strip():
+        return {}
+    loaded = json.loads(value)
+    if not isinstance(loaded, dict):
+        raise ValueError("Workflow input must be a JSON object.")
+    return loaded
+
+
+if __name__ == "__main__":
+    main(Path(sys.argv[1]), sys.argv[2] if len(sys.argv) > 2 else "{}")

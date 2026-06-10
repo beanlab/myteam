@@ -32,7 +32,7 @@ class AgentRuntimeConfig:
     exit_sequence: bytes
     get_session_info: Callable[[str], tuple[str, Path]]
     build_argv: Callable[
-        [str, bool, str | None, bool, str | None, list[str] | None],
+        [str, bool, str | None, bool, str | None, tuple[str, ...] | None, str | None],
         list[str],
     ]
     source: Path | str

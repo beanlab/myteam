@@ -8,7 +8,7 @@ from typing import Any
 from .agent_utils import resolve_session_path, iter_jsonl_reverse, estimate_usage_cost
 from .runtime import AgentSessionContext
 from .codex import PRICING_INFO
-from ..definition.models import UsageInfo
+from ..results import UsageInfo
 
 EXEC = "pi"
 SESSION_ID_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")

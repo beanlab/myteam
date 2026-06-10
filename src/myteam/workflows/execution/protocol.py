@@ -1,4 +1,4 @@
-"""Small JSON-over-Unix-socket protocol for the session prototype."""
+"""Small JSON-over-Unix-socket protocol for workflow supervision."""
 from __future__ import annotations
 
 from dataclasses import dataclass

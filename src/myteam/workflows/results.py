@@ -2,7 +2,18 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, is_dataclass
+import json
+import os
+import sys
 from typing import Any
+
+from .execution.protocol import (
+    ENV_REQUEST_ID,
+    ENV_SESSION_ID,
+    ENV_SOCKET,
+    KIND_REPORT_RESULT,
+    RpcClient,
+)
 
 
 @dataclass
@@ -40,11 +51,22 @@ class SessionResult:
         }
 
 
-def report_result(result_json=None, status: str = "ok") -> None:
-    """Report a JSON-compatible result to the active mothership."""
-    from ..proto import report_result as proto_report_result
+def report_result(result_json: Any | None = None, status: str = "ok") -> None:
+    """Report a JSON-compatible result to the active workflow supervisor."""
 
-    proto_report_result(_jsonable(result_json), status=status)
+    socket_path = os.environ.get(ENV_SOCKET)
+    session_id = os.environ.get(ENV_SESSION_ID)
+    request_id = os.environ.get(ENV_REQUEST_ID)
+    if not socket_path or not session_id or not request_id:
+        raise RuntimeError("No active myteam workflow session is available.")
+
+    RpcClient(socket_path).call(
+        KIND_REPORT_RESULT,
+        request_id=request_id,
+        session_id=session_id,
+        status=status,
+        output=_load_result(_jsonable(result_json)),
+    )
 
 
 def _jsonable(value: Any) -> Any:
@@ -53,3 +75,21 @@ def _jsonable(value: Any) -> Any:
     if is_dataclass(value):
         return asdict(value)
     return value
+
+
+def _load_result(result_json: Any | None) -> Any:
+    if result_json is None:
+        if sys.stdin.isatty():
+            return None
+        text = sys.stdin.read()
+    elif isinstance(result_json, str):
+        text = result_json
+    else:
+        return result_json
+
+    if not text.strip():
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return text

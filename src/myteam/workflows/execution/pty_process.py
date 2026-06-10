@@ -1,4 +1,4 @@
-"""Managed child PTY process for the prototype mothership."""
+"""Managed child PTY process for the workflow supervisor."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -26,6 +26,8 @@ class ManagedPtyProcess:
     process: subprocess.Popen[bytes]
     parent_session_id: str | None = None
     nonce: str | None = None
+    agent_name: str | None = None
+    cwd: str | None = None
     recording: TerminalRecording = field(default_factory=TerminalRecording)
 
     @classmethod
@@ -40,6 +42,7 @@ class ManagedPtyProcess:
         winsize: Winsize,
         parent_session_id: str | None = None,
         nonce: str | None = None,
+        agent_name: str | None = None,
     ) -> "ManagedPtyProcess":
         master_fd, slave_fd = pty.openpty()
         set_winsize(master_fd, winsize)
@@ -65,6 +68,8 @@ class ManagedPtyProcess:
             process=process,
             parent_session_id=parent_session_id,
             nonce=nonce,
+            agent_name=agent_name,
+            cwd=cwd,
         )
 
     def poll(self) -> int | None:

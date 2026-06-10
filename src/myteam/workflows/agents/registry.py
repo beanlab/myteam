@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
-from ..definition.models import AgentConfig
 from .runtime import AgentSessionContext, resolve_agent_runtime_config
+
+
+class AgentConfig(TypedDict):
+    name: str
+    argv: list[str]
 
 
 DEFAULT_AGENT = "codex"
