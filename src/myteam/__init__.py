@@ -1,4 +1,4 @@
-"""Myteam package for managing agent role directories."""
+"""myteam framework and CLI for skills, workflows, and agent sessions."""
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
