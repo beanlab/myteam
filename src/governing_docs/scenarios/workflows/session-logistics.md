@@ -2,7 +2,7 @@
 
 `myteam start` launches or contacts the long-lived mothership TTY shell. The mothership owns the user's real terminal and forwards the interactive session to one active child process at a time.
 
-The goal is to support nested interactive agent sessions. A child process can ask the mothership to start another child process. When this happens, the current child session is suspended, the new child becomes active, and the user's terminal is switched to the new child. When the new child reports a result, the mothership terminates that child and resumes the previously suspended session.
+The goal is to support nested interactive agent sessions. A child process can ask the mothership to start another child process. When this happens, the current child session is suspended, the new child becomes active, and the user's terminal is switched to the new child. When the new child reports a result, or exits cleanly with no result, the mothership terminates that child and resumes the previously suspended session.
 
 This behaves like a small purpose-built terminal multiplexer with stack-based session handoff.
 
@@ -26,7 +26,8 @@ The mothership is responsible for:
 - switching the visible TTY session when the active child changes;
 - maintaining a stack of suspended sessions;
 - storing child results by request id;
-- killing a child after it reports its result.
+- killing a child after it reports its result;
+- treating a clean child exit without a reported result as a successful no-result completion.
 
 ### 2. Client/shim mode
 
@@ -166,25 +167,25 @@ mothership -> client/shim: accepted(request_id)
 mothership suspends parent session
 mothership launches child session
 
-child session eventually reports result
-mothership stores result under request_id
+child session eventually reports result or exits cleanly with no result
+mothership stores result or None under request_id
 mothership terminates child session
 mothership resumes parent session
 
 client/shim -> mothership: poll_result(request_id)
 mothership -> client/shim: result(request_id, status, payload)
 
-client/shim prints JSON result to stdout
+client/shim prints JSON result to stdout (`null` for no result)
 client/shim exits
 ```
 
-The client/shim may be suspended as part of the parent session after it receives the request id. That is expected. When the parent session is resumed, the client/shim continues polling, receives the stored result, prints it, and exits. The parent agent then observes its `myteam start` command completing normally.
+The client/shim may be suspended as part of the parent session after it receives the request id. That is expected. When the parent session is resumed, the client/shim continues polling, receives the stored result or no-result value, prints it, and exits. The parent agent then observes its `myteam start` command completing normally.
 
 The mothership should store results durably enough that a resumed client/shim can retrieve them by request id. Results should remain available until they are acknowledged or otherwise garbage-collected.
 
 ## Result format
 
-When a nested child workflow completes, the inner `myteam start` client/shim prints the child's result as JSON to stdout.
+When a nested child workflow completes, the inner `myteam start` client/shim prints the child's result as JSON to stdout. If the child completed with no result, it prints JSON `null`.
 
 For small and medium results, the JSON payload can contain the result directly:
 
@@ -211,10 +212,10 @@ For large results or artifacts, the child workflow can write data to a file and 
 
 The `myteam start` client/shim should use its exit code to indicate high-level success or failure:
 
-- `0` for successful child completion;
+- `0` for successful child completion, including no-result completion;
 - non-zero for failed, cancelled, or unavailable results.
 
-Human-oriented diagnostics should go to stderr. Machine-readable child results should go to stdout as JSON.
+Human-oriented diagnostics should go to stderr. Machine-readable child results should go to stdout as JSON. No-result completion is represented as JSON `null`, not `{}`.
 
 ## Reporting a result
 
@@ -229,14 +230,16 @@ When the active child reports a result, the mothership:
 7. switches terminal forwarding back to it;
 8. clears the terminal.
 
+When the active child exits cleanly without reporting a result, such as via `/quit`, the mothership follows the same suspend/resume behavior but stores a successful no-result completion. The output for that request is `None` and is serialized to CLI callers as JSON `null`. Non-zero exits remain failures.
+
 Example:
 
 ```text
 active: codex2
 stack:  [codex1]
 
-codex2 reports result
-mothership stores result for request id
+codex2 reports result, or exits cleanly with no result
+mothership stores result or None for request id
 mothership terminates codex2
 mothership resumes codex1
 
@@ -244,7 +247,7 @@ active: codex1
 stack:  []
 ```
 
-After `codex1` resumes, the inner `myteam start` client/shim polls for the request id, receives the stored result, prints the JSON result to stdout, and exits. From `codex1`'s perspective, its command has completed with the child workflow result.
+After `codex1` resumes, the inner `myteam start` client/shim polls for the request id, receives the stored result or no-result value, prints the JSON result to stdout (`null` for no result), and exits. From `codex1`'s perspective, its command has completed with the child workflow result.
 
 ## Nested session model
 
@@ -262,20 +265,20 @@ B starts C
 active: C
 stack:  [A, B]
 
-C reports result
+C reports result or exits cleanly with no result
 active: B
 stack:  [A]
 
-B's inner `myteam start` prints C's result and exits
+B's inner `myteam start` prints C's result (or `null`) and exits
 
-B reports result
+B reports result or exits cleanly with no result
 active: A
 stack:  []
 
-A's inner `myteam start` prints B's result and exits
+A's inner `myteam start` prints B's result (or `null`) and exits
 ```
 
-This means child sessions can behave like interactive subroutines. A parent can start a child, yield the terminal to that child, and later resume after the child reports its result.
+This means child sessions can behave like interactive subroutines. A parent can start a child, yield the terminal to that child, and later resume after the child reports its result or exits cleanly with no result.
 
 ## TTY forwarding model
 
@@ -321,4 +324,4 @@ The switch does not need to preserve or replay full screen state. The active chi
 
 ## End state
 
-If a child reports a result and there is no suspended process on the stack, then the top-level session has completed. The mothership can then exit, return the result to its caller, or perform whatever top-level completion behavior is appropriate for `myteam start`.
+If a child reports a result, or exits cleanly with no result, and there is no suspended process on the stack, then the top-level session has completed. The mothership can then exit, return the result or no-result value to its caller, or perform whatever top-level completion behavior is appropriate for `myteam start`.

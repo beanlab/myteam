@@ -14,7 +14,7 @@ See also `agent-session-management.md`.
 
 ```python
 class SessionResult:
-    output: dict[str, Any]
+    output: dict[str, Any] | None
     usage: list[UsageInfo]
     transcript: str
     session_id: str
@@ -125,7 +125,7 @@ The input and output schemas are not formal jsonschema. Rather, they are human-r
 
 The input schema guides the caller in what data should be passed via the `--input` argument.
 
-The output schema is intended more as prompt for the agent than as output-shape enforcement.
+The output schema is intended more as prompt for the agent than as output-shape enforcement. Even when an output schema is present, a cleanly quit managed session can return `None`; callers and workflow authors are responsible for deciding how to respond to missing output.
 
 In Markdown workflows, there is only one step, so the strict output shape is less critical.
 

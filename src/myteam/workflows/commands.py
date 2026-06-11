@@ -275,7 +275,7 @@ def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:
 
 def _session_result_from_payload(payload: Any) -> SessionResult:
     if payload is None:
-        return SessionResult(output={}, usage=[], transcript="", session_id=None)
+        return SessionResult(output=None, usage=[], transcript="", session_id=None)
 
     if not isinstance(payload, dict):
         return SessionResult(output={"value": payload}, usage=[], transcript="", session_id=None)
@@ -284,8 +284,8 @@ def _session_result_from_payload(payload: Any) -> SessionResult:
         return SessionResult(output=payload, usage=[], transcript="", session_id=None)
 
     usage = [UsageInfo(**item) for item in payload.get("usage", []) if isinstance(item, dict)]
-    output_value = payload.get("output", {})
-    if not isinstance(output_value, dict):
+    output_value = payload.get("output")
+    if output_value is not None and not isinstance(output_value, dict):
         output_value = {"value": output_value}
     return SessionResult(
         output=output_value,

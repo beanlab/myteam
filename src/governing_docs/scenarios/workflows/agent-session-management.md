@@ -107,6 +107,8 @@ When an agent session starts, `myteam` augments the provided prompt with brief i
 
 When the agent calls `myteam result`, that command connects to the active supervisor control socket and sends a JSONL-RPC-style message containing the output JSON and the current request ID.
 
+A managed agent session may also end cleanly without calling `myteam result`, for example when a human user or agent enters `/quit`. This is treated as a successful no-result completion. The supervisor records the session metadata, transcript, and usage as usual, but the session output is `None`. This is distinct from an agent deliberately reporting an empty object (`{}`) with `myteam result '{}'`.
+
 The supervisor then:
 
 1. records the reported output for the request;
@@ -130,10 +132,10 @@ When `myteam start` is invoked from inside an existing managed session, it does 
 3. it receives a request ID;
 4. the supervisor suspends the current agent session;
 5. the supervisor launches the nested workflow/session;
-6. the nested session eventually reports its result;
-7. the supervisor stores the result and resumes the parent session;
+6. the nested session eventually reports its result or exits cleanly with no result;
+7. the supervisor stores the result (or `None`) and resumes the parent session;
 8. the inner `myteam start` shim retrieves the result;
-9. the shim prints the nested workflow result as JSON to stdout and exits.
+9. the shim prints the nested workflow result as JSON to stdout and exits (`None` is printed as JSON `null`).
 
 From the parent agent's perspective, `myteam start` behaves like a blocking command that eventually prints the child workflow result.
 
@@ -146,9 +148,9 @@ terminal
       -> inner `myteam start` shim
         -> request over supervisor socket
     -> supervisor suspends parent and runs child session
-    -> child reports result with `myteam result`
+    -> child reports result with `myteam result` or exits cleanly with no result
     -> supervisor resumes parent
-    -> inner shim prints child result to parent stdout
+    -> inner shim prints child result to parent stdout (`null` for no result)
 ```
 
 ## Multiple `run_agent` Calls in One Workflow
@@ -157,7 +159,7 @@ A Python workflow may call `run_agent` multiple times. Each call starts a distin
 
 This allows the supervisor to aggregate usage and preserve a coherent runtime context across the whole workflow. It also ensures that any agent session can safely invoke nested workflows through `myteam start`, because the supervisor is already present and able to suspend/resume sessions.
 
-The result of each `run_agent` call is a `SessionResult` for that specific agent session. The workflow may combine these results however it chooses and return a final workflow result.
+The result of each `run_agent` call is a `SessionResult` for that specific agent session. The workflow may combine these results however it chooses and return a final workflow result. If the child session ended cleanly without reporting a result, `SessionResult.output` is `None`; workflow authors can handle this as an expected no-result outcome or raise their own error.
 
 ## Relationship Between `run_agent`, `myteam start`, and `myteam result`
 
@@ -165,6 +167,7 @@ The result of each `run_agent` call is a `SessionResult` for that specific agent
 - Nested `myteam start` calls are client/shims that delegate to the existing supervisor.
 - `run_agent` submits an agent-session request to the current supervisor.
 - `myteam result` reports the result of the currently active managed agent session to the supervisor.
+- Cleanly exiting the currently active managed agent session without `myteam result` completes that session with `output: None`.
 - The supervisor is the only component that owns terminal switching, child process lifecycle, result storage, transcript collection, usage aggregation, and nested session suspend/resume behavior.
 
 This means `run_agent` should be understood as the public API for starting managed agent sessions, not as a standalone process-spawning helper independent of the `myteam` runtime.

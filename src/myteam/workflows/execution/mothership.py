@@ -86,11 +86,17 @@ class WorkflowCompletedCommand:
 Command = StartWorkflowCommand | StartAgentSessionCommand | ReportCommand | WorkflowCompletedCommand
 
 
-# A managed agent may spawn `myteam result` and then exit before the result
-# command has finished Python startup, Fire startup, socket connection, and RPC
-# handling. Do not publish an `exited` result immediately in that window, or the
-# workflow caller can observe failure before the in-flight report arrives.
-EXIT_REPORT_GRACE_SECONDS = float(os.environ.get("MYTEAM_EXIT_REPORT_GRACE_SECONDS", "5.0"))
+# By default, a managed agent session that exits without having reported a
+# result is finalized immediately. This matches the intended synchronous usage:
+# agents run `myteam result` as a foreground subprocess, and that subprocess only
+# exits after the mothership has accepted and stored the report.
+#
+# A non-zero grace period may be useful if future integrations support
+# fire-and-forget/background result reporting, agent CLIs that launch result
+# commands asynchronously without waiting, or shutdown paths where the managed
+# session can disappear while a separate reporter process is still starting
+# Python, connecting to the socket, or completing its RPC.
+EXIT_REPORT_GRACE_SECONDS = float(os.environ.get("MYTEAM_EXIT_REPORT_GRACE_SECONDS", "0.0"))
 
 
 @dataclass
@@ -619,11 +625,18 @@ class Mothership:
             session, code, _deadline = self._pending_exits.pop(request_id)
             if request_id in self.results:
                 continue
-            self._store_result(
-                request_id,
-                status="exited",
-                result=self._session_result_payload(session, {"exit_code": code}),
-            )
+            if code == 0:
+                self._store_result(
+                    request_id,
+                    status="ok",
+                    result=self._session_result_payload(session, None),
+                )
+            else:
+                self._store_result(
+                    request_id,
+                    status="exited",
+                    result=self._session_result_payload(session, {"exit_code": code}),
+                )
 
     def _resize_sessions(self, winsize: Winsize) -> None:
         for session in self.sessions.values():
@@ -637,7 +650,7 @@ class Mothership:
             record.result = result
 
     def _minimal_session_result_payload(self, session_id: str | None, output: Any) -> dict[str, Any]:
-        if not isinstance(output, dict):
+        if output is not None and not isinstance(output, dict):
             output = {"value": output}
         return {
             "output": output,
@@ -648,7 +661,7 @@ class Mothership:
         }
 
     def _session_result_payload(self, session: ManagedPtyProcess, output: Any) -> dict[str, Any]:
-        if not isinstance(output, dict):
+        if output is not None and not isinstance(output, dict):
             output = {"value": output}
 
         native_session_id = session.session_id

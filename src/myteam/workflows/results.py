@@ -37,7 +37,7 @@ class UsageInfo:
 
 @dataclass
 class SessionResult:
-    output: dict[str, Any]
+    output: dict[str, Any] | None
     usage: list[UsageInfo]
     transcript: str
     session_id: str | None = None
