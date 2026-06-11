@@ -199,11 +199,7 @@ def run_agent(
     if result.get("status") != "ok":
         raise RuntimeError(json.dumps(result))
 
-    payload = result.get("result")
-    if not isinstance(payload, dict):
-        payload = {"output": {}, "usage": [], "transcript": "", "session_id": None}
-
-    return _session_result_from_payload(payload)
+    return _session_result_from_payload(result.get("result"))
 
 
 def _start_workflow_result(
@@ -234,7 +230,14 @@ def _start_workflow_result(
 
     if result is None:
         return None
-    return _session_result_from_payload(result)
+
+    status = str(result.get("status", "ok")) if isinstance(result, dict) else "ok"
+    if status == "ok":
+        payload = result.get("result") if isinstance(result, dict) and "result" in result else result
+        return _session_result_from_payload(payload)
+    raise RuntimeError(
+        json.dumps({"status": status, "result": result.get("result") if isinstance(result, dict) else result})
+    )
 
 
 def _start_workflow_via_existing_mothership(
@@ -258,10 +261,7 @@ def _start_workflow_via_existing_mothership(
 
     status = str(result.get("status", "ok"))
     if status == "ok":
-        payload = result.get("result")
-        if not isinstance(payload, dict):
-            payload = {"output": {}, "usage": [], "transcript": "", "session_id": None}
-        return _session_result_from_payload(payload)
+        return _session_result_from_payload(result.get("result"))
     raise RuntimeError(json.dumps({"status": status, "result": result.get("result")}))
 
 
@@ -273,7 +273,16 @@ def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:
         time.sleep(0.25)
 
 
-def _session_result_from_payload(payload: dict[str, Any]) -> SessionResult:
+def _session_result_from_payload(payload: Any) -> SessionResult:
+    if payload is None:
+        return SessionResult(output={}, usage=[], transcript="", session_id=None)
+
+    if not isinstance(payload, dict):
+        return SessionResult(output={"value": payload}, usage=[], transcript="", session_id=None)
+
+    if not _is_session_result_payload(payload):
+        return SessionResult(output=payload, usage=[], transcript="", session_id=None)
+
     usage = [UsageInfo(**item) for item in payload.get("usage", []) if isinstance(item, dict)]
     output_value = payload.get("output", {})
     if not isinstance(output_value, dict):
@@ -284,6 +293,10 @@ def _session_result_from_payload(payload: dict[str, Any]) -> SessionResult:
         transcript=str(payload.get("transcript") or ""),
         session_id=payload.get("session_id"),
     )
+
+
+def _is_session_result_payload(payload: dict[str, Any]) -> bool:
+    return "output" in payload and bool({"usage", "transcript", "session_id", "nonce"} & payload.keys())
 
 
 def _print_session_result(result: SessionResult) -> None:
@@ -368,12 +381,14 @@ description: Not implemented yet.
 """
 from __future__ import annotations
 
+import json
+
 from myteam.workflows import run_agent
 
 
 def main() -> None:
     result = run_agent(prompt="Not implemented yet. Tell the user.")
-    print(result.output)
+    print(json.dumps(result.to_jsonable()))
 
 
 if __name__ == "__main__":

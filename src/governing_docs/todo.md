@@ -1,0 +1,6 @@
+- fix usage
+- print session titles on start and resume to orient the user
+- new_workflow.py template
+- command-line args to override md workflow settings (agent, model, reasoning, interactive)
+- print usage only on master `myteam start` invocation
+- strip transcript from error messages (it floods the terminal)

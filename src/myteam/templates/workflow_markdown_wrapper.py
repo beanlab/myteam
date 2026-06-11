@@ -26,7 +26,7 @@ def main(markdown_file: Path, workflow_inputs: str = "{}") -> None:
         output=output_schema if isinstance(output_schema, dict) else None,
         **settings,
     )
-    print(json.dumps(result.output))
+    print(json.dumps(result.to_jsonable()))
 
 
 def _load_json_object(value: str) -> dict[str, Any]:

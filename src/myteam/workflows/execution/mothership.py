@@ -11,6 +11,7 @@ import socket
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -85,6 +86,13 @@ class WorkflowCompletedCommand:
 Command = StartWorkflowCommand | StartAgentSessionCommand | ReportCommand | WorkflowCompletedCommand
 
 
+# A managed agent may spawn `myteam result` and then exit before the result
+# command has finished Python startup, Fire startup, socket connection, and RPC
+# handling. Do not publish an `exited` result immediately in that window, or the
+# workflow caller can observe failure before the in-flight report arrives.
+EXIT_REPORT_GRACE_SECONDS = float(os.environ.get("MYTEAM_EXIT_REPORT_GRACE_SECONDS", "5.0"))
+
+
 @dataclass
 class RequestRecord:
     request_id: str
@@ -108,9 +116,12 @@ class Mothership:
         self.socket_path = ""
         self.requests: dict[str, RequestRecord] = {}
         self.results: dict[str, dict[str, Any]] = {}
+        self._pending_reports: dict[str, ReportCommand] = {}
+        self._pending_exits: dict[str, tuple[ManagedPtyProcess, int | None, float]] = {}
         self.active: ManagedPtyProcess | None = None
         self.stack: list[ManagedPtyProcess] = []
         self.sessions: dict[str, ManagedPtyProcess] = {}
+        self.completed_sessions: dict[str, ManagedPtyProcess] = {}
         self.workflow_threads: dict[str, threading.Thread] = {}
 
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
@@ -184,6 +195,7 @@ class Mothership:
             while not self._closed.is_set():
                 self._drain_commands()
                 self._reap_exited_active_session()
+                self._finalize_expired_exits()
 
                 if top_request_id in self.results:
                     return self.results[top_request_id]
@@ -191,6 +203,7 @@ class Mothership:
                     self.active is None
                     and not self.stack
                     and self._commands.empty()
+                    and not self._pending_exits
                     and not self._has_running_workflows()
                 ):
                     return None
@@ -205,6 +218,10 @@ class Mothership:
                 ready, _, _ = select.select(read_fds, [], [], 0.1)
                 if self._wakeup_r in ready:
                     self._drain_wakeup_pipe()
+                    self._drain_commands()
+                    self._reap_exited_active_session()
+                    self._finalize_expired_exits()
+                    continue
 
                 if self.active is not None and self.active.master_fd in ready:
                     chunk = self.active.read()
@@ -353,12 +370,34 @@ class Mothership:
         status = message.get("status", "ok")
         if not isinstance(status, str) or not status:
             raise ValueError("status must be a string.")
-        return {"ok": True}, ReportCommand(
+        command = ReportCommand(
             request_id=request_id,
             session_id=session_id,
             status=status,
             output=message.get("output"),
         )
+        session = self.sessions.get(session_id) or self.completed_sessions.get(session_id)
+        if session is not None and session.request_id == request_id:
+            self._pending_reports[request_id] = command
+            self._pending_exits.pop(request_id, None)
+            self._store_result(
+                request_id,
+                status=status,
+                result=self._session_result_payload(session, command.output),
+            )
+            return {"ok": True}, command
+
+        record = self.requests.get(request_id)
+        if record is not None and record.kind == "agent_session" and record.session_id == session_id:
+            self._pending_exits.pop(request_id, None)
+            self._store_result(
+                request_id,
+                status=status,
+                result=self._minimal_session_result_payload(session_id, command.output),
+            )
+            return {"ok": True}, command
+
+        raise ValueError("report_result does not match a managed session.")
 
     def _drain_commands(self) -> None:
         while True:
@@ -497,6 +536,8 @@ class Mothership:
         session = self.sessions.get(command.session_id)
         if session is None or session.request_id != command.request_id:
             return
+        self._pending_reports.pop(command.request_id, None)
+        self._pending_exits.pop(command.request_id, None)
         self._store_result(
             session.request_id,
             status=command.status,
@@ -526,11 +567,19 @@ class Mothership:
                 code = session.wait(timeout=0.1)
             except subprocess.TimeoutExpired:
                 code = None
-        self._store_result(
-            session.request_id,
-            status="exited",
-            result=self._session_result_payload(session, {"exit_code": code}),
-        )
+        pending_report = self._pending_reports.pop(session.request_id, None)
+        if pending_report is not None:
+            self._store_result(
+                session.request_id,
+                status=pending_report.status,
+                result=self._session_result_payload(session, pending_report.output),
+            )
+        else:
+            self._pending_exits[session.request_id] = (
+                session,
+                code,
+                time.monotonic() + EXIT_REPORT_GRACE_SECONDS,
+            )
         self._remove_session(session)
         record = self.requests.get(session.request_id)
         if record is not None and record.parent_session_id is not None:
@@ -552,10 +601,29 @@ class Mothership:
             self._wake()
 
     def _remove_session(self, session: ManagedPtyProcess) -> None:
-        self.sessions.pop(session.session_id, None)
+        removed = self.sessions.pop(session.session_id, None)
+        if removed is not None:
+            self.completed_sessions[session.session_id] = removed
         if self.active is session:
             self.active = None
         session.close()
+
+    def _finalize_expired_exits(self) -> None:
+        now = time.monotonic()
+        expired_request_ids = [
+            request_id
+            for request_id, (_session, _code, deadline) in self._pending_exits.items()
+            if deadline <= now
+        ]
+        for request_id in expired_request_ids:
+            session, code, _deadline = self._pending_exits.pop(request_id)
+            if request_id in self.results:
+                continue
+            self._store_result(
+                request_id,
+                status="exited",
+                result=self._session_result_payload(session, {"exit_code": code}),
+            )
 
     def _resize_sessions(self, winsize: Winsize) -> None:
         for session in self.sessions.values():
@@ -567,6 +635,17 @@ class Mothership:
         if record is not None:
             record.status = status if status in {"ok", "error", "exited"} else "ok"
             record.result = result
+
+    def _minimal_session_result_payload(self, session_id: str | None, output: Any) -> dict[str, Any]:
+        if not isinstance(output, dict):
+            output = {"value": output}
+        return {
+            "output": output,
+            "usage": [],
+            "transcript": "",
+            "session_id": session_id,
+            "nonce": None,
+        }
 
     def _session_result_payload(self, session: ManagedPtyProcess, output: Any) -> dict[str, Any]:
         if not isinstance(output, dict):
