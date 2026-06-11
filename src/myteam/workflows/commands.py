@@ -40,9 +40,9 @@ class AgentSettings(TypedDict, total=False):
 
 
 class MarkdownWorkflowInfo(AgentSettings, total=False):
-    input: dict[str, Any]
+    input: dict[str, Any] | None
     prompt: str
-    output: dict[str, Any]
+    output: dict[str, Any] | None
 
 
 def new_workflow(workflow_name: str, parents: bool = False) -> None:
@@ -291,17 +291,18 @@ def _build_agent_prompt(
     session_nonce: str,
     output_schema: dict[str, Any] | None,
 ) -> str:
+    if output_schema is None:
+        return prompt.rstrip()
+
     result_instructions = templates.get_template("agent_result_instructions.md")
-    output_schema_section = ""
-    if output_schema is not None:
-        output_schema_section = (
-            "\nExpected result JSON shape:\n\n"
-            "This describes the intended fields and structure for the result. "
-            "Treat it as guidance for what to report with `myteam result`, not as a strict JSON Schema document.\n\n"
-            "```json\n"
-            f"{json.dumps(output_schema, indent=2, sort_keys=True)}\n"
-            "```"
-        )
+    output_schema_section = (
+        "\nExpected result JSON shape:\n\n"
+        "This describes the intended fields and structure for the result. "
+        "Treat it as guidance for what to report with `myteam result`, not as a strict JSON Schema document.\n\n"
+        "```json\n"
+        f"{json.dumps(output_schema, indent=2, sort_keys=True)}\n"
+        "```"
+    )
 
     result_instructions = (
         result_instructions
