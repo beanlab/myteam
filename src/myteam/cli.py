@@ -10,7 +10,7 @@ from .commands import changelog, version
 from .explain import explain_resources
 from .listing import list_resources
 from .skills import new_skill, load_skill
-from .workflows import new_workflow, start_workflow, report_result
+from .workflows import new_workflow, start_workflow_cli, report_result
 
 
 def printed(func):
@@ -29,7 +29,7 @@ def main():
             "workflow": new_workflow
         },
         "load": printed(load_skill),
-        "start": printed(start_workflow),
+        "start": start_workflow_cli,
         "result": report_result,
         "version": version,
         "changelog": changelog,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 import secrets
 import shlex
@@ -111,30 +112,35 @@ def start_workflow(
 ) -> str:
     """Start a workflow invocation under the workflow supervisor."""
 
-    workflow_input_json = workflow_input_json if workflow_input_json is not None else input
-    argv = _build_workflow_argv(workflow_name, args, workflow_input_json)
-    socket_path = os.environ.get(ENV_SOCKET)
-    parent_session_id = os.environ.get(ENV_SESSION_ID)
-
-    if socket_path:
-        return _start_workflow_via_existing_mothership(
-            socket_path=socket_path,
-            parent_session_id=parent_session_id,
-            argv=argv,
-            workflow_input_json=workflow_input_json,
-        )
-
-    with Mothership() as mothership:
-        request_id = mothership.start_top_level_workflow(
-            argv=argv,
-            cwd=os.getcwd(),
-            input_json=workflow_input_json,
-        )
-        result = mothership.run_until_complete(request_id)
-
+    result = _start_workflow_result(
+        workflow_name=workflow_name,
+        args=args,
+        workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
+    )
     if result is None:
         return ""
-    return json.dumps(result)
+    return json.dumps({
+        "output": result.output,
+        "usage": [asdict(item) for item in result.usage],
+    })
+
+
+def start_workflow_cli(
+    workflow_name: str | None = None,
+    *args: str,
+    workflow_input_json: str | None = None,
+    input: str | None = None,
+) -> None:
+    """CLI entrypoint for `myteam start`."""
+
+    result = _start_workflow_result(
+        workflow_name=workflow_name,
+        args=args,
+        workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
+    )
+    if result is None:
+        return
+    _print_session_result(result)
 
 
 def run_agent(
@@ -197,16 +203,38 @@ def run_agent(
     if not isinstance(payload, dict):
         payload = {"output": {}, "usage": [], "transcript": "", "session_id": None}
 
-    usage = [UsageInfo(**item) for item in payload.get("usage", []) if isinstance(item, dict)]
-    output_value = payload.get("output", {})
-    if not isinstance(output_value, dict):
-        output_value = {"value": output_value}
-    return SessionResult(
-        output=output_value,
-        usage=usage,
-        transcript=str(payload.get("transcript") or ""),
-        session_id=payload.get("session_id"),
-    )
+    return _session_result_from_payload(payload)
+
+
+def _start_workflow_result(
+    *,
+    workflow_name: str | None,
+    args: tuple[str, ...],
+    workflow_input_json: str | None,
+) -> SessionResult | None:
+    argv = _build_workflow_argv(workflow_name, args, workflow_input_json)
+    socket_path = os.environ.get(ENV_SOCKET)
+    parent_session_id = os.environ.get(ENV_SESSION_ID)
+
+    if socket_path:
+        return _start_workflow_via_existing_mothership(
+            socket_path=socket_path,
+            parent_session_id=parent_session_id,
+            argv=argv,
+            workflow_input_json=workflow_input_json,
+        )
+
+    with Mothership() as mothership:
+        request_id = mothership.start_top_level_workflow(
+            argv=argv,
+            cwd=os.getcwd(),
+            input_json=workflow_input_json,
+        )
+        result = mothership.run_until_complete(request_id)
+
+    if result is None:
+        return None
+    return _session_result_from_payload(result)
 
 
 def _start_workflow_via_existing_mothership(
@@ -215,7 +243,7 @@ def _start_workflow_via_existing_mothership(
     parent_session_id: str | None,
     argv: list[str],
     workflow_input_json: str | None,
-) -> str:
+) -> SessionResult:
     client = RpcClient(socket_path)
     response = client.call(
         KIND_START_WORKFLOW,
@@ -229,10 +257,12 @@ def _start_workflow_via_existing_mothership(
     client.call(KIND_ACK_RESULT, request_id=request_id)
 
     status = str(result.get("status", "ok"))
-    rendered = json.dumps({"status": status, "result": result.get("result")})
     if status == "ok":
-        return rendered
-    raise RuntimeError(rendered)
+        payload = result.get("result")
+        if not isinstance(payload, dict):
+            payload = {"output": {}, "usage": [], "transcript": "", "session_id": None}
+        return _session_result_from_payload(payload)
+    raise RuntimeError(json.dumps({"status": status, "result": result.get("result")}))
 
 
 def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:
@@ -241,6 +271,24 @@ def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:
         if poll.get("ready"):
             return poll
         time.sleep(0.25)
+
+
+def _session_result_from_payload(payload: dict[str, Any]) -> SessionResult:
+    usage = [UsageInfo(**item) for item in payload.get("usage", []) if isinstance(item, dict)]
+    output_value = payload.get("output", {})
+    if not isinstance(output_value, dict):
+        output_value = {"value": output_value}
+    return SessionResult(
+        output=output_value,
+        usage=usage,
+        transcript=str(payload.get("transcript") or ""),
+        session_id=payload.get("session_id"),
+    )
+
+
+def _print_session_result(result: SessionResult) -> None:
+    print(json.dumps([asdict(item) for item in result.usage], indent=2, sort_keys=True), file=sys.stderr)
+    print(json.dumps(result.output), file=sys.stdout)
 
 
 def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_input_json: str | None) -> list[str]:
