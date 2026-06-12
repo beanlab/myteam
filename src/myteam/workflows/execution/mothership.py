@@ -653,6 +653,7 @@ class Mothership:
         if output is not None and not isinstance(output, dict):
             output = {"value": output}
         return {
+            "exit_code": 0,
             "output": output,
             "usage": [],
             "transcript": "",
@@ -688,6 +689,7 @@ class Mothership:
                 usage = []
 
         return {
+            "exit_code": _session_exit_code(session),
             "output": output,
             "usage": usage,
             "transcript": session.recording.snapshot(),
@@ -719,6 +721,14 @@ class Mothership:
                 pass
         except (BlockingIOError, OSError):
             pass
+
+
+def _session_exit_code(session: ManagedPtyProcess) -> int:
+    try:
+        code = session.poll()
+    except Exception:
+        return 0
+    return code if isinstance(code, int) else 0
 
 
 def _parse_workflow_stdout(stdout: str) -> Any:

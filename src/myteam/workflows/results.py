@@ -37,6 +37,7 @@ class UsageInfo:
 
 @dataclass
 class SessionResult:
+    exit_code: int
     output: dict[str, Any] | None
     usage: list[UsageInfo]
     transcript: str
@@ -44,6 +45,7 @@ class SessionResult:
 
     def to_jsonable(self) -> dict[str, Any]:
         return {
+            "exit_code": self.exit_code,
             "output": self.output,
             "usage": [asdict(item) for item in self.usage],
             "transcript": self.transcript,

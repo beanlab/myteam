@@ -516,11 +516,13 @@ The new test shape should probably cover:
 
 ## Suggested implementation order
 
-1. **Define final protocols/data models**
-   - `SessionResult.exit_code`
-   - `UsageInfo`
-   - documented `AgentConfig`
-   - `.myteam.yaml` loader
+1. **Define final protocols/data models** — **completed**
+   - Added `SessionResult.exit_code` and included it in JSON serialization/deserialization.
+   - Added agent-session result environment variable names for the future `run_agent` result socket.
+   - Added `.myteam.yaml` loading for `defaults` and `agents`.
+   - Added `reasoning` to workflow defaults.
+   - Loosened local/custom agent-name resolution so configured names like `codex-mini` can resolve from `.myteam.yaml`.
+   - Added focused tests for session-result payloads, `.myteam.yaml` parsing, and hyphenated configured agents.
 
 2. **Build standalone `run_agent` implementation**
    - no supervisor agent-session RPC

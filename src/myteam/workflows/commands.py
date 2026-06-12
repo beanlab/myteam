@@ -275,24 +275,33 @@ def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:
 
 def _session_result_from_payload(payload: Any) -> SessionResult:
     if payload is None:
-        return SessionResult(output=None, usage=[], transcript="", session_id=None)
+        return SessionResult(exit_code=0, output=None, usage=[], transcript="", session_id=None)
 
     if not isinstance(payload, dict):
-        return SessionResult(output={"value": payload}, usage=[], transcript="", session_id=None)
+        return SessionResult(exit_code=0, output={"value": payload}, usage=[], transcript="", session_id=None)
 
     if not _is_session_result_payload(payload):
-        return SessionResult(output=payload, usage=[], transcript="", session_id=None)
+        return SessionResult(exit_code=0, output=payload, usage=[], transcript="", session_id=None)
 
     usage = [UsageInfo(**item) for item in payload.get("usage", []) if isinstance(item, dict)]
     output_value = payload.get("output")
     if output_value is not None and not isinstance(output_value, dict):
         output_value = {"value": output_value}
     return SessionResult(
+        exit_code=_coerce_exit_code(payload.get("exit_code")),
         output=output_value,
         usage=usage,
         transcript=str(payload.get("transcript") or ""),
         session_id=payload.get("session_id"),
     )
+
+
+def _coerce_exit_code(value: Any) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    return 0
 
 
 def _is_session_result_payload(payload: dict[str, Any]) -> bool:

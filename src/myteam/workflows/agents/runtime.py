@@ -10,6 +10,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from ...config import load_myteam_config
 from .agent_utils import encode_input
 from ..results import UsageInfo
 
@@ -101,7 +102,7 @@ def resolve_agent_runtime_config(
 def _require_agent_name(name: str | None) -> str:
     if not name:
         raise KeyError("Unknown workflow agent: None")
-    if not name.isidentifier():
+    if any(separator in name for separator in ("/", "\\", ":")) or name in {".", ".."}:
         raise KeyError(f"Unknown workflow agent: {name}")
     return name
 
@@ -143,17 +144,16 @@ def _config_from_module(
 
 
 def _local_agent_config_path(project_root: Path, agent_name: str) -> str | Path | None:
-    yaml_path = project_root / ".myteam.yaml"
-    if yaml_path.exists():
-        import yaml
-
-        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            agents = data.get("agents")
-            if isinstance(agents, dict):
-                target = agents.get(agent_name)
-                if isinstance(target, str) and target:
-                    return target if Path(target).is_absolute() else yaml_path.parent / target
+    config = load_myteam_config(project_root)
+    if config is not None:
+        target = config.agents.get(agent_name)
+        if target:
+            target_path, separator, class_name = target.partition("::")
+            path = Path(target_path)
+            if not path.is_absolute():
+                assert config.path is not None
+                path = config.path.parent / path
+            return f"{path}::{class_name}" if separator else path
 
     legacy_path = project_root / ".myteam" / ".config" / f"{agent_name}.py"
     return legacy_path if legacy_path.exists() else None
