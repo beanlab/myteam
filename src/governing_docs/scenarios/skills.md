@@ -18,7 +18,7 @@ The `description` field is encouraged, but optional.
 
 Markdown skills are simply printed as-is (but without the YAML frontmatter). 
 
-Python skills are run using the same Python executable running `myteam` with the skill's directory as the working directory and environment variables inherited. Their stdout is returned as the skill content.
+Python skills are run using the same Python executable running `myteam` with the working directory and environment variables inherited. Their stdout is returned as the skill content.
 
 If the Python process exits non-zero, `myteam load` should print stderr and exit non-zero. This allows the agent to inform the user of the issue. Any captured stdout is omitted. 
 

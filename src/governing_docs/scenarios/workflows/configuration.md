@@ -24,6 +24,7 @@ class AgentConfig(Protocol):
             self,
             prompt_text: str,
             model: str | None,
+            reasoning: str | None,
             interactive: bool,
             session_id: str | None,
             fork: bool,
@@ -45,7 +46,7 @@ class AgentConfig(Protocol):
         Parse the session ID from the given session data. 
         """
 
-    def get_usage_info(self, session_data: Path) -> list[UsageInfo]:
+    def get_usage_info(self, session_data: Any) -> list[UsageInfo]:
         """
         Parse the UsageInfo from the provided session data.
         """
