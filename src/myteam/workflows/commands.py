@@ -4,7 +4,6 @@ import json
 import os
 from dataclasses import asdict
 from pathlib import Path
-import secrets
 import shlex
 import sys
 import time
@@ -13,15 +12,13 @@ from typing import Any, TypedDict
 from .. import templates
 from ..config import WorkflowDefaults
 from ..templates import get_template_file
-from .agents.registry import DEFAULT_AGENT
-from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
+from .agent_session import build_agent_prompt, run_agent_session
 from .execution.mothership import Mothership
 from .execution.protocol import (
     ENV_SESSION_ID,
     ENV_SOCKET,
     KIND_ACK_RESULT,
     KIND_POLL_RESULT,
-    KIND_START_AGENT_SESSION,
     KIND_START_WORKFLOW,
     RpcClient,
 )
@@ -156,50 +153,20 @@ def run_agent(
     session_id: str | None = None,
     fork: bool | None = None,
 ) -> SessionResult:
-    """Start an agent session through the active workflow supervisor."""
+    """Start and manage one child agent session."""
 
-    socket_path = os.environ.get(ENV_SOCKET)
-    if not socket_path:
-        raise RuntimeError("run_agent requires an active myteam supervisor. Invoke the workflow with `myteam start`.")
-
-    runtime_config = _resolve_runtime_config(agent)
-    session_nonce = secrets.token_urlsafe(16)
-    agent_prompt = _build_agent_prompt(prompt, session_nonce=session_nonce, output_schema=output)
-    argv = runtime_config.build_argv(
-        agent_prompt,
-        True if interactive is None else interactive,
-        session_id,
-        False if fork is None else fork,
-        model,
-        tuple(str(item) for item in extra_args) if extra_args is not None else None,
-        reasoning,
-    )
-
-    client = RpcClient(socket_path)
-    response = client.call(
-        KIND_START_AGENT_SESSION,
-        argv=argv,
-        prompt=agent_prompt,
-        session_nonce=session_nonce,
+    return run_agent_session(
+        prompt=prompt,
         input=input,
         output=output,
-        agent=runtime_config.name,
+        agent=agent,
         model=model,
         reasoning=reasoning,
+        extra_args=extra_args,
         interactive=interactive,
         session_id=session_id,
         fork=fork,
-        cwd=os.getcwd(),
-        parent_session_id=os.environ.get(ENV_SESSION_ID),
     )
-    request_id = response["request_id"]
-    result = _poll_until_ready(client, request_id)
-    client.call(KIND_ACK_RESULT, request_id=request_id)
-
-    if result.get("status") != "ok":
-        raise RuntimeError(json.dumps(result))
-
-    return _session_result_from_payload(result.get("result"))
 
 
 def _start_workflow_result(
@@ -342,45 +309,13 @@ def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_inp
     return [target, *args]
 
 
-def _resolve_runtime_config(agent: str | None) -> AgentRuntimeConfig:
-    cwd = Path.cwd().resolve()
-    return resolve_agent_runtime_config(
-        agent or DEFAULT_AGENT,
-        project_root=cwd,
-        session_context=AgentSessionContext(
-            home=Path.home().resolve(),
-            project_root=cwd,
-            launch_cwd=cwd,
-        ),
-    )
-
-
 def _build_agent_prompt(
     prompt: str,
     *,
     session_nonce: str,
     output_schema: dict[str, Any] | None,
 ) -> str:
-    if output_schema is None:
-        return prompt.rstrip()
-
-    result_instructions = templates.get_template("agent_result_instructions.md")
-    output_schema_section = (
-        "\nExpected result JSON shape:\n\n"
-        "This describes the intended fields and structure for the result. "
-        "Treat it as guidance for what to report with `myteam result`, not as a strict JSON Schema document.\n\n"
-        "```json\n"
-        f"{json.dumps(output_schema, indent=2, sort_keys=True)}\n"
-        "```"
-    )
-
-    result_instructions = (
-        result_instructions
-        .replace("{{SESSION_NONCE}}", session_nonce)
-        .replace("{{OUTPUT_SCHEMA_SECTION}}", output_schema_section)
-        .strip()
-    )
-    return "\n\n".join((prompt.rstrip(), result_instructions))
+    return build_agent_prompt(prompt, session_nonce=session_nonce, output_schema=output_schema)
 
 
 def _default_python_workflow_template() -> str:

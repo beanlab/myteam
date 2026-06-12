@@ -524,15 +524,20 @@ The new test shape should probably cover:
    - Loosened local/custom agent-name resolution so configured names like `codex-mini` can resolve from `.myteam.yaml`.
    - Added focused tests for session-result payloads, `.myteam.yaml` parsing, and hyphenated configured agents.
 
-2. **Build standalone `run_agent` implementation** — **in progress**
+2. **Build standalone `run_agent` implementation** — **mostly completed**
    - **Completed:** added a standalone per-`run_agent` agent result channel in `src/myteam/workflows/agent_result_channel.py`.
    - **Completed:** updated `myteam result` to prefer `MYTEAM_AGENT_SESSION_RESULT_SOCKET` and report to the new channel.
    - **Completed:** kept fallback reporting to the existing supervisor socket during the transition.
    - **Completed:** added focused tests for direct channel reporting, `myteam result` JSON/stdin/text handling, unmanaged-session errors, and supervisor fallback.
-   - Remaining: wire `run_agent` itself to own this result channel.
-   - Remaining: remove supervisor agent-session RPC after standalone agent launching is implemented.
-   - Remaining: Jinja2 prompt rendering.
-   - Remaining: nonce/session/usage lookup in standalone `run_agent`.
+   - **Completed:** added `src/myteam/workflows/agent_session.py` as a standalone `run_agent` session runner.
+   - **Completed:** changed `run_agent` to launch/manage agent processes directly instead of calling the supervisor's `KIND_START_AGENT_SESSION` RPC.
+   - **Completed:** `run_agent` no longer requires `MYTEAM_MOTHERSHIP_SOCKET`.
+   - **Completed:** `run_agent` now owns an `AgentResultServer` and injects `MYTEAM_AGENT_SESSION_RESULT_SOCKET` and `MYTEAM_AGENT_SESSION_NONCE` into the child agent environment.
+   - **Completed:** prompt rendering now uses Jinja2 inputs before appending nonce/result instructions.
+   - **Completed:** standalone `run_agent` resolves native session id and usage through the agent runtime config after child completion.
+   - **Completed:** added focused tests for reported output, clean no-result exit, nonzero no-result exit, text result wrapping, Jinja rendering, supervisor independence, and child `myteam result` reporting.
+   - Remaining: remove supervisor agent-session RPC/dead code from `Mothership` and protocol.
+   - Remaining: improve standalone TTY/transcript behavior from simple pipe forwarding to the final PTY/terminal model.
 
 3. **Refactor `Mothership` to manage workflows only**
    - remove agent-session RPCs
