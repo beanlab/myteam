@@ -7,7 +7,9 @@ import os
 import sys
 from typing import Any
 
+from .agent_result_channel import send_agent_result
 from .execution.protocol import (
+    ENV_AGENT_SESSION_RESULT_SOCKET,
     ENV_REQUEST_ID,
     ENV_SESSION_ID,
     ENV_SOCKET,
@@ -54,7 +56,14 @@ class SessionResult:
 
 
 def report_result(result_json: Any | None = None, status: str = "ok") -> None:
-    """Report a JSON-compatible result to the active workflow supervisor."""
+    """Report a JSON-compatible result to the active managed agent session."""
+
+    output = _load_result(_jsonable(result_json))
+
+    agent_result_socket = os.environ.get(ENV_AGENT_SESSION_RESULT_SOCKET)
+    if agent_result_socket:
+        send_agent_result(agent_result_socket, status=status, output=output)
+        return
 
     socket_path = os.environ.get(ENV_SOCKET)
     session_id = os.environ.get(ENV_SESSION_ID)
@@ -67,7 +76,7 @@ def report_result(result_json: Any | None = None, status: str = "ok") -> None:
         request_id=request_id,
         session_id=session_id,
         status=status,
-        output=_load_result(_jsonable(result_json)),
+        output=output,
     )
 
 

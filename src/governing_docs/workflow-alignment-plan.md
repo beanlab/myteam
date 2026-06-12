@@ -524,12 +524,15 @@ The new test shape should probably cover:
    - Loosened local/custom agent-name resolution so configured names like `codex-mini` can resolve from `.myteam.yaml`.
    - Added focused tests for session-result payloads, `.myteam.yaml` parsing, and hyphenated configured agents.
 
-2. **Build standalone `run_agent` implementation**
-   - no supervisor agent-session RPC
-   - per-run result socket
-   - new `myteam result` behavior
-   - Jinja2 prompt rendering
-   - nonce/session/usage lookup
+2. **Build standalone `run_agent` implementation** — **in progress**
+   - **Completed:** added a standalone per-`run_agent` agent result channel in `src/myteam/workflows/agent_result_channel.py`.
+   - **Completed:** updated `myteam result` to prefer `MYTEAM_AGENT_SESSION_RESULT_SOCKET` and report to the new channel.
+   - **Completed:** kept fallback reporting to the existing supervisor socket during the transition.
+   - **Completed:** added focused tests for direct channel reporting, `myteam result` JSON/stdin/text handling, unmanaged-session errors, and supervisor fallback.
+   - Remaining: wire `run_agent` itself to own this result channel.
+   - Remaining: remove supervisor agent-session RPC after standalone agent launching is implemented.
+   - Remaining: Jinja2 prompt rendering.
+   - Remaining: nonce/session/usage lookup in standalone `run_agent`.
 
 3. **Refactor `Mothership` to manage workflows only**
    - remove agent-session RPCs
