@@ -20,13 +20,22 @@ class RealTerminal:
     def __init__(self, *, on_resize: Callable[[Winsize], None] | None = None) -> None:
         self.on_resize = on_resize
         self.stdin_fd: int | None = None
-        self.stdout_fd: int = sys.stdout.fileno()
+        try:
+            self.stdout_fd: int = sys.stdout.fileno()
+        except (OSError, ValueError, AttributeError):
+            self.stdout_fd = 1
         self._restore_tty: list[Any] | None = None
         self._previous_winch_handler: Any = None
 
     def __enter__(self) -> "RealTerminal":
         if sys.stdin.isatty():
-            self.stdin_fd = sys.stdin.fileno()
+            try:
+                self.stdin_fd = sys.stdin.fileno()
+            except (OSError, ValueError, AttributeError):
+                self.stdin_fd = None
+                self._previous_winch_handler = signal.getsignal(signal.SIGWINCH)
+                signal.signal(signal.SIGWINCH, self._handle_winch)
+                return self
             self._restore_tty = termios.tcgetattr(self.stdin_fd)
             tty.setraw(self.stdin_fd)
         self._previous_winch_handler = signal.getsignal(signal.SIGWINCH)

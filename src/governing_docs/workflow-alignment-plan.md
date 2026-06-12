@@ -540,11 +540,16 @@ The new test shape should probably cover:
    - **Completed:** added focused workflow-only supervisor tests.
    - Remaining: improve standalone TTY/transcript behavior from simple pipe forwarding to the final PTY/terminal model.
 
-3. **Refactor `Mothership` to manage workflows only** — **partially completed**
+3. **Refactor `Mothership` to manage workflows only** — **initial PTY/process-stack implementation completed**
    - **Completed:** removed agent-session RPCs and result-reporting responsibility.
-   - Remaining: launch workflow PTY/process groups.
-   - Remaining: nested start request/poll/ack with proper workflow process suspension.
-   - Remaining: suspend/resume workflow process groups.
+   - **Completed:** workflow processes are now launched under PTYs using `ManagedPtyProcess`.
+   - **Completed:** supervisor forwards the real terminal to one active workflow at a time when running interactively.
+   - **Completed:** nested `myteam start` requests suspend the active parent workflow process group, run the child workflow, store the child process result, and resume the parent workflow.
+   - **Completed:** workflow process IDs are carried with `MYTEAM_WORKFLOW_INVOCATION_ID` for nested parent/child association.
+   - **Completed:** stdout is recorded from the workflow PTY and stderr is captured separately through a pipe.
+   - **Completed:** added focused tests for PTY-backed workflows and nested start parent-resume behavior.
+   - Remaining: harden terminal edge cases and signal/control-byte behavior in real interactive sessions.
+   - Remaining: improve standalone `run_agent` TTY/transcript behavior from simple pipe forwarding to the final PTY/terminal model.
 
 4. **Fix `myteam start` CLI behavior** — **completed for process-result semantics**
    - **Completed:** removed no-target fallback to `$MYTEAM_DEFAULT_WORKFLOW_COMMAND`, `$SHELL`, or `sh`; `myteam start` now requires a workflow file.
@@ -554,7 +559,7 @@ The new test shape should probably cover:
    - **Completed:** `start_workflow_cli` prints workflow stdout/stderr and exits nonzero when the workflow exits nonzero.
    - **Completed:** Python workflows no longer receive generic `--input`; only Markdown workflow wrapper invocation receives the input JSON.
    - **Completed:** added focused tests for missing target errors, Python/Markdown argv construction, stdout preservation, stderr preservation, and exit-code propagation.
-   - Remaining: nested shim behavior is semantically aligned through shared process-result handling, but full nested interactive suspension/resume still awaits the workflow PTY/process-group supervisor work.
+   - **Completed:** nested shim behavior now uses the workflow PTY/process-stack path: parent workflow suspension, child workflow execution, result polling, output printing, and parent workflow resume.
 
 5. **Fix markdown workflow wrapper** — **completed**
    - **Completed:** wrapper passes the Markdown body directly as the `run_agent` prompt without `str.format` pre-rendering.
