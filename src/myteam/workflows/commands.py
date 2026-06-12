@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-import shlex
 import sys
 import time
 from typing import Any, TypedDict
@@ -23,6 +22,13 @@ from .execution.protocol import (
     RpcClient,
 )
 from .results import SessionResult, UsageInfo
+
+
+@dataclass(frozen=True)
+class WorkflowProcessResult:
+    exit_code: int
+    stdout: str
+    stderr: str
 
 ENCODING = "utf-8"
 
@@ -107,19 +113,14 @@ def start_workflow(
     workflow_input_json: str | None = None,
     input: str | None = None,
 ) -> str:
-    """Start a workflow invocation under the workflow supervisor."""
+    """Start a workflow invocation and return the workflow stdout."""
 
     result = _start_workflow_result(
         workflow_name=workflow_name,
         args=args,
         workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
     )
-    if result is None:
-        return ""
-    return json.dumps({
-        "output": result.output,
-        "usage": [asdict(item) for item in result.usage],
-    })
+    return result.stdout
 
 
 def start_workflow_cli(
@@ -135,9 +136,9 @@ def start_workflow_cli(
         args=args,
         workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
     )
-    if result is None:
-        return
-    _print_session_result(result)
+    _print_workflow_process_result(result)
+    if result.exit_code != 0:
+        raise SystemExit(result.exit_code)
 
 
 def run_agent(
@@ -174,7 +175,7 @@ def _start_workflow_result(
     workflow_name: str | None,
     args: tuple[str, ...],
     workflow_input_json: str | None,
-) -> SessionResult | None:
+) -> WorkflowProcessResult:
     argv = _build_workflow_argv(workflow_name, args, workflow_input_json)
     socket_path = os.environ.get(ENV_SOCKET)
     parent_session_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
@@ -196,15 +197,9 @@ def _start_workflow_result(
         result = mothership.run_until_complete(request_id)
 
     if result is None:
-        return None
+        return WorkflowProcessResult(exit_code=1, stdout="", stderr="Workflow did not produce a result.\n")
 
-    status = str(result.get("status", "ok")) if isinstance(result, dict) else "ok"
-    if status == "ok":
-        payload = result.get("result") if isinstance(result, dict) and "result" in result else result
-        return _session_result_from_payload(payload)
-    raise RuntimeError(
-        json.dumps({"status": status, "result": result.get("result") if isinstance(result, dict) else result})
-    )
+    return _workflow_process_result_from_supervisor_result(result)
 
 
 def _start_workflow_via_existing_mothership(
@@ -213,7 +208,7 @@ def _start_workflow_via_existing_mothership(
     parent_session_id: str | None,
     argv: list[str],
     workflow_input_json: str | None,
-) -> SessionResult:
+) -> WorkflowProcessResult:
     client = RpcClient(socket_path)
     response = client.call(
         KIND_START_WORKFLOW,
@@ -226,10 +221,41 @@ def _start_workflow_via_existing_mothership(
     result = _poll_until_ready(client, request_id)
     client.call(KIND_ACK_RESULT, request_id=request_id)
 
-    status = str(result.get("status", "ok"))
-    if status == "ok":
-        return _session_result_from_payload(result.get("result"))
-    raise RuntimeError(json.dumps({"status": status, "result": result.get("result")}))
+    return _workflow_process_result_from_supervisor_result(result)
+
+
+def _workflow_process_result_from_supervisor_result(result: dict[str, Any]) -> WorkflowProcessResult:
+    payload = result.get("result")
+    if not isinstance(payload, dict):
+        return WorkflowProcessResult(
+            exit_code=1,
+            stdout="",
+            stderr=f"Invalid workflow result payload: {payload!r}\n",
+        )
+
+    if "exit_code" not in payload:
+        message = payload.get("message")
+        return WorkflowProcessResult(
+            exit_code=1,
+            stdout="",
+            stderr=(message if isinstance(message, str) else f"Invalid workflow result payload: {payload!r}") + "\n",
+        )
+
+    exit_code = _coerce_exit_code(payload.get("exit_code"))
+    stdout = payload.get("stdout")
+    stderr = payload.get("stderr")
+    return WorkflowProcessResult(
+        exit_code=exit_code,
+        stdout=stdout if isinstance(stdout, str) else "",
+        stderr=stderr if isinstance(stderr, str) else "",
+    )
+
+
+def _print_workflow_process_result(result: WorkflowProcessResult) -> None:
+    if result.stdout:
+        print(result.stdout, end="", file=sys.stdout)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
 
 
 def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:
@@ -282,31 +308,25 @@ def _print_session_result(result: SessionResult) -> None:
 
 def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_input_json: str | None) -> list[str]:
     if target is None:
-        default_command = os.environ.get("MYTEAM_DEFAULT_WORKFLOW_COMMAND") or os.environ.get("SHELL") or "sh"
-        return shlex.split(default_command)
+        raise RuntimeError("myteam start requires a workflow file.")
 
     path = Path(target)
-    if path.exists():
-        suffix = path.suffix.lower()
-        absolute = str(path.resolve())
-        if suffix == ".py":
-            argv = [sys.executable, absolute]
-            if workflow_input_json is not None:
-                argv.extend(["--input", workflow_input_json])
-            argv.extend(args)
-            return argv
-        if suffix == ".md":
-            argv = [
-                sys.executable,
-                str(get_template_file("workflow_markdown_wrapper.py")),
-                absolute,
-                workflow_input_json or "{}",
-            ]
-            argv.extend(args)
-            return argv
-        raise RuntimeError(f"Workflow '{target}' has unsupported extension '{path.suffix}'.")
+    if not path.exists():
+        raise RuntimeError(f"Workflow '{target}' does not exist.")
 
-    return [target, *args]
+    suffix = path.suffix.lower()
+    absolute = str(path.resolve())
+    if suffix == ".py":
+        return [sys.executable, absolute, *args]
+    if suffix == ".md":
+        return [
+            sys.executable,
+            str(get_template_file("workflow_markdown_wrapper.py")),
+            absolute,
+            workflow_input_json or "{}",
+            *args,
+        ]
+    raise RuntimeError(f"Workflow '{target}' has unsupported extension '{path.suffix}'.")
 
 
 def _build_agent_prompt(

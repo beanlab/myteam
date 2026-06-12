@@ -7,7 +7,6 @@ per-agent result channel, not through this supervisor.
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
 import os
 from queue import Empty, Queue
 import secrets
@@ -259,16 +258,12 @@ class Mothership:
                 stderr=subprocess.PIPE,
                 check=False,
             )
-            if completed.returncode == 0:
-                status = "ok"
-                result = _parse_workflow_stdout(completed.stdout)
-            else:
-                status = "exited"
-                result = {
-                    "exit_code": completed.returncode,
-                    "stdout": completed.stdout,
-                    "stderr": completed.stderr,
-                }
+            status = "ok" if completed.returncode == 0 else "exited"
+            result = {
+                "exit_code": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }
         except Exception as exc:
             status = "error"
             result = {"message": str(exc)}
@@ -298,13 +293,3 @@ class Mothership:
     def _new_request_id(self) -> str:
         return secrets.token_urlsafe(12)
 
-
-def _parse_workflow_stdout(stdout: str) -> Any:
-    lines = [line for line in stdout.splitlines() if line.strip()]
-    if not lines:
-        return None
-    last_line = lines[-1]
-    try:
-        return json.loads(last_line)
-    except json.JSONDecodeError:
-        return stdout

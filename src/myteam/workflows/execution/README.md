@@ -1,25 +1,23 @@
 # `myteam.workflows.execution`
 
-Workflow-level supervision and nested interactive agent-session runtime.
+Workflow-level supervision and nested workflow runtime.
 
 ## Shape
 
 - `myteam.workflows.commands` is the public command/API surface used by `myteam start` and `run_agent(...)`.
+- `myteam.workflows.agent_session` owns standalone `run_agent(...)` child-agent execution.
+- `myteam.workflows.agent_result_channel` owns the per-`run_agent` result socket used by `myteam result`.
 - `myteam.workflows.results` owns `SessionResult`, `UsageInfo`, and `myteam result` reporting.
-- `mothership.py` coordinates the Unix-socket RPC server, workflow requests, agent-session requests, session stack, result storage, and active-session switching.
-- `pty_process.py` launches and manages one child agent process attached to one PTY.
-- `terminal.py` owns real-terminal raw mode, resize handling, clearing, input, and output.
-- `recording.py` captures simple per-session transcripts.
-- `protocol.py` contains JSON RPC client/helpers and shared environment variable names.
+- `mothership.py` coordinates the workflow supervisor Unix-socket RPC server, workflow requests, workflow result storage, and nested `myteam start` polling.
+- `pty_process.py`, `terminal.py`, and `recording.py` contain PTY/terminal helpers that will be reused when workflow supervision is moved to the final PTY/process-group model.
+- `protocol.py` contains JSON RPC client/helpers and shared workflow-supervisor environment variable names.
 
-A workflow invocation may call `run_agent(...)` many times. Those agent sessions all use the same supervisor. Nested `myteam start` calls from inside a managed agent session use the active supervisor, suspend the parent session, run the nested workflow, and resume the parent session when the nested workflow completes.
+A workflow invocation may call `run_agent(...)` many times. Those agent sessions are managed by `run_agent` itself, not by the workflow supervisor. Nested `myteam start` calls use the active supervisor socket, request a child workflow, poll for that workflow process result, then print the child stdout/stderr and exit with the child workflow exit code.
 
-The control socket supports:
+The workflow supervisor control socket supports:
 
 - `start_workflow`
-- `start_agent_session`
-- `report_result`
 - `poll_result`
 - `ack_result`
 
-The socket is the supervisor control socket, not a one-off result socket for a single `run_agent(...)` call.
+The workflow supervisor socket is separate from the per-agent result socket owned by each `run_agent(...)` call.

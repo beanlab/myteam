@@ -546,16 +546,24 @@ The new test shape should probably cover:
    - Remaining: nested start request/poll/ack with proper workflow process suspension.
    - Remaining: suspend/resume workflow process groups.
 
-4. **Fix `myteam start` CLI behavior**
-   - no default shell
-   - no SessionResult wrapping
-   - nested shim prints stdout/stderr and exits with child status
+4. **Fix `myteam start` CLI behavior** — **completed for process-result semantics**
+   - **Completed:** removed no-target fallback to `$MYTEAM_DEFAULT_WORKFLOW_COMMAND`, `$SHELL`, or `sh`; `myteam start` now requires a workflow file.
+   - **Completed:** removed `SessionResult` wrapping from workflow start results.
+   - **Completed:** introduced distinct workflow process-result semantics: `exit_code`, `stdout`, and `stderr`.
+   - **Completed:** `Mothership` now preserves workflow stdout/stderr verbatim and no longer parses the last stdout line as JSON.
+   - **Completed:** `start_workflow_cli` prints workflow stdout/stderr and exits nonzero when the workflow exits nonzero.
+   - **Completed:** Python workflows no longer receive generic `--input`; only Markdown workflow wrapper invocation receives the input JSON.
+   - **Completed:** added focused tests for missing target errors, Python/Markdown argv construction, stdout preservation, stderr preservation, and exit-code propagation.
+   - Remaining: nested shim behavior is semantically aligned through shared process-result handling, but full nested interactive suspension/resume still awaits the workflow PTY/process-group supervisor work.
 
-5. **Fix markdown workflow wrapper**
-   - body as prompt
-   - `--input` JSON as actual input
-   - Jinja rendering delegated to `run_agent`
-   - frontmatter maps cleanly to `run_agent`
+5. **Fix markdown workflow wrapper** — **completed**
+   - **Completed:** wrapper passes the Markdown body directly as the `run_agent` prompt without `str.format` pre-rendering.
+   - **Completed:** wrapper passes actual `--input` JSON values to `run_agent` regardless of whether an input schema is present.
+   - **Completed:** Jinja rendering is delegated to `run_agent`.
+   - **Completed:** frontmatter agent settings are passed through with `resolve_agent_settings`.
+   - **Completed:** wrapper prints `result.output` as workflow stdout, not the full `SessionResult`.
+   - **Completed:** wrapper prints `null` for no reported output.
+   - **Completed:** added focused tests for prompt/input pass-through, frontmatter settings, clean output printing, `null` output, and non-object input validation.
 
 6. **Clean smaller docs mismatches**
    - Python skill cwd

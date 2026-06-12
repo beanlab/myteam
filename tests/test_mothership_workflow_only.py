@@ -21,7 +21,14 @@ def test_mothership_runs_workflow_process(tmp_path: Path) -> None:
         )
         result = mothership.run_until_complete(request_id)
 
-    assert result == {"status": "ok", "result": {"answer": "ok"}}
+    assert result == {
+        "status": "ok",
+        "result": {
+            "exit_code": 0,
+            "stdout": '{"answer": "ok"}\n',
+            "stderr": "",
+        },
+    }
 
 
 def test_mothership_rejects_old_agent_session_rpc() -> None:

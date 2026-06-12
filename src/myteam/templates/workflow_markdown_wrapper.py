@@ -15,18 +15,15 @@ def main(markdown_file: Path, workflow_inputs: str = "{}") -> None:
     frontmatter, content = split_markdown_frontmatter(markdown_file.read_text(encoding="utf-8"))
 
     settings = resolve_agent_settings(frontmatter)
-    prompt = content.format(**input_values) if input_values else content
-
     output_schema = frontmatter.get("output")
-    input_schema = frontmatter.get("input")
 
     result = run_agent(
-        prompt=prompt,
-        input=input_values if input_schema is not None else None,
+        prompt=content,
+        input=input_values,
         output=output_schema if isinstance(output_schema, dict) else None,
         **settings,
     )
-    print(json.dumps(result.to_jsonable()))
+    print(json.dumps(result.output))
 
 
 def _load_json_object(value: str) -> dict[str, Any]:
