@@ -16,7 +16,6 @@ def _load_markdown_skill(skill_file: Path) -> str:
 def _load_python_skill(skill_file: Path) -> str:
     result = subprocess.run(
         [sys.executable, str(skill_file.absolute())],
-        cwd=skill_file.parent,
         check=False,
         text=True,
         stdout=subprocess.PIPE,

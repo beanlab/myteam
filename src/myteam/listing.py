@@ -25,11 +25,8 @@ def list_resources(prefix: str | None = None) -> str:
 
 
 def list_resource_entries(root: Path, prefix: Path) -> list[ResourceInfo]:
-    if not prefix.exists():
-        print(f"Not a directory: {prefix}", file=sys.stderr)
-        raise SystemExit(1)
-    if not prefix.is_dir():
-        print(f"Not a directory: {prefix}", file=sys.stderr)
+    if not prefix.exists() or not prefix.is_dir():
+        print(f"Not a skill folder: {prefix}", file=sys.stderr)
         raise SystemExit(1)
 
     entries: list[ResourceInfo] = []
@@ -126,7 +123,10 @@ def _format_resource_infos(infos: list[ResourceInfo]) -> str:
 
 
 def _format_info(info: ResourceInfo) -> str:
-    header = f"----{info.type}: {info.name}----"
+    if info.type == "folder":
+        header = f"----{info.name}----"
+    else:
+        header = f"----{info.type}: {info.name}----"
 
     if not info.description:
         return header

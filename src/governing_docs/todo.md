@@ -4,3 +4,4 @@
 - command-line args to override md workflow settings (agent, model, reasoning, interactive)
 - print usage only on master `myteam start` invocation
 - strip transcript from error messages (it floods the terminal)
+- make sure workflow outputs don't print transcript either in template

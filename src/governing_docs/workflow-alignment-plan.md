@@ -565,11 +565,13 @@ The new test shape should probably cover:
    - **Completed:** wrapper prints `null` for no reported output.
    - **Completed:** added focused tests for prompt/input pass-through, frontmatter settings, clean output printing, `null` output, and non-object input validation.
 
-6. **Clean smaller docs mismatches**
-   - Python skill cwd
-   - listing headers/errors
-   - templates
-   - tests
+6. **Clean smaller docs mismatches** — **completed**
+   - **Completed:** Python skills now inherit the caller's working directory instead of running from the skill file's parent directory.
+   - **Completed:** folder listing headers now match the docs (`----agents/foo/----`) instead of using `folder:`.
+   - **Completed:** missing or non-directory list prefixes now report `Not a skill folder: ...`.
+   - **Completed:** added a packaged `new_workflow.py` template and removed the inline fallback template.
+   - **Completed:** `myteam new workflow foo.py` now uses the packaged Python workflow template.
+   - **Completed:** added focused tests for Python skill cwd inheritance, listing folder headers, listing prefix errors, and Python workflow template creation.
 
 ## Short version
 

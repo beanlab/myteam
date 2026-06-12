@@ -71,12 +71,7 @@ def new_workflow(workflow_name: str, parents: bool = False) -> None:
     if suffix == ".md":
         workflow_path.write_text(templates.get_template("new_workflow.md"), encoding=ENCODING)
     elif suffix == ".py":
-        template_name = "new_workflow.py"
-        try:
-            content = templates.get_template(template_name)
-        except FileNotFoundError:
-            content = _default_python_workflow_template()
-        workflow_path.write_text(content, encoding=ENCODING)
+        workflow_path.write_text(templates.get_template("new_workflow.py"), encoding=ENCODING)
     else:
         print(f"Workflow '{workflow_name}' has unsupported extension '{workflow_path.suffix}'.", file=sys.stderr)
         raise SystemExit(1)
@@ -337,24 +332,3 @@ def _build_agent_prompt(
 ) -> str:
     return build_agent_prompt(prompt, session_nonce=session_nonce, output_schema=output_schema)
 
-
-def _default_python_workflow_template() -> str:
-    return '''"""
-type: workflow
-description: Not implemented yet.
-"""
-from __future__ import annotations
-
-import json
-
-from myteam.workflows import run_agent
-
-
-def main() -> None:
-    result = run_agent(prompt="Not implemented yet. Tell the user.")
-    print(json.dumps(result.to_jsonable()))
-
-
-if __name__ == "__main__":
-    main()
-'''
