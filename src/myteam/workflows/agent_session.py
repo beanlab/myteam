@@ -25,7 +25,7 @@ from ..config import WorkflowDefaults, load_myteam_config
 from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
-from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET, ENV_SESSION_NONCE
+from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
 from .results import SessionResult, UsageInfo
 
 
@@ -82,7 +82,6 @@ def run_agent_session(
             **os.environ,
             ENV_AGENT_SESSION_RESULT_SOCKET: result_server.socket_path,
             ENV_AGENT_SESSION_NONCE: session_nonce,
-            ENV_SESSION_NONCE: session_nonce,
         }
         process = subprocess.Popen(
             argv,

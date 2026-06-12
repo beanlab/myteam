@@ -526,9 +526,9 @@ The new test shape should probably cover:
 
 2. **Build standalone `run_agent` implementation** — **mostly completed**
    - **Completed:** added a standalone per-`run_agent` agent result channel in `src/myteam/workflows/agent_result_channel.py`.
-   - **Completed:** updated `myteam result` to prefer `MYTEAM_AGENT_SESSION_RESULT_SOCKET` and report to the new channel.
-   - **Completed:** kept fallback reporting to the existing supervisor socket during the transition.
-   - **Completed:** added focused tests for direct channel reporting, `myteam result` JSON/stdin/text handling, unmanaged-session errors, and supervisor fallback.
+   - **Completed:** updated `myteam result` to require `MYTEAM_AGENT_SESSION_RESULT_SOCKET` and report to the new channel.
+   - **Completed:** removed fallback result reporting to the old supervisor socket.
+   - **Completed:** added focused tests for direct channel reporting, `myteam result` JSON/stdin/text handling, and unmanaged-session errors.
    - **Completed:** added `src/myteam/workflows/agent_session.py` as a standalone `run_agent` session runner.
    - **Completed:** changed `run_agent` to launch/manage agent processes directly instead of calling the supervisor's `KIND_START_AGENT_SESSION` RPC.
    - **Completed:** `run_agent` no longer requires `MYTEAM_MOTHERSHIP_SOCKET`.
@@ -536,14 +536,15 @@ The new test shape should probably cover:
    - **Completed:** prompt rendering now uses Jinja2 inputs before appending nonce/result instructions.
    - **Completed:** standalone `run_agent` resolves native session id and usage through the agent runtime config after child completion.
    - **Completed:** added focused tests for reported output, clean no-result exit, nonzero no-result exit, text result wrapping, Jinja rendering, supervisor independence, and child `myteam result` reporting.
-   - Remaining: remove supervisor agent-session RPC/dead code from `Mothership` and protocol.
+   - **Completed:** removed supervisor agent-session RPC/dead code from `Mothership` and protocol, including the old `start_agent_session` and supervisor `report_result` paths.
+   - **Completed:** added focused workflow-only supervisor tests.
    - Remaining: improve standalone TTY/transcript behavior from simple pipe forwarding to the final PTY/terminal model.
 
-3. **Refactor `Mothership` to manage workflows only**
-   - remove agent-session RPCs
-   - launch workflow PTY/process groups
-   - nested start request/poll/ack
-   - suspend/resume workflow process groups
+3. **Refactor `Mothership` to manage workflows only** — **partially completed**
+   - **Completed:** removed agent-session RPCs and result-reporting responsibility.
+   - Remaining: launch workflow PTY/process groups.
+   - Remaining: nested start request/poll/ack with proper workflow process suspension.
+   - Remaining: suspend/resume workflow process groups.
 
 4. **Fix `myteam start` CLI behavior**
    - no default shell

@@ -8,14 +8,7 @@ import sys
 from typing import Any
 
 from .agent_result_channel import send_agent_result
-from .execution.protocol import (
-    ENV_AGENT_SESSION_RESULT_SOCKET,
-    ENV_REQUEST_ID,
-    ENV_SESSION_ID,
-    ENV_SOCKET,
-    KIND_REPORT_RESULT,
-    RpcClient,
-)
+from .execution.protocol import ENV_AGENT_SESSION_RESULT_SOCKET
 
 
 @dataclass
@@ -61,23 +54,10 @@ def report_result(result_json: Any | None = None, status: str = "ok") -> None:
     output = _load_result(_jsonable(result_json))
 
     agent_result_socket = os.environ.get(ENV_AGENT_SESSION_RESULT_SOCKET)
-    if agent_result_socket:
-        send_agent_result(agent_result_socket, status=status, output=output)
-        return
+    if not agent_result_socket:
+        raise RuntimeError("No active myteam agent session is available.")
 
-    socket_path = os.environ.get(ENV_SOCKET)
-    session_id = os.environ.get(ENV_SESSION_ID)
-    request_id = os.environ.get(ENV_REQUEST_ID)
-    if not socket_path or not session_id or not request_id:
-        raise RuntimeError("No active myteam workflow session is available.")
-
-    RpcClient(socket_path).call(
-        KIND_REPORT_RESULT,
-        request_id=request_id,
-        session_id=session_id,
-        status=status,
-        output=output,
-    )
+    send_agent_result(agent_result_socket, status=status, output=output)
 
 
 def _jsonable(value: Any) -> Any:

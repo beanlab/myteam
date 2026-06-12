@@ -15,8 +15,8 @@ from ..templates import get_template_file
 from .agent_session import build_agent_prompt, run_agent_session
 from .execution.mothership import Mothership
 from .execution.protocol import (
-    ENV_SESSION_ID,
     ENV_SOCKET,
+    ENV_WORKFLOW_INVOCATION_ID,
     KIND_ACK_RESULT,
     KIND_POLL_RESULT,
     KIND_START_WORKFLOW,
@@ -177,7 +177,7 @@ def _start_workflow_result(
 ) -> SessionResult | None:
     argv = _build_workflow_argv(workflow_name, args, workflow_input_json)
     socket_path = os.environ.get(ENV_SOCKET)
-    parent_session_id = os.environ.get(ENV_SESSION_ID)
+    parent_session_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
 
     if socket_path:
         return _start_workflow_via_existing_mothership(
