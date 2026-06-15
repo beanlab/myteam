@@ -6,7 +6,6 @@ import functools
 import fire
 
 from .commands import changelog, version
-# from .rosters import download_roster, list_available_rosters, update_roster
 from .explain import explain_resources
 from .listing import list_resources
 from .skills import new_skill, load_skill
@@ -16,7 +15,9 @@ from .workflows import new_workflow, start_workflow_cli, report_result
 def printed(func):
     @functools.wraps(func)
     def new_func(*args, **kwargs):
-        print(func(*args, **kwargs))
+        result = func(*args, **kwargs)
+        if result is not None:
+            print(result, end="")
     return new_func
 
 
@@ -33,11 +34,6 @@ def main():
         "result": report_result,
         "version": version,
         "changelog": changelog,
-        "rosters": {
-            # "list": printed(list_available_rosters),
-            # "download": download_roster,
-            # "update": update_roster,
-        }
     }
 
     fire.Fire(commands)

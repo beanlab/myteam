@@ -1,3 +1,9 @@
+"""Implementation-level tests for workflow result race handling.
+
+Result reports may arrive immediately before process exit. These tests exercise
+the supervisor's storage path directly so race regressions fail with a focused
+error instead of a flaky end-to-end timeout.
+"""
 from __future__ import annotations
 
 import pytest

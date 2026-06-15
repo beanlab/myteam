@@ -1,3 +1,9 @@
+"""Implementation-level tests for the per-agent result socket.
+
+The result channel is a small RPC boundary used by managed child agent sessions.
+Contract-level `run_agent` tests cover normal behavior; these lower-level tests
+keep protocol failures and stdin/JSON edge cases deterministic and diagnostic.
+"""
 from __future__ import annotations
 
 import io

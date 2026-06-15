@@ -1,3 +1,8 @@
+"""Implementation-level tests for workflow-result RPC reporting.
+
+Public `myteam start` tests cover reported result text. These tests keep the
+managed-workflow environment checks and RPC payload validation focused.
+"""
 from __future__ import annotations
 
 import pytest

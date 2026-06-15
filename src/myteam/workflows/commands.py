@@ -122,10 +122,14 @@ def start_workflow(
 ) -> str:
     """Start a workflow invocation and return its explicit result text."""
 
+    args, effective_input = _extract_workflow_input_arg(
+        args,
+        workflow_input_json if workflow_input_json is not None else input,
+    )
     result = _start_workflow_result(
         workflow_name=workflow_name,
         args=args,
-        workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
+        workflow_input_json=effective_input,
     )
     return result.result_text
 
@@ -138,14 +142,42 @@ def start_workflow_cli(
 ) -> None:
     """CLI entrypoint for `myteam start`."""
 
+    args, effective_input = _extract_workflow_input_arg(
+        args,
+        workflow_input_json if workflow_input_json is not None else input,
+    )
     result = _start_workflow_result(
         workflow_name=workflow_name,
         args=args,
-        workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
+        workflow_input_json=effective_input,
     )
     _print_workflow_process_result(result)
     if result.exit_code != 0:
         raise SystemExit(result.exit_code)
+
+
+def _extract_workflow_input_arg(args: tuple[Any, ...], explicit_input: Any) -> tuple[tuple[str, ...], Any]:
+    remaining: list[str] = []
+    effective_input = explicit_input
+    iterator = iter(args)
+    for arg in iterator:
+        if arg in {"--input", "--workflow-input-json", "--workflow_input_json"}:
+            try:
+                effective_input = next(iterator)
+            except StopIteration as exc:
+                raise RuntimeError(f"{arg} requires a JSON value.") from exc
+            continue
+        if isinstance(arg, str) and arg.startswith("--input="):
+            effective_input = arg.partition("=")[2]
+            continue
+        if isinstance(arg, str) and arg.startswith("--workflow-input-json="):
+            effective_input = arg.partition("=")[2]
+            continue
+        if isinstance(arg, str) and arg.startswith("--workflow_input_json="):
+            effective_input = arg.partition("=")[2]
+            continue
+        remaining.append(str(arg))
+    return tuple(remaining), effective_input
 
 
 def _start_workflow_result(
@@ -154,6 +186,7 @@ def _start_workflow_result(
     args: tuple[str, ...],
     workflow_input_json: str | None,
 ) -> WorkflowProcessResult:
+    workflow_input_json = _normalize_workflow_input_json(workflow_input_json)
     argv = _build_workflow_argv(workflow_name, args, workflow_input_json)
     socket_path = os.environ.get(ENV_SOCKET)
     parent_session_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
@@ -200,6 +233,14 @@ def _start_workflow_via_existing_mothership(
     client.call(KIND_ACK_RESULT, request_id=request_id)
 
     return _workflow_process_result_from_supervisor_result(result)
+
+
+def _normalize_workflow_input_json(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return json.dumps(value)
 
 
 def _workflow_process_result_from_supervisor_result(result: dict[str, Any]) -> WorkflowProcessResult:

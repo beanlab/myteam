@@ -1,3 +1,9 @@
+"""Implementation-level tests for supervisor PTY workflow handling.
+
+The governing testing philosophy permits lower-level coverage for PTY/session
+handoff because failures are race-prone and difficult to diagnose only through
+CLI assertions.
+"""
 from __future__ import annotations
 
 import sys

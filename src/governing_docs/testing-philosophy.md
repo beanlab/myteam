@@ -12,7 +12,7 @@ For `myteam`, the important boundaries are:
 
 1. **CLI behavior**: what happens when a user or agent runs `myteam ...`.
 2. **Public Python API behavior**: what workflow authors and library consumers can import, call, receive, and depend on.
-3. **Documented file/resource behavior**: how skills, workflows, frontmatter, rosters, and templates are discovered and interpreted.
+3. **Documented file/resource behavior**: how skills, workflows, frontmatter, and templates are discovered and interpreted.
 
 Tests should usually assert these contracts directly instead of asserting which private function, class, subprocess wrapper, parser helper, or internal data structure happens to implement them.
 

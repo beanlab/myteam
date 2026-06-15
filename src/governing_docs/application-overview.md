@@ -39,7 +39,7 @@ In support of these primary concerns, `myteam` also supports:
 
 - `myteam explain` - provide instructions to an agent about how to use `myteam` commands
 - `myteam version` - display version
-- `myteam rosters list`, `myteam rosters download`,`myteam rosters update` - list, download, and update predefined skills and workflows
+- `myteam changelog` - display packaged release notes
 
 ## Scenarios
 

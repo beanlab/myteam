@@ -1,3 +1,8 @@
+"""Implementation-level tests for the workflow supervisor RPC boundary.
+
+The supervisor owns TTY/process orchestration and rejects obsolete RPC calls;
+these protocol checks are intentionally below the CLI layer for determinism.
+"""
 from __future__ import annotations
 
 import sys

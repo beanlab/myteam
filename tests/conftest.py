@@ -82,7 +82,12 @@ def run_myteam_inprocess(monkeypatch):
 
 
 @pytest.fixture
-def initialized_project(tmp_path: Path, run_myteam) -> Path:
-    result = run_myteam(tmp_path, "init")
-    assert result.exit_code == 0, result.stderr
+def initialized_project(tmp_path: Path) -> Path:
+    """Temporary project root used by legacy tests during the test-suite refactor.
+
+    `myteam init` is no longer part of the documented public contract, so this
+    fixture intentionally does not initialize an old `.myteam` tree. Tests that
+    still rely on that legacy shape will be removed or rewritten in later phases.
+    """
+
     return tmp_path

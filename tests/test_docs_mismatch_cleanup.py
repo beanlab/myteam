@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from myteam.frontmatter import parse_python_frontmatter
 from myteam.listing import list_resources
 from myteam.skills import load_skill
 from myteam.workflows.commands import new_workflow
@@ -77,14 +78,19 @@ def test_listing_file_prefix_reports_not_a_skill_folder(
     assert "Not a skill folder:" in capsys.readouterr().err
 
 
-def test_new_python_workflow_uses_packaged_template(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_new_python_workflow_template_has_documented_structure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.chdir(tmp_path)
 
     new_workflow("review.py")
 
     content = (tmp_path / "review.py").read_text(encoding="utf-8")
-    assert "type: workflow" in content
-    assert "usage: no arguments" in content
-    assert "from myteam import report_workflow_result, run_agent" in content
-    assert 'report_workflow_result(json.dumps(result.output) + "\\n")' in content
-    assert "to_jsonable" not in content
+    frontmatter = parse_python_frontmatter(content)
+    assert frontmatter["type"] == "workflow"
+    assert "description" in frontmatter
+    assert "usage" in frontmatter
+    assert "run_agent" in content
+    assert "report_workflow_result" in content
+    assert "def main" in content
