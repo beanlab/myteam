@@ -36,7 +36,7 @@ _AGENT_RESULT_POLL_SECONDS = 0.05
 _AGENT_EXIT_TIMEOUT_SECONDS = 2.0
 
 
-def run_agent_session(
+def run_agent(
     *,
     prompt: str,
     input: dict[str, Any] | None = None,

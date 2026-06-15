@@ -11,7 +11,7 @@ from typing import Any, TypedDict
 from .. import templates
 from ..config import WorkflowDefaults
 from ..templates import get_template_file
-from .agent_session import build_agent_prompt, run_agent_session
+from .agent_session import build_agent_prompt
 from .execution.mothership import Mothership
 from .execution.protocol import (
     ENV_SOCKET,
@@ -134,35 +134,6 @@ def start_workflow_cli(
     _print_workflow_process_result(result)
     if result.exit_code != 0:
         raise SystemExit(result.exit_code)
-
-
-def run_agent(
-    *,
-    prompt: str,
-    input: dict[str, Any] | None = None,
-    output: dict[str, Any] | None = None,
-    agent: str | None = None,
-    model: str | None = None,
-    reasoning: str | None = None,
-    extra_args: tuple[str, ...] | list[str] | None = None,
-    interactive: bool | None = None,
-    session_id: str | None = None,
-    fork: bool | None = None,
-) -> SessionResult:
-    """Start and manage one child agent session."""
-
-    return run_agent_session(
-        prompt=prompt,
-        input=input,
-        output=output,
-        agent=agent,
-        model=model,
-        reasoning=reasoning,
-        extra_args=extra_args,
-        interactive=interactive,
-        session_id=session_id,
-        fork=fork,
-    )
 
 
 def _start_workflow_result(
