@@ -82,6 +82,33 @@ def test_run_agent_does_not_require_supervisor_and_returns_reported_output(tmp_p
     assert result.output["nonce"]
 
 
+def test_run_agent_launches_agent_with_tty_stdio(tmp_path: Path, monkeypatch) -> None:
+    write_fake_agent_project(
+        tmp_path,
+        """
+        import sys
+        from pathlib import Path
+        from myteam.workflows.results import report_result
+
+        Path('native-session.txt').write_text('native-tty', encoding='utf-8')
+        report_result({
+            'stdin': sys.stdin.isatty(),
+            'stdout': sys.stdout.isatty(),
+            'stderr': sys.stderr.isatty(),
+        })
+        assert sys.stdin.readline() == 'exit\\n'
+        """,
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(ENV_SOCKET, raising=False)
+
+    result = run_agent(prompt="TTY check", agent="fake-agent")
+
+    assert result.exit_code == 0
+    assert result.session_id == "native-tty"
+    assert result.output == {"stdin": True, "stdout": True, "stderr": True}
+
+
 def test_run_agent_returns_none_output_for_clean_exit_without_result(tmp_path: Path, monkeypatch) -> None:
     write_fake_agent_project(
         tmp_path,

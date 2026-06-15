@@ -10,9 +10,10 @@ import json
 import os
 from pathlib import Path
 import secrets
+import select
 import subprocess
 import sys
-import threading
+import time
 from typing import Any
 
 try:  # pragma: no cover - exercised when dependency is installed
@@ -26,6 +27,8 @@ from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
 from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
+from .execution.pty_process import ManagedPtyProcess
+from .execution.terminal import RealTerminal
 from .results import SessionResult, UsageInfo
 
 
@@ -83,27 +86,26 @@ def run_agent_session(
             ENV_AGENT_SESSION_RESULT_SOCKET: result_server.socket_path,
             ENV_AGENT_SESSION_NONCE: session_nonce,
         }
-        process = subprocess.Popen(
-            argv,
-            cwd=str(cwd),
+        session = ManagedPtyProcess.launch(
+            session_id=session_nonce,
+            request_id=session_nonce,
+            argv=argv,
             env=env,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            cwd=str(cwd),
+            winsize=RealTerminal().winsize(),
+            nonce=session_nonce,
+            agent_name=agent_name,
         )
-        transcript_parts: list[bytes] = []
-        transcript_lock = threading.Lock()
-        stdout_thread = _start_pipe_forwarder(process.stdout, _binary_output_stream(sys.stdout), transcript_parts, transcript_lock)
-        stderr_thread = _start_pipe_forwarder(process.stderr, _binary_output_stream(sys.stderr), transcript_parts, transcript_lock)
+        try:
+            reported_result, exit_code = _forward_pty_until_complete(
+                session,
+                result_server,
+                exit_sequence=runtime_config.exit_sequence,
+            )
+            transcript = session.recording.snapshot()
+        finally:
+            session.close()
 
-        reported_result = _wait_for_report_or_exit(process, result_server)
-        if reported_result is not None:
-            _close_reported_agent_session(process, runtime_config.exit_sequence)
-        exit_code = _wait_for_process(process)
-        _join_reader(stdout_thread)
-        _join_reader(stderr_thread)
-
-    transcript = _decode_transcript(transcript_parts, transcript_lock)
     output_value = reported_result.output if reported_result is not None else None
     if output_value is not None and not isinstance(output_value, dict):
         output_value = {"value": output_value}
@@ -202,75 +204,100 @@ def _binary_output_stream(stream: Any) -> Any:
     return stream.buffer if hasattr(stream, "buffer") else _TextStreamBinaryAdapter(stream)
 
 
-def _start_pipe_forwarder(
-    source: Any,
-    destination: Any,
-    transcript_parts: list[bytes],
-    transcript_lock: threading.Lock,
-) -> threading.Thread:
-    def forward() -> None:
-        if source is None:
-            return
-        while True:
-            chunk = source.read(4096)
-            if not chunk:
-                return
-            with transcript_lock:
-                transcript_parts.append(chunk)
-            try:
-                destination.write(chunk)
-                destination.flush()
-            except Exception:
-                pass
-
-    thread = threading.Thread(target=forward, daemon=True)
-    thread.start()
-    return thread
-
-
-def _wait_for_report_or_exit(
-    process: subprocess.Popen[bytes],
+def _forward_pty_until_complete(
+    session: ManagedPtyProcess,
     result_server: AgentResultServer,
-) -> AgentReportedResult | None:
-    while True:
-        reported_result = result_server.wait_for_result(timeout=_AGENT_RESULT_POLL_SECONDS)
-        if reported_result is not None:
-            return reported_result
-        if process.poll() is not None:
-            return None
+    *,
+    exit_sequence: bytes,
+) -> tuple[AgentReportedResult | None, int]:
+    """Proxy the caller's terminal to an agent PTY while waiting for completion.
+
+    This restores the old mothership behavior for agent sessions: the bytes read
+    from the PTY master are both written to the caller's stdout and recorded by
+    ``ManagedPtyProcess.read()`` for the session transcript. When the caller has
+    an interactive stdin, input is forwarded into the child PTY as well.
+    """
+
+    reported_result: AgentReportedResult | None = None
+    exit_deadline: float | None = None
+    output = _binary_output_stream(sys.stdout)
+
+    with RealTerminal(on_resize=session.resize) as terminal:
+        session.resize(terminal.winsize())
+        while True:
+            if reported_result is None:
+                reported_result = result_server.wait_for_result(timeout=0)
+                if reported_result is not None:
+                    _request_agent_exit(session, exit_sequence)
+                    exit_deadline = time.monotonic() + _AGENT_EXIT_TIMEOUT_SECONDS
+
+            code = session.poll()
+            if code is not None:
+                _drain_ready_pty_output(session, output)
+                return reported_result, code
+
+            if exit_deadline is not None and time.monotonic() >= exit_deadline:
+                session.terminate()
+                continue
+
+            read_fds = [session.master_fd]
+            if terminal.can_read_stdin:
+                assert terminal.stdin_fd is not None
+                read_fds.append(terminal.stdin_fd)
+
+            ready, _, _ = select.select(read_fds, [], [], _AGENT_RESULT_POLL_SECONDS)
+
+            if session.master_fd in ready:
+                chunk = session.read()
+                if chunk:
+                    _write_output(output, chunk)
+                else:
+                    code = session.poll()
+                    if code is None:
+                        try:
+                            code = session.wait(timeout=0.1)
+                        except subprocess.TimeoutExpired:
+                            code = 0
+                    return reported_result, code if isinstance(code, int) else 0
+
+            if terminal.stdin_fd is not None and terminal.stdin_fd in ready:
+                data = terminal.read_stdin()
+                if data:
+                    try:
+                        session.write(data)
+                    except OSError:
+                        pass
 
 
-def _close_reported_agent_session(process: subprocess.Popen[bytes], exit_sequence: bytes) -> None:
-    if process.poll() is not None:
+def _request_agent_exit(session: ManagedPtyProcess, exit_sequence: bytes) -> None:
+    if session.poll() is not None:
         return
-    if process.stdin is not None:
-        try:
-            process.stdin.write(exit_sequence)
-            process.stdin.flush()
-        except OSError:
-            pass
-
-
-def _wait_for_process(process: subprocess.Popen[bytes]) -> int:
     try:
-        return process.wait(timeout=_AGENT_EXIT_TIMEOUT_SECONDS)
-    except subprocess.TimeoutExpired:
-        process.terminate()
+        session.write(exit_sequence)
+    except OSError:
+        pass
+
+
+def _drain_ready_pty_output(session: ManagedPtyProcess, output: Any) -> None:
+    while True:
         try:
-            return process.wait(timeout=0.5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            return process.wait()
+            ready, _, _ = select.select([session.master_fd], [], [], 0)
+        except OSError:
+            return
+        if session.master_fd not in ready:
+            return
+        chunk = session.read()
+        if not chunk:
+            return
+        _write_output(output, chunk)
 
 
-def _join_reader(thread: threading.Thread) -> None:
-    thread.join(timeout=1)
-
-
-def _decode_transcript(parts: list[bytes], lock: threading.Lock) -> str:
-    with lock:
-        data = b"".join(parts)
-    return data.decode("utf-8", errors="replace")
+def _write_output(output: Any, chunk: bytes) -> None:
+    try:
+        output.write(chunk)
+        output.flush()
+    except Exception:
+        pass
 
 
 def _resolve_session_metadata(

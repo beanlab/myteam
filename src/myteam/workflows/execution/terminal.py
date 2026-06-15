@@ -65,9 +65,15 @@ class RealTerminal:
     def winsize(self) -> Winsize:
         size = shutil.get_terminal_size(fallback=(80, 24))
         winsize = (size.lines, size.columns)
-        if self.stdin_fd is not None:
+        stdin_fd = self.stdin_fd
+        if stdin_fd is None and sys.stdin.isatty():
             try:
-                winsize = termios.tcgetwinsize(self.stdin_fd)
+                stdin_fd = sys.stdin.fileno()
+            except (OSError, ValueError, AttributeError):
+                stdin_fd = None
+        if stdin_fd is not None:
+            try:
+                winsize = termios.tcgetwinsize(stdin_fd)
             except OSError:
                 pass
         return winsize
