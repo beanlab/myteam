@@ -1,8 +1,19 @@
-## myteam result reporting
+## Session result reporting
 
-myteam session metadata:
-- session nonce: {{SESSION_NONCE}}
-- When you have completed this session, report the final result with `myteam result`.
-- Pass the result as JSON, for example: `myteam result '{"status": "done"}'`.
-- You may also pipe JSON to stdin, for example: `printf '%s' '{"status": "done"}' | myteam result`.
-{{OUTPUT_SCHEMA_SECTION}}
+This session is part of a larger pipeline. The information needed from this session and how to report it are described here.
+
+When you have the requested information, pipe the final result JSON to `myteam result`.
+
+Example:
+
+```bash
+myteam result <<EOF
+{"status": "done", "findings": "ready to merge"}
+EOF
+```
+
+The result JSON should follow this schema:
+
+```json
+{{ OUTPUT_SCHEMA_JSON }}
+```

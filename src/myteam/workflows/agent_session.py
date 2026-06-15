@@ -125,26 +125,22 @@ def build_agent_prompt(
     session_nonce: str,
     output_schema: dict[str, Any] | None,
 ) -> str:
-    result_instructions = templates.get_template("agent_result_instructions.md")
-    output_schema_section = ""
-    if output_schema is not None:
-        output_schema_section = (
-            "\nExpected result JSON shape:\n\n"
-            "This describes the intended fields and structure for the result. "
-            "Treat it as guidance for what to report with `myteam result`, not as a strict JSON Schema document.\n\n"
-            "```json\n"
-            f"{json.dumps(output_schema, indent=2, sort_keys=True)}\n"
-            "```"
-        )
+    sections = [
+        f"*Session ID: {session_nonce}*",
+        prompt.rstrip(),
+    ]
 
-    result_instructions = _render_prompt(
-        result_instructions,
-        {
-            "SESSION_NONCE": session_nonce,
-            "OUTPUT_SCHEMA_SECTION": output_schema_section,
-        },
-    ).strip()
-    return "\n\n".join((prompt.rstrip(), result_instructions))
+    if output_schema is not None:
+        result_instructions = _render_prompt(
+            templates.get_template("agent_result_instructions.md"),
+            {
+                # Don't sort the keys so the order the user provided is preserved
+                "OUTPUT_SCHEMA_JSON": json.dumps(output_schema, indent=2),
+            },
+        ).strip()
+        sections.append(result_instructions)
+
+    return "\n\n".join(section for section in sections if section)
 
 
 def _render_prompt(prompt: str, input_values: dict[str, Any]) -> str:
@@ -225,6 +221,7 @@ def _forward_pty_until_complete(
             code = session.poll()
             if code is not None:
                 _drain_ready_pty_output(session, output)
+                reported_result = _collect_reported_result(reported_result, result_server)
                 return reported_result, code
 
             if exit_deadline is not None and time.monotonic() >= exit_deadline:
@@ -249,6 +246,7 @@ def _forward_pty_until_complete(
                             code = session.wait(timeout=0.1)
                         except subprocess.TimeoutExpired:
                             code = 0
+                    reported_result = _collect_reported_result(reported_result, result_server)
                     return reported_result, code if isinstance(code, int) else 0
 
             if terminal.stdin_fd is not None and terminal.stdin_fd in ready:
@@ -258,6 +256,15 @@ def _forward_pty_until_complete(
                         session.write(data)
                     except OSError:
                         pass
+
+
+def _collect_reported_result(
+    reported_result: AgentReportedResult | None,
+    result_server: AgentResultServer,
+) -> AgentReportedResult | None:
+    if reported_result is not None:
+        return reported_result
+    return result_server.wait_for_result(timeout=0.1)
 
 
 def _request_agent_exit(session: ManagedPtyProcess, exit_sequence: bytes) -> None:

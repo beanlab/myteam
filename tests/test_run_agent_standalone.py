@@ -77,8 +77,9 @@ def test_run_agent_does_not_require_supervisor_and_returns_reported_output(tmp_p
     assert result.exit_code == 0
     assert result.session_id == "native-123"
     assert result.output is not None
-    assert "Hello Ada" in result.output["prompt"]
-    assert "myteam result reporting" in result.output["prompt"]
+    assert result.output["prompt"].startswith("*Session ID: ")
+    assert "\n\nHello Ada" in result.output["prompt"]
+    assert "Session result reporting" not in result.output["prompt"]
     assert result.output["nonce"]
 
 
