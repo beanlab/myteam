@@ -43,4 +43,8 @@ In support of these primary concerns, `myteam` also supports:
 
 ## Scenarios
 
-Files in `scenarios/` describe how this tool is used. 
+Files in `scenarios/` describe how this tool is used.
+
+## Testing Philosophy
+
+See `testing-philosophy.md` for the testing philosophy: tests should protect the public CLI and Python API contracts, avoiding implementation-level assertions except for unusually tricky or risky internals such as PTY/session handling.
