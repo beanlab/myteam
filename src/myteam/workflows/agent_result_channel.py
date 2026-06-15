@@ -91,13 +91,12 @@ class AgentResultServer:
 
     def _handle_connection(self, connection: socket.socket) -> None:
         with connection:
+            reported_result: AgentReportedResult | None = None
             try:
                 message = _load_agent_result_message(read_all(connection))
-                self._results.put(
-                    AgentReportedResult(
-                        status=message["status"],
-                        output=message.get("output"),
-                    )
+                reported_result = AgentReportedResult(
+                    status=message["status"],
+                    output=message.get("output"),
                 )
                 response = {"ok": True}
             except Exception as exc:
@@ -106,6 +105,8 @@ class AgentResultServer:
                 connection.sendall(json_response(**response))
             except OSError:
                 pass
+            if reported_result is not None:
+                self._results.put(reported_result)
 
 
 def send_agent_result(socket_path: str, *, status: str, output: Any) -> None:

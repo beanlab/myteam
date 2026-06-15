@@ -162,3 +162,35 @@ def test_run_agent_wraps_text_reported_by_myteam_result(tmp_path: Path, monkeypa
 
     assert result.exit_code == 0
     assert result.output == {"value": "plain text result"}
+
+
+def test_run_agent_suppresses_terminal_bytes_after_reported_result(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    write_fake_agent_project(
+        tmp_path,
+        """
+        import sys
+        from pathlib import Path
+        from myteam.workflows.results import report_result
+
+        Path('native-session.txt').write_text('native-clean-terminal', encoding='utf-8')
+        print('visible before result', flush=True)
+        report_result({'done': True})
+        print('DANGLING-BYTES-AFTER-RESULT', flush=True)
+        assert sys.stdin.readline() == 'exit\\n'
+        """,
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(ENV_SOCKET, raising=False)
+
+    result = run_agent(prompt="Report with noisy teardown", agent="fake-agent")
+    captured = capsys.readouterr()
+
+    assert result.exit_code == 0
+    assert result.output == {"done": True}
+    assert "visible before result" in captured.out
+    assert "DANGLING-BYTES-AFTER-RESULT" not in captured.out
+    assert "DANGLING-BYTES-AFTER-RESULT" in result.transcript

@@ -31,6 +31,7 @@ from .protocol import (
     read_all,
     safe_unlink,
 )
+from .pty_forwarding import drain_pty_output, os_fd_writer, pump_pty_once
 from .pty_process import ManagedPtyProcess
 from .terminal import RealTerminal, Winsize
 
@@ -149,51 +150,43 @@ class Mothership:
             live_forwarding = sys.stdout.isatty()
             while not self._closed.is_set():
                 self._drain_commands()
-                self._reap_exited_active_session()
+                self._reap_exited_active_session(terminal=terminal, live_forwarding=live_forwarding)
 
                 if top_request_id in self.results:
                     return self.results[top_request_id]
                 if self.active is None and not self.stack and self._commands.empty():
                     return None
 
-                read_fds = [self._wakeup_r]
-                if self.active is not None:
-                    read_fds.append(self.active.master_fd)
-                    stderr_fd = self.active.stderr_fd()
-                    if stderr_fd is not None:
-                        read_fds.append(stderr_fd)
-                if terminal.can_read_stdin and self.active is not None:
-                    assert terminal.stdin_fd is not None
-                    read_fds.append(terminal.stdin_fd)
-
-                ready, _, _ = select.select(read_fds, [], [], 0.1)
-                if self._wakeup_r in ready:
-                    self._drain_wakeup_pipe()
+                if self.active is None:
+                    ready, _, _ = select.select([self._wakeup_r], [], [], 0.1)
+                    if self._wakeup_r in ready:
+                        self._drain_wakeup_pipe()
                     continue
 
-                if self.active is not None and self.active.master_fd in ready:
-                    chunk = self.active.read()
-                    if chunk:
-                        if live_forwarding:
-                            terminal.write_stdout(chunk)
-                    else:
-                        self._handle_workflow_exit(self.active)
-                        continue
-
-                if self.active is not None:
-                    stderr_fd = self.active.stderr_fd()
-                    if stderr_fd is not None and stderr_fd in ready:
-                        chunk = self.active.read_stderr()
-                        if chunk and live_forwarding:
-                            try:
-                                os.write(sys.stderr.fileno(), chunk)
-                            except OSError:
-                                pass
-
-                if terminal.stdin_fd is not None and terminal.stdin_fd in ready and self.active is not None:
-                    data = terminal.read_stdin()
-                    if data:
-                        self.active.write(data)
+                stderr_writer = _stderr_writer() if live_forwarding else None
+                activity = pump_pty_once(
+                    self.active,
+                    terminal,
+                    timeout=0.1,
+                    stdout_writer=terminal.write_stdout if live_forwarding else None,
+                    stderr_writer=stderr_writer,
+                    forward_stdout=live_forwarding,
+                    forward_stderr=live_forwarding,
+                    extra_fds=[self._wakeup_r],
+                    preempt_on_extra_fd=True,
+                )
+                if self._wakeup_r in activity.ready_extra_fds:
+                    self._drain_wakeup_pipe()
+                    continue
+                if activity.stdout_eof:
+                    self._handle_workflow_exit(
+                        self.active,
+                        stdout_writer=terminal.write_stdout if live_forwarding else None,
+                        stderr_writer=stderr_writer,
+                        forward_stdout=live_forwarding,
+                        forward_stderr=live_forwarding,
+                    )
+                    continue
 
         return None
 
@@ -354,7 +347,15 @@ class Mothership:
         else:
             self._wake()
 
-    def _handle_workflow_exit(self, session: ManagedPtyProcess) -> None:
+    def _handle_workflow_exit(
+        self,
+        session: ManagedPtyProcess,
+        *,
+        stdout_writer=None,
+        stderr_writer=None,
+        forward_stdout: bool = False,
+        forward_stderr: bool = False,
+    ) -> None:
         code = session.poll()
         if code is None:
             try:
@@ -362,6 +363,13 @@ class Mothership:
             except subprocess.TimeoutExpired:
                 code = None
         exit_code = code if isinstance(code, int) else 1
+        drain_pty_output(
+            session,
+            stdout_writer=stdout_writer,
+            stderr_writer=stderr_writer,
+            forward_stdout=forward_stdout,
+            forward_stderr=forward_stderr,
+        )
         result = {
             "exit_code": exit_code,
             "stdout": _normalize_pty_text(session.recording.snapshot()),
@@ -377,9 +385,15 @@ class Mothership:
         )
         self._wake()
 
-    def _reap_exited_active_session(self) -> None:
+    def _reap_exited_active_session(self, *, terminal: RealTerminal, live_forwarding: bool) -> None:
         if self.active is not None and self.active.poll() is not None:
-            self._handle_workflow_exit(self.active)
+            self._handle_workflow_exit(
+                self.active,
+                stdout_writer=terminal.write_stdout if live_forwarding else None,
+                stderr_writer=_stderr_writer() if live_forwarding else None,
+                forward_stdout=live_forwarding,
+                forward_stderr=live_forwarding,
+            )
 
     def _resume_previous_workflow(self) -> None:
         if self.stack:
@@ -433,3 +447,10 @@ class Mothership:
 
 def _normalize_pty_text(text: str) -> str:
     return text.replace("\r\n", "\n")
+
+
+def _stderr_writer():
+    try:
+        return os_fd_writer(sys.stderr.fileno())
+    except (OSError, ValueError, AttributeError):
+        return None

@@ -10,7 +10,6 @@ import json
 import os
 from pathlib import Path
 import secrets
-import select
 import subprocess
 import sys
 import time
@@ -24,6 +23,7 @@ from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
 from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
+from .execution.pty_forwarding import binary_output_stream, drain_pty_output, pump_pty_once, write_bytes
 from .execution.pty_process import ManagedPtyProcess
 from .execution.terminal import RealTerminal
 from .results import SessionResult, UsageInfo
@@ -176,21 +176,6 @@ def _resolve_runtime_config(agent_name: str, cwd: Path) -> AgentRuntimeConfig:
     )
 
 
-class _TextStreamBinaryAdapter:
-    def __init__(self, stream: Any) -> None:
-        self.stream = stream
-
-    def write(self, data: bytes) -> None:
-        self.stream.write(data.decode("utf-8", errors="replace"))
-
-    def flush(self) -> None:
-        self.stream.flush()
-
-
-def _binary_output_stream(stream: Any) -> Any:
-    return stream.buffer if hasattr(stream, "buffer") else _TextStreamBinaryAdapter(stream)
-
-
 def _forward_pty_until_complete(
     session: ManagedPtyProcess,
     result_server: AgentResultServer,
@@ -207,20 +192,39 @@ def _forward_pty_until_complete(
 
     reported_result: AgentReportedResult | None = None
     exit_deadline: float | None = None
-    output = _binary_output_stream(sys.stdout)
+    output = binary_output_stream(sys.stdout)
+
+    def notice_reported_result() -> bool:
+        nonlocal reported_result, exit_deadline
+        if reported_result is None:
+            reported_result = result_server.wait_for_result(timeout=0)
+            if reported_result is not None:
+                _request_agent_exit(session, exit_sequence)
+                exit_deadline = time.monotonic() + _AGENT_EXIT_TIMEOUT_SECONDS
+        return reported_result is not None
+
+    def stdout_writer(chunk: bytes) -> None:
+        # A result may arrive while select() is waiting for PTY output. Check the
+        # result channel again immediately before visible forwarding so bytes
+        # emitted after `myteam result` don't leak to the user's terminal.
+        if not notice_reported_result():
+            write_bytes(output, chunk)
 
     with RealTerminal(on_resize=session.resize) as terminal:
         session.resize(terminal.winsize())
         while True:
-            if reported_result is None:
-                reported_result = result_server.wait_for_result(timeout=0)
-                if reported_result is not None:
-                    _request_agent_exit(session, exit_sequence)
-                    exit_deadline = time.monotonic() + _AGENT_EXIT_TIMEOUT_SECONDS
+            notice_reported_result()
 
             code = session.poll()
             if code is not None:
-                _drain_ready_pty_output(session, output)
+                # After a result has been reported, shutdown/TUI cleanup bytes are
+                # still recorded but no longer visibly forwarded. This keeps the
+                # terminal clean after run_agent semantically completes.
+                drain_pty_output(
+                    session,
+                    stdout_writer=stdout_writer,
+                    forward_stdout=reported_result is None,
+                )
                 reported_result = _collect_reported_result(reported_result, result_server)
                 return reported_result, code
 
@@ -228,34 +232,22 @@ def _forward_pty_until_complete(
                 session.terminate()
                 continue
 
-            read_fds = [session.master_fd]
-            if terminal.can_read_stdin:
-                assert terminal.stdin_fd is not None
-                read_fds.append(terminal.stdin_fd)
-
-            ready, _, _ = select.select(read_fds, [], [], _AGENT_RESULT_POLL_SECONDS)
-
-            if session.master_fd in ready:
-                chunk = session.read()
-                if chunk:
-                    _write_output(output, chunk)
-                else:
-                    code = session.poll()
-                    if code is None:
-                        try:
-                            code = session.wait(timeout=0.1)
-                        except subprocess.TimeoutExpired:
-                            code = 0
-                    reported_result = _collect_reported_result(reported_result, result_server)
-                    return reported_result, code if isinstance(code, int) else 0
-
-            if terminal.stdin_fd is not None and terminal.stdin_fd in ready:
-                data = terminal.read_stdin()
-                if data:
+            activity = pump_pty_once(
+                session,
+                terminal,
+                timeout=_AGENT_RESULT_POLL_SECONDS,
+                stdout_writer=stdout_writer,
+                forward_stdout=reported_result is None,
+            )
+            if activity.stdout_eof:
+                code = session.poll()
+                if code is None:
                     try:
-                        session.write(data)
-                    except OSError:
-                        pass
+                        code = session.wait(timeout=0.1)
+                    except subprocess.TimeoutExpired:
+                        code = 0
+                reported_result = _collect_reported_result(reported_result, result_server)
+                return reported_result, code if isinstance(code, int) else 0
 
 
 def _collect_reported_result(
@@ -273,28 +265,6 @@ def _request_agent_exit(session: ManagedPtyProcess, exit_sequence: bytes) -> Non
     try:
         session.write(exit_sequence)
     except OSError:
-        pass
-
-
-def _drain_ready_pty_output(session: ManagedPtyProcess, output: Any) -> None:
-    while True:
-        try:
-            ready, _, _ = select.select([session.master_fd], [], [], 0)
-        except OSError:
-            return
-        if session.master_fd not in ready:
-            return
-        chunk = session.read()
-        if not chunk:
-            return
-        _write_output(output, chunk)
-
-
-def _write_output(output: Any, chunk: bytes) -> None:
-    try:
-        output.write(chunk)
-        output.flush()
-    except Exception:
         pass
 
 
