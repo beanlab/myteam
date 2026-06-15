@@ -16,10 +16,7 @@ import sys
 import time
 from typing import Any
 
-try:  # pragma: no cover - exercised when dependency is installed
-    from jinja2 import Template
-except ModuleNotFoundError:  # lightweight fallback for in-tree tests before deps are installed
-    Template = None  # type: ignore[assignment]
+from jinja2 import Template
 
 from .. import templates
 from ..config import WorkflowDefaults, load_myteam_config
@@ -140,26 +137,20 @@ def build_agent_prompt(
             "```"
         )
 
-    result_instructions = (
-        result_instructions
-        .replace("{{SESSION_NONCE}}", session_nonce)
-        .replace("{{OUTPUT_SCHEMA_SECTION}}", output_schema_section)
-        .strip()
-    )
+    result_instructions = _render_prompt(
+        result_instructions,
+        {
+            "SESSION_NONCE": session_nonce,
+            "OUTPUT_SCHEMA_SECTION": output_schema_section,
+        },
+    ).strip()
     return "\n\n".join((prompt.rstrip(), result_instructions))
 
 
 def _render_prompt(prompt: str, input_values: dict[str, Any]) -> str:
     if not input_values:
         return prompt
-    if Template is not None:
-        return Template(prompt).render(**input_values)
-
-    rendered = prompt
-    for key, value in input_values.items():
-        rendered = rendered.replace("{{ " + key + " }}", str(value))
-        rendered = rendered.replace("{{" + key + "}}", str(value))
-    return rendered
+    return Template(prompt).render(**input_values)
 
 
 def _load_defaults(cwd: Path) -> WorkflowDefaults:
