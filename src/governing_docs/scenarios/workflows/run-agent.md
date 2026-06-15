@@ -61,7 +61,9 @@ Certainly, the workflow author may choose to prepare the prompt as static text a
 
 ### `run_agent` output design
 
-Design the `output` field for `run_agent` in a way to guide the agent towards completion of the desired task. Once the agent believes it has the needed information to fulfill the output schema, it will call `myteam result` and end the session. Thus, use that schema as a way of controlling what happens in the session before the session concludes. 
+Design the `output` field for `run_agent` in a way to guide the agent towards completion of the desired task. Once the agent believes it has the needed information to fulfill the output schema, it will call `myteam result` and end the session. Thus, use that schema as a way of controlling what happens in the session before the session concludes.
+
+The agent result returned by `run_agent` is not automatically returned by `myteam start`. It is returned to workflow code as `SessionResult.output`. The workflow decides what text, if any, should be returned to the `myteam start` caller by calling `report_workflow_result(...)`.
 
 ## Agent Session Play-by-play
 
@@ -70,14 +72,15 @@ Agent sessions are always managed by a `run_agent` invocation.
 - In the workflow process, `run_agent` is called
 - `run_agent` generates a session nonce and setups up a communication socket
 - `run_agent` launches the agent session with env vars identifying the socket
-  - `run_agent` records session transcript while forwarding all stdin/out/err to workflow
+  - `run_agent` records session transcript while forwarding the active child session to the terminal
 - The agent session either:
   - Reports a result to the workflow via `myteam result`
     - `run_agent` ends the agent session
   - Exits via `/quit` or error
     - `run_agent` uses `None` as the result
 - The `run_agent` uses the agent configuration to determine the session_id and usage for the agent session
-- `run_agent` returns the associated `SessionResult` in the workflow code 
+- `run_agent` returns the associated `SessionResult` in the workflow code
+- Workflow code may turn `SessionResult.output` into caller-facing text by calling `report_workflow_result(...)`
 
 ## Result Socket
 
@@ -100,6 +103,8 @@ MYTEAM_AGENT_SESSION_NONCE=<nonce>
 The stdout/stderr/stdin of the active child agent session are wired through the workflow to the supervisor process and on to the user's terminal. This creates a transparent UX from the user to the active child process.
 
 This means that `run_agent` launches the agent session in a way that it cleanly inherits stdin/out/err connections from the workflow.
+
+Agent PTY/TUI display is live display, not workflow result text. It must not be captured and replayed as the output of `myteam start`. If a workflow wants to return information from an agent subsession to its caller, it should convert the returned `SessionResult.output` into text and call `report_workflow_result(...)`.
 
 Stdout/stderr/stdin are also recorded by `run_agent` so that a transcript of each managed session can be returned. This transcript captures the final version of each line as it scrolls off-screen.
 
@@ -133,6 +138,8 @@ A managed agent session may also end cleanly without calling `myteam result`, fo
 
 Calling `myteam result` outside a managed session is an error.
 
+`myteam result` reports only to the active `run_agent` invocation. It does not report to the workflow supervisor and does not directly affect `myteam start` output.
+
 ## Nested `myteam start` from a managed workflow
 
 A managed workflow may invoke `myteam start <workflow>` to run a nested workflow.
@@ -145,10 +152,10 @@ When `myteam start` is invoked from inside an existing managed workflow, it does
 4. the supervisor suspends the current workflow;
 5. the supervisor launches the nested workflow;
 6. the nested workflow eventually exits;
-7. the supervisor stores the output and resumes the parent workflow;
-8. the inner `myteam start` shim retrieves the output;
-9. the shim prints the nested workflow output and exits
+7. the supervisor stores the reported workflow result text and resumes the parent workflow;
+8. the inner `myteam start` shim retrieves the result text;
+9. the shim prints the nested workflow result text, if any, and exits
 
-From the parent workflow's perspective, `myteam start` behaves like a blocking command that eventually prints the child workflow result.
+From the parent workflow's perspective, `myteam start` behaves like a blocking command that eventually prints the child workflow's reported result text.
 
 Note that the all subprocesses spawned by a workflow should inherit the `myteam` environment variables so that `myteam start` commands from those subprocesses are handled correctly. 
