@@ -1,17 +1,18 @@
-from myteam.workflows.execution.mothership import Mothership, ReportCommand, RequestRecord
+from __future__ import annotations
+
+import pytest
+
+from myteam.workflows.execution.mothership import Mothership, RequestRecord
 
 
 class FakeRecording:
     def snapshot(self) -> str:
-        return "transcript"
+        return "live transcript"
 
 
 class FakeSession:
-    session_id = "session-1"
+    session_id = "request-1"
     request_id = "request-1"
-    nonce = None
-    cwd = None
-    agent_name = None
     recording = FakeRecording()
 
     def __init__(self, exit_code: int = 0) -> None:
@@ -23,127 +24,71 @@ class FakeSession:
     def wait(self, timeout=None) -> int:
         return self.exit_code
 
+    def stderr_snapshot(self) -> str:
+        return ""
+
     def close(self) -> None:
         pass
 
 
-def test_report_result_is_stored_as_soon_as_rpc_is_accepted() -> None:
+def test_workflow_result_is_stored_as_soon_as_rpc_is_accepted() -> None:
     mothership = Mothership()
-    session = FakeSession()
-    mothership.active = session
-    mothership.sessions[session.session_id] = session
-    mothership.requests[session.request_id] = RequestRecord(
-        request_id=session.request_id,
-        kind="agent_session",
+    mothership.requests["request-1"] = RequestRecord(
+        request_id="request-1",
+        kind="workflow",
         status="running",
-        session_id=session.session_id,
     )
 
-    response, _command = mothership._accept_report_result(
+    response = mothership._report_workflow_result(
         {
-            "request_id": session.request_id,
-            "session_id": session.session_id,
-            "status": "ok",
-            "output": {"answer": "ok"},
+            "request_id": "request-1",
+            "text": "first\n",
         }
     )
+    mothership._report_workflow_result({"request_id": "request-1", "text": None})
+    mothership._report_workflow_result({"request_id": "request-1", "text": "second\n"})
 
     assert response == {"ok": True}
-    assert mothership.results[session.request_id]["status"] == "ok"
-    assert mothership.results[session.request_id]["result"]["output"] == {"answer": "ok"}
+    assert mothership.requests["request-1"].workflow_result_parts == ["first\n", "second\n"]
 
 
-def test_reported_result_wins_if_session_exits_before_report_command_is_drained() -> None:
+def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("myteam.workflows.execution.mothership.drain_pty_output", lambda *_args, **_kwargs: None)
     mothership = Mothership()
     session = FakeSession()
-    mothership.active = session
-    mothership.sessions[session.session_id] = session
+    mothership.active = session  # type: ignore[assignment]
+    mothership.sessions[session.session_id] = session  # type: ignore[assignment]
     mothership.requests[session.request_id] = RequestRecord(
         request_id=session.request_id,
-        kind="agent_session",
+        kind="workflow",
         status="running",
-        session_id=session.session_id,
     )
-    mothership._pending_reports[session.request_id] = ReportCommand(
-        request_id=session.request_id,
-        session_id=session.session_id,
-        status="ok",
-        output={"answer": "ok"},
-    )
+    mothership.requests[session.request_id].workflow_result_parts.extend(["first\n", "second\n"])
 
-    mothership._handle_session_exit(session)
+    mothership._handle_workflow_exit(session)  # type: ignore[arg-type]
+    mothership._drain_commands()
 
     assert mothership.results[session.request_id]["status"] == "ok"
-    assert mothership.results[session.request_id]["result"]["output"] == {"answer": "ok"}
+    assert mothership.results[session.request_id]["result"]["result_text"] == "first\nsecond\n"
+    assert mothership.results[session.request_id]["result"]["transcript"] == "live transcript"
 
 
-def test_late_report_can_override_exited_result_for_completed_session() -> None:
-    mothership = Mothership()
-    session = FakeSession()
-    mothership.active = session
-    mothership.sessions[session.session_id] = session
-    mothership.requests[session.request_id] = RequestRecord(
-        request_id=session.request_id,
-        kind="agent_session",
-        status="running",
-        session_id=session.session_id,
-    )
-
-    mothership._handle_session_exit(session)
-    assert session.request_id not in mothership.results
-    assert session.request_id in mothership._pending_exits
-
-    response, _command = mothership._accept_report_result(
-        {
-            "request_id": session.request_id,
-            "session_id": session.session_id,
-            "status": "ok",
-            "output": {"answer": "late ok"},
-        }
-    )
-
-    assert response == {"ok": True}
-    assert mothership.results[session.request_id]["status"] == "ok"
-    assert mothership.results[session.request_id]["result"]["output"] == {"answer": "late ok"}
-
-
-def test_clean_exit_becomes_none_output_after_late_report_grace_expires() -> None:
-    mothership = Mothership()
-    session = FakeSession()
-    mothership.active = session
-    mothership.sessions[session.session_id] = session
-    mothership.requests[session.request_id] = RequestRecord(
-        request_id=session.request_id,
-        kind="agent_session",
-        status="running",
-        session_id=session.session_id,
-    )
-
-    mothership._handle_session_exit(session)
-    pending_session, code, _deadline = mothership._pending_exits[session.request_id]
-    mothership._pending_exits[session.request_id] = (pending_session, code, 0)
-    mothership._finalize_expired_exits()
-
-    assert mothership.results[session.request_id]["status"] == "ok"
-    assert mothership.results[session.request_id]["result"]["output"] is None
-
-
-def test_nonzero_exit_is_reported_after_late_report_grace_expires() -> None:
+def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("myteam.workflows.execution.mothership.drain_pty_output", lambda *_args, **_kwargs: None)
     mothership = Mothership()
     session = FakeSession(exit_code=7)
-    mothership.active = session
-    mothership.sessions[session.session_id] = session
+    mothership.active = session  # type: ignore[assignment]
+    mothership.sessions[session.session_id] = session  # type: ignore[assignment]
     mothership.requests[session.request_id] = RequestRecord(
         request_id=session.request_id,
-        kind="agent_session",
+        kind="workflow",
         status="running",
-        session_id=session.session_id,
     )
+    mothership.requests[session.request_id].workflow_result_parts.append("partial\n")
 
-    mothership._handle_session_exit(session)
-    pending_session, code, _deadline = mothership._pending_exits[session.request_id]
-    mothership._pending_exits[session.request_id] = (pending_session, code, 0)
-    mothership._finalize_expired_exits()
+    mothership._handle_workflow_exit(session)  # type: ignore[arg-type]
+    mothership._drain_commands()
 
     assert mothership.results[session.request_id]["status"] == "exited"
-    assert mothership.results[session.request_id]["result"]["output"] == {"exit_code": 7}
+    assert mothership.results[session.request_id]["result"]["exit_code"] == 7
+    assert mothership.results[session.request_id]["result"]["result_text"] == "partial\n"

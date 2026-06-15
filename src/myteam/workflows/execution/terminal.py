@@ -62,6 +62,14 @@ class RealTerminal:
         if sys.stdout.isatty():
             self.write_stdout(b"\x1b[2J\x1b[H")
 
+    def flush_input(self) -> None:
+        if self.stdin_fd is None:
+            return
+        try:
+            termios.tcflush(self.stdin_fd, termios.TCIFLUSH)
+        except OSError:
+            pass
+
     def winsize(self) -> Winsize:
         size = shutil.get_terminal_size(fallback=(80, 24))
         winsize = (size.lines, size.columns)
@@ -79,6 +87,7 @@ class RealTerminal:
         return winsize
 
     def restore(self) -> None:
+        self.flush_input()
         if self._previous_winch_handler is not None:
             signal.signal(signal.SIGWINCH, self._previous_winch_handler)
             self._previous_winch_handler = None

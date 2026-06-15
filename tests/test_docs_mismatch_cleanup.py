@@ -85,6 +85,6 @@ def test_new_python_workflow_uses_packaged_template(tmp_path: Path, monkeypatch:
     content = (tmp_path / "review.py").read_text(encoding="utf-8")
     assert "type: workflow" in content
     assert "usage: no arguments" in content
-    assert "from myteam import run_agent" in content
-    assert "print(json.dumps(result.output))" in content
+    assert "from myteam import report_workflow_result, run_agent" in content
+    assert 'report_workflow_result(json.dumps(result.output) + "\\n")' in content
     assert "to_jsonable" not in content

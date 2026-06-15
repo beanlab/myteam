@@ -48,21 +48,35 @@ def test_markdown_workflow_receives_input_json(tmp_path: Path) -> None:
     ]
 
 
-def test_start_workflow_preserves_stdout_verbatim(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_workflow_returns_explicit_workflow_result_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workflow = tmp_path / "workflow.py"
     workflow.write_text(
-        "print('first line')\n"
-        "print('{\"not\": \"parsed\"}')\n",
+        "from myteam.workflows import report_workflow_result\n"
+        "print('live log')\n"
+        "report_workflow_result('first line\\n')\n"
+        "report_workflow_result('{\"not\": \"parsed\"}\\n')\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
 
-    stdout = start_workflow(str(workflow))
+    result_text = start_workflow(str(workflow))
 
-    assert stdout == 'first line\n{"not": "parsed"}\n'
+    assert result_text == 'first line\n{"not": "parsed"}\n'
 
 
-def test_start_workflow_cli_prints_stdout_stderr_and_exits_with_code(
+def test_start_workflow_returns_empty_text_when_no_result_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "workflow.py"
+    workflow.write_text("print('live only')\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result_text = start_workflow(str(workflow))
+
+    assert result_text == ""
+
+
+def test_start_workflow_cli_prints_result_text_and_exits_with_code(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -70,8 +84,10 @@ def test_start_workflow_cli_prints_stdout_stderr_and_exits_with_code(
     workflow = tmp_path / "workflow.py"
     workflow.write_text(
         "import sys\n"
-        "print('out')\n"
-        "print('err', file=sys.stderr)\n"
+        "from myteam.workflows import report_workflow_result\n"
+        "print('live out')\n"
+        "print('live err', file=sys.stderr)\n"
+        "report_workflow_result('result out\\n')\n"
         "sys.exit(7)\n",
         encoding="utf-8",
     )
@@ -82,16 +98,20 @@ def test_start_workflow_cli_prints_stdout_stderr_and_exits_with_code(
 
     captured = capsys.readouterr()
     assert excinfo.value.code == 7
-    assert captured.out == "out\n"
-    assert captured.err == "err\n"
+    assert captured.out == "result out\n"
+    assert captured.err == ""
 
 
-def test_start_workflow_result_preserves_stderr_and_exit_code(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_workflow_result_preserves_result_text_and_exit_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workflow = tmp_path / "workflow.py"
     workflow.write_text(
         "import sys\n"
-        "print('out')\n"
-        "print('err', file=sys.stderr)\n"
+        "from myteam.workflows import report_workflow_result\n"
+        "print('live out')\n"
+        "print('live err', file=sys.stderr)\n"
+        "report_workflow_result('explicit result\\n')\n"
         "sys.exit(3)\n",
         encoding="utf-8",
     )
@@ -100,5 +120,5 @@ def test_start_workflow_result_preserves_stderr_and_exit_code(tmp_path: Path, mo
     result = _start_workflow_result(workflow_name=str(workflow), args=(), workflow_input_json=None)
 
     assert result.exit_code == 3
-    assert result.stdout == "out\n"
-    assert result.stderr == "err\n"
+    assert result.result_text == "explicit result\n"
+    assert result.error_text == ""

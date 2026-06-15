@@ -27,8 +27,20 @@ from .results import SessionResult, UsageInfo
 @dataclass(frozen=True)
 class WorkflowProcessResult:
     exit_code: int
-    stdout: str
-    stderr: str
+    result_text: str
+    error_text: str = ""
+
+    @property
+    def stdout(self) -> str:
+        """Compatibility alias for explicit workflow result text."""
+
+        return self.result_text
+
+    @property
+    def stderr(self) -> str:
+        """Compatibility alias for command/supervisor error text."""
+
+        return self.error_text
 
 ENCODING = "utf-8"
 
@@ -108,14 +120,14 @@ def start_workflow(
     workflow_input_json: str | None = None,
     input: str | None = None,
 ) -> str:
-    """Start a workflow invocation and return the workflow stdout."""
+    """Start a workflow invocation and return its explicit result text."""
 
     result = _start_workflow_result(
         workflow_name=workflow_name,
         args=args,
         workflow_input_json=workflow_input_json if workflow_input_json is not None else input,
     )
-    return result.stdout
+    return result.result_text
 
 
 def start_workflow_cli(
@@ -163,7 +175,7 @@ def _start_workflow_result(
         result = mothership.run_until_complete(request_id)
 
     if result is None:
-        return WorkflowProcessResult(exit_code=1, stdout="", stderr="Workflow did not produce a result.\n")
+        return WorkflowProcessResult(exit_code=1, result_text="", error_text="Workflow did not produce a result.\n")
 
     return _workflow_process_result_from_supervisor_result(result)
 
@@ -195,33 +207,34 @@ def _workflow_process_result_from_supervisor_result(result: dict[str, Any]) -> W
     if not isinstance(payload, dict):
         return WorkflowProcessResult(
             exit_code=1,
-            stdout="",
-            stderr=f"Invalid workflow result payload: {payload!r}\n",
+            result_text="",
+            error_text=f"Invalid workflow result payload: {payload!r}\n",
         )
 
     if "exit_code" not in payload:
         message = payload.get("message")
+        error_text = message if isinstance(message, str) else f"Invalid workflow result payload: {payload!r}"
         return WorkflowProcessResult(
             exit_code=1,
-            stdout="",
-            stderr=(message if isinstance(message, str) else f"Invalid workflow result payload: {payload!r}") + "\n",
+            result_text="",
+            error_text=error_text + "\n",
         )
 
     exit_code = _coerce_exit_code(payload.get("exit_code"))
-    stdout = payload.get("stdout")
-    stderr = payload.get("stderr")
+    result_text = payload.get("result_text")
+    error_text = payload.get("error_text")
     return WorkflowProcessResult(
         exit_code=exit_code,
-        stdout=stdout if isinstance(stdout, str) else "",
-        stderr=stderr if isinstance(stderr, str) else "",
+        result_text=result_text if isinstance(result_text, str) else "",
+        error_text=error_text if isinstance(error_text, str) else "",
     )
 
 
 def _print_workflow_process_result(result: WorkflowProcessResult) -> None:
-    if result.stdout:
-        print(result.stdout, end="", file=sys.stdout)
-    if result.stderr:
-        print(result.stderr, end="", file=sys.stderr)
+    if result.result_text:
+        print(result.result_text, end="", file=sys.stdout)
+    if result.error_text:
+        print(result.error_text, end="", file=sys.stderr)
 
 
 def _poll_until_ready(client: RpcClient, request_id: str) -> dict[str, Any]:

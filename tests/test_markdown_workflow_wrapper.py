@@ -43,12 +43,15 @@ def test_markdown_wrapper_passes_body_unrendered_and_input_to_run_agent(
             session_id="session-1",
         )
 
+    reported: list[str | None] = []
     monkeypatch.setattr(workflow_markdown_wrapper, "run_agent", fake_run_agent)
+    monkeypatch.setattr(workflow_markdown_wrapper, "report_workflow_result", reported.append)
 
     workflow_markdown_wrapper.main(workflow, '{"topic": "release"}')
 
     captured = capsys.readouterr()
-    assert json.loads(captured.out) == {"summary": "ok"}
+    assert captured.out == ""
+    assert reported == [json.dumps({"summary": "ok"}) + "\n"]
     assert seen == {
         "prompt": "Review {{ topic }}.\n",
         "input": {"topic": "release"},
@@ -79,15 +82,18 @@ def test_markdown_wrapper_passes_input_even_without_input_schema(
         seen.update(kwargs)
         return SessionResult(exit_code=0, output=None, usage=[], transcript="", session_id=None)
 
+    reported: list[str | None] = []
     monkeypatch.setattr(workflow_markdown_wrapper, "run_agent", fake_run_agent)
+    monkeypatch.setattr(workflow_markdown_wrapper, "report_workflow_result", reported.append)
 
     workflow_markdown_wrapper.main(workflow, '{"topic": "release"}')
 
+    assert reported == [None]
     assert seen["prompt"] == "Use {{ topic }}.\n"
     assert seen["input"] == {"topic": "release"}
 
 
-def test_markdown_wrapper_prints_null_for_none_output(
+def test_markdown_wrapper_reports_no_text_for_none_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -98,11 +104,14 @@ def test_markdown_wrapper_prints_null_for_none_output(
     def fake_run_agent(**_kwargs: object) -> SessionResult:
         return SessionResult(exit_code=0, output=None, usage=[], transcript="hidden", session_id="hidden")
 
+    reported: list[str | None] = []
     monkeypatch.setattr(workflow_markdown_wrapper, "run_agent", fake_run_agent)
+    monkeypatch.setattr(workflow_markdown_wrapper, "report_workflow_result", reported.append)
 
     workflow_markdown_wrapper.main(workflow, "{}")
 
-    assert capsys.readouterr().out == "null\n"
+    assert capsys.readouterr().out == ""
+    assert reported == [None]
 
 
 def test_markdown_wrapper_rejects_non_object_input(tmp_path: Path) -> None:

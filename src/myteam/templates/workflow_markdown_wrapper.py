@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from myteam.frontmatter import split_markdown_frontmatter
-from myteam.workflows import run_agent
+from myteam.workflows import report_workflow_result, run_agent
 from myteam.workflows.commands import resolve_agent_settings
 
 
@@ -23,7 +23,10 @@ def main(markdown_file: Path, workflow_inputs: str = "{}") -> None:
         output=output_schema if isinstance(output_schema, dict) else None,
         **settings,
     )
-    print(json.dumps(result.output))
+    if result.output is not None:
+        report_workflow_result(json.dumps(result.output) + "\n")
+    else:
+        report_workflow_result(None)
 
 
 def _load_json_object(value: str) -> dict[str, Any]:

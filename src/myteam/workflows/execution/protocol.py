@@ -18,6 +18,7 @@ ENV_WORKFLOW_INPUT_JSON = "MYTEAM_WORKFLOW_INPUT_JSON"
 KIND_START_WORKFLOW = "start_workflow"
 KIND_POLL_RESULT = "poll_result"
 KIND_ACK_RESULT = "ack_result"
+KIND_WORKFLOW_RESULT = "workflow_result"
 
 
 @dataclass(frozen=True)

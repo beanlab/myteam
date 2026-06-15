@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import json
 
-from myteam import run_agent
+from myteam import report_workflow_result, run_agent
 
 
 def main() -> None:
     result = run_agent(prompt="Not implemented yet. Tell the user.")
-    print(json.dumps(result.output))
+    if result.output is not None:
+        report_workflow_result(json.dumps(result.output) + "\n")
+    else:
+        report_workflow_result(None)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ channel, not through this supervisor.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from queue import Empty, Queue
 import secrets
@@ -26,6 +26,7 @@ from .protocol import (
     KIND_ACK_RESULT,
     KIND_POLL_RESULT,
     KIND_START_WORKFLOW,
+    KIND_WORKFLOW_RESULT,
     json_response,
     load_json_object,
     read_all,
@@ -62,6 +63,7 @@ class RequestRecord:
     status: Literal["pending", "running", "ok", "error", "exited"] = "pending"
     parent_session_id: str | None = None
     result: Any = None
+    workflow_result_parts: list[str] = field(default_factory=list)
 
 
 class Mothership:
@@ -105,6 +107,7 @@ class Mothership:
         return self
 
     def __exit__(self, _exc_type: Any, _exc: Any, _tb: Any) -> None:
+        self._terminal.flush_input()
         self._terminal.restore()
         self._closed.set()
         if self._server is not None:
@@ -216,6 +219,8 @@ class Mothership:
                     response = self._poll_result(message)
                 elif kind == KIND_ACK_RESULT:
                     response = self._ack_result(message)
+                elif kind == KIND_WORKFLOW_RESULT:
+                    response = self._report_workflow_result(message)
                 else:
                     response = {"ok": False, "error": f"Unsupported RPC kind: {kind!r}"}
             except Exception as exc:  # return friendly errors over the socket
@@ -269,6 +274,22 @@ class Mothership:
         self.requests.pop(request_id, None)
         return {"ok": True}
 
+    def _report_workflow_result(self, message: dict[str, Any]) -> dict[str, Any]:
+        request_id = message.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("workflow_result requires request_id.")
+        text = message.get("text")
+        if text is not None and not isinstance(text, str):
+            raise ValueError("workflow_result text must be a string or null.")
+        record = self.requests.get(request_id)
+        if record is None:
+            raise ValueError("Unknown workflow request_id.")
+        if record.status not in {"pending", "running"}:
+            raise ValueError("Workflow is not active.")
+        if text is not None:
+            record.workflow_result_parts.append(text)
+        return {"ok": True}
+
     def _drain_commands(self) -> None:
         while True:
             try:
@@ -291,24 +312,26 @@ class Mothership:
                     status="error",
                     result={
                         "exit_code": 1,
-                        "stdout": "",
-                        "stderr": "Parent workflow is not the active managed workflow.\n",
+                        "result_text": "",
+                        "error_text": "Parent workflow is not the active managed workflow.\n",
                     },
                 )
                 return
+            self._terminal.flush_input()
             self.active.suspend()
             self.stack.append(self.active)
             self.active = None
             if sys.stdout.isatty():
                 self._terminal.clear()
+            self._terminal.flush_input()
         elif self.active is not None:
             self._store_result(
                 command.request_id,
                 status="error",
                 result={
                     "exit_code": 1,
-                    "stdout": "",
-                    "stderr": "Another workflow is already active.\n",
+                    "result_text": "",
+                    "error_text": "Another workflow is already active.\n",
                 },
             )
             return
@@ -318,6 +341,7 @@ class Mothership:
         self.active = session
         if sys.stdout.isatty():
             self._terminal.clear()
+        self._terminal.flush_input()
 
     def _launch_workflow(self, command: StartWorkflowCommand) -> ManagedPtyProcess:
         env = {
@@ -370,10 +394,13 @@ class Mothership:
             forward_stdout=forward_stdout,
             forward_stderr=forward_stderr,
         )
+        record = self.requests.get(session.request_id)
+        result_text = "" if record is None else "".join(record.workflow_result_parts)
         result = {
             "exit_code": exit_code,
-            "stdout": _normalize_pty_text(session.recording.snapshot()),
-            "stderr": session.stderr_snapshot(),
+            "result_text": result_text,
+            "transcript": _normalize_pty_text(session.recording.snapshot()),
+            "stderr_transcript": session.stderr_snapshot(),
         }
         self._remove_session(session)
         self._commands.put(
@@ -397,10 +424,12 @@ class Mothership:
 
     def _resume_previous_workflow(self) -> None:
         if self.stack:
+            self._terminal.flush_input()
             self.active = self.stack.pop()
             self.active.resume()
             if sys.stdout.isatty():
                 self._terminal.clear()
+            self._terminal.flush_input()
         else:
             self.active = None
             self._wake()

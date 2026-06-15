@@ -337,6 +337,8 @@ myteam get task research/summary --prefix .agents
 
 Executes a workflow definition from the selected local root.
 
+`myteam start` prints the workflow's explicit result text. Python workflows return this text by calling `report_workflow_result(...)`; ordinary `print(...)` output is live display/logging and is not replayed as the returned result. Markdown workflows report JSON text automatically from their single `run_agent(...)` output, and missing/`None` results print nothing.
+
 - use slash-delimited workflow paths such as `dev/frontend`
 - workflow paths are resolved starting from the selected local root, which acts as the reference point for lookup
 - relative segments in workflow paths are allowed
@@ -501,13 +503,12 @@ Notes:
 - the step agent can request a nested task by calling `myteam task start`
 - `myteam start` stops at the first failing step and does not continue to later steps
 - `--verbose` writes workflow lifecycle logs to standard error
-- successful `myteam start` runs currently mirror workflow session terminal output; they do not yet
-  print a separate final structured payload on stdout
+- successful `myteam start` runs print only explicit workflow result text; workflow stdout/stderr are live display/logging, not the returned result
 
 Python workflow files ending in `.py` are run as scripts in a separate Python process. The child
-process uses the directory containing the workflow file as its current working directory, receives
-the selected local root in `MYTEAM_PROJECT_ROOT`, and returns its exit status directly through
-`myteam start`.
+process uses the directory containing the workflow file as its current working directory and returns
+its exit status directly through `myteam start`. To return caller-facing text, Python workflows call
+`report_workflow_result("final text\\n")`; if they never report text, `myteam start` prints nothing.
 
 ## Why Use Myteam
 

@@ -11,7 +11,12 @@ from myteam.workflows.execution.protocol import RpcClient
 
 def test_mothership_runs_workflow_process(tmp_path: Path) -> None:
     workflow = tmp_path / "workflow.py"
-    workflow.write_text("print('{\"answer\": \"ok\"}')\n", encoding="utf-8")
+    workflow.write_text(
+        "from myteam.workflows import report_workflow_result\n"
+        "print('live log')\n"
+        "report_workflow_result('{\"answer\": \"ok\"}\\n')\n",
+        encoding="utf-8",
+    )
 
     with Mothership() as mothership:
         request_id = mothership.start_top_level_workflow(
@@ -25,8 +30,9 @@ def test_mothership_runs_workflow_process(tmp_path: Path) -> None:
         "status": "ok",
         "result": {
             "exit_code": 0,
-            "stdout": '{"answer": "ok"}\n',
-            "stderr": "",
+            "result_text": '{"answer": "ok"}\n',
+            "transcript": "live log\n",
+            "stderr_transcript": "",
         },
     }
 
