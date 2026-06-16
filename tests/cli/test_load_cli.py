@@ -14,6 +14,27 @@ def test_load_markdown_skill_prints_body_without_frontmatter(run_myteam, tmp_pat
     assert result.stderr == ""
 
 
+def test_load_markdown_skill_renders_document_relative_jinja_helpers(run_myteam, tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "fragment.txt").write_text("rendered fragment\n", encoding="utf-8")
+    skill = docs / "skill.md"
+    skill.write_text(
+        "---\n"
+        "type: skill\n"
+        "description: demo\n"
+        "---\n"
+        "{{ read_file('fragment.txt') }}",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "load", "docs/skill.md")
+
+    assert result.exit_code == 0
+    assert result.stdout == "rendered fragment\n"
+    assert result.stderr == ""
+
+
 def test_load_markdown_skill_does_not_require_valid_frontmatter(run_myteam, tmp_path: Path) -> None:
     skill = tmp_path / "loose.md"
     skill.write_text("Just content.\n", encoding="utf-8")

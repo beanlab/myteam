@@ -52,3 +52,4 @@ htmlcov/
 # Local scratch space
 scratch/
 .cache
+/.myteam.yaml

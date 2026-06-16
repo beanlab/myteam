@@ -4,13 +4,14 @@ from pathlib import Path
 
 from . import templates
 from .frontmatter import split_markdown_frontmatter
+from .prompt_rendering import render_markdown_body
 
 ENCODING = "utf-8"
 
 
 def _load_markdown_skill(skill_file: Path) -> str:
     _, content = split_markdown_frontmatter(skill_file.read_text(encoding=ENCODING))
-    return content
+    return render_markdown_body(content, source_path=skill_file)
 
 
 def _load_python_skill(skill_file: Path) -> str:
