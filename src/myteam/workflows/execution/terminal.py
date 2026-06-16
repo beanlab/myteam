@@ -14,6 +14,9 @@ from typing import Any
 Winsize = tuple[int, int]
 
 
+_VISUAL_RESTORE_SEQUENCE = b"\x1b[0m\x1b[?25h"
+
+
 class RealTerminal:
     """Owns raw-mode setup, output, input, clearing, and resize callbacks."""
 
@@ -94,6 +97,19 @@ class RealTerminal:
         if self._restore_tty is not None and self.stdin_fd is not None:
             termios.tcsetattr(self.stdin_fd, termios.TCSADRAIN, self._restore_tty)
             self._restore_tty = None
+        self.restore_visual_state()
+
+    def restore_visual_state(self) -> None:
+        """Restore terminal-emulator state that termios cannot represent."""
+
+        # This intentionally fixes the common post-TUI symptom where the cursor
+        # remains hidden after child PTY teardown bytes were suppressed. If users
+        # report broader leftover TUI state (for example: still in alternate
+        # screen, mouse reporting/bracketed paste left enabled, or visible raw
+        # escape artifacts), consider a more selective post-result PTY cleanup
+        # pass-through/filter instead of only forcing this small local reset.
+        if sys.stdout.isatty():
+            self.write_stdout(_VISUAL_RESTORE_SEQUENCE)
 
     def _handle_winch(self, _signum: int, _frame: Any) -> None:
         if self.on_resize is not None:
