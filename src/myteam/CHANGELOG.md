@@ -1,5 +1,21 @@
 # Change Log
 
+## 0.3.0 **Major Rewrite**
+
+`myteam` now focuses on agent *workflows* and progressive disclosure of dynamic *skills*. The concepts of *roles* and *tasks* are superseded by workflows.
+
+Rather than describe it all here, open your favorite agent session, paste in 
+
+```text
+Run `myteam onboard` and prepare to answer my questions about `myteam`. Say "Ready" when you are ready to help me.
+```
+
+and ask away!
+
+- `How do workflows work?`
+- `How do skills work?`
+- `Help me build a workflow for ...`
+
 ## 0.2.27
 
 - Renamed workflow commands and docs to tasks.
