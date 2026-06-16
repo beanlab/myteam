@@ -25,7 +25,7 @@ from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_age
 from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
 from .execution.pty_forwarding import binary_output_stream, drain_pty_output, pump_pty_once, write_bytes
 from .execution.pty_process import ManagedPtyProcess
-from .execution.terminal import RealTerminal
+from .execution.terminal import RealTerminal, has_screen_rewriting_control, strip_ansi_csi
 from .results import SessionResult, UsageInfo
 
 
@@ -193,6 +193,9 @@ def _forward_pty_until_complete(
     reported_result: AgentReportedResult | None = None
     exit_deadline: float | None = None
     output = binary_output_stream(sys.stdout)
+    forwarded_live_output = False
+    forwarded_screen_rewriting_output = False
+    live_output_ended_with_newline = True
 
     def notice_reported_result() -> bool:
         nonlocal reported_result, exit_deadline
@@ -204,10 +207,17 @@ def _forward_pty_until_complete(
         return reported_result is not None
 
     def stdout_writer(chunk: bytes) -> None:
+        nonlocal forwarded_live_output, forwarded_screen_rewriting_output, live_output_ended_with_newline
         # A result may arrive while select() is waiting for PTY output. Check the
         # result channel again immediately before visible forwarding so bytes
         # emitted after `myteam result` don't leak to the user's terminal.
         if not notice_reported_result():
+            if has_screen_rewriting_control(chunk):
+                forwarded_screen_rewriting_output = True
+            display_text = strip_ansi_csi(chunk)
+            if display_text:
+                forwarded_live_output = True
+                live_output_ended_with_newline = display_text.endswith(b"\n")
             write_bytes(output, chunk)
 
     with RealTerminal(on_resize=session.resize) as terminal:
@@ -224,6 +234,11 @@ def _forward_pty_until_complete(
                     session,
                     stdout_writer=stdout_writer,
                     forward_stdout=reported_result is None,
+                )
+                terminal.separate_interactive_region(
+                    had_output=forwarded_live_output,
+                    ended_with_newline=live_output_ended_with_newline,
+                    had_screen_rewriting_output=forwarded_screen_rewriting_output,
                 )
                 reported_result = _collect_reported_result(reported_result, result_server)
                 return reported_result, code
@@ -246,6 +261,11 @@ def _forward_pty_until_complete(
                         code = session.wait(timeout=0.1)
                     except subprocess.TimeoutExpired:
                         code = 0
+                terminal.separate_interactive_region(
+                    had_output=forwarded_live_output,
+                    ended_with_newline=live_output_ended_with_newline,
+                    had_screen_rewriting_output=forwarded_screen_rewriting_output,
+                )
                 reported_result = _collect_reported_result(reported_result, result_server)
                 return reported_result, code if isinstance(code, int) else 0
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import os
 from queue import Empty, Queue
-import re
 import secrets
 import select
 import socket
@@ -35,7 +34,7 @@ from .protocol import (
 )
 from .pty_forwarding import drain_pty_output, os_fd_writer, pump_pty_once
 from .pty_process import ManagedPtyProcess
-from .terminal import RealTerminal, Winsize
+from .terminal import RealTerminal, Winsize, has_screen_rewriting_control, strip_ansi_csi
 
 
 @dataclass
@@ -472,9 +471,9 @@ class Mothership:
         return _write
 
     def _notice_live_output(self, data: bytes) -> None:
-        if _has_screen_rewriting_control(data):
+        if has_screen_rewriting_control(data):
             self._forwarded_screen_rewriting_output = True
-        display_text = _strip_ansi_csi(data)
+        display_text = strip_ansi_csi(data)
         if not display_text:
             return
         self._forwarded_live_output = True
@@ -522,58 +521,8 @@ class Mothership:
             pass
 
 
-_ANSI_CSI_RE = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
-_HARMLESS_CSI_FINALS = {b"m"}
-_HARMLESS_CSI_SEQUENCES = {
-    b"\x1b[?25h",  # show cursor
-    b"\x1b[?25l",  # hide cursor
-    b"\x1b[?2004h",  # enable bracketed paste
-    b"\x1b[?2004l",  # disable bracketed paste
-    b"\x1b[?1000h",
-    b"\x1b[?1000l",
-    b"\x1b[?1002h",
-    b"\x1b[?1002l",
-    b"\x1b[?1003h",
-    b"\x1b[?1003l",
-    b"\x1b[?1006h",
-    b"\x1b[?1006l",
-}
-
-
 def _normalize_pty_text(text: str) -> str:
     return text.replace("\r\n", "\n")
-
-
-def _strip_ansi_csi(data: bytes) -> bytes:
-    """Remove CSI terminal-control sequences for line-boundary tracking."""
-
-    return _ANSI_CSI_RE.sub(b"", data)
-
-
-def _has_screen_rewriting_control(data: bytes) -> bool:
-    """Return true for terminal controls that make the final screen non-linear."""
-
-    if _has_bare_carriage_return(data):
-        return True
-    for match in _ANSI_CSI_RE.finditer(data):
-        sequence = match.group(0)
-        if sequence in _HARMLESS_CSI_SEQUENCES:
-            continue
-        if sequence[-1:] in _HARMLESS_CSI_FINALS:
-            continue
-        return True
-    return False
-
-
-def _has_bare_carriage_return(data: bytes) -> bool:
-    index = 0
-    while True:
-        index = data.find(b"\r", index)
-        if index == -1:
-            return False
-        if index + 1 >= len(data) or data[index + 1 : index + 2] != b"\n":
-            return True
-        index += 2
 
 
 def _stderr_writer():

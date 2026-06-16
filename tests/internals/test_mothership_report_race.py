@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from myteam.workflows.execution.mothership import Mothership, RequestRecord, _has_screen_rewriting_control
+from myteam.workflows.execution.mothership import Mothership, RequestRecord
+from myteam.workflows.execution.terminal import has_screen_rewriting_control
 
 
 class FakeTerminal:
@@ -153,7 +154,7 @@ def test_final_result_clears_after_screen_rewriting_live_output() -> None:
 
 
 def test_screen_rewriting_detection_ignores_plain_lines_and_style_controls() -> None:
-    assert _has_screen_rewriting_control(b"plain line\r\n") is False
-    assert _has_screen_rewriting_control(b"\x1b[31mred\x1b[0m\r\n") is False
-    assert _has_screen_rewriting_control(b"line\rrewritten") is True
-    assert _has_screen_rewriting_control(b"\x1b[2K") is True
+    assert has_screen_rewriting_control(b"plain line\r\n") is False
+    assert has_screen_rewriting_control(b"\x1b[31mred\x1b[0m\r\n") is False
+    assert has_screen_rewriting_control(b"line\rrewritten") is True
+    assert has_screen_rewriting_control(b"\x1b[2K") is True

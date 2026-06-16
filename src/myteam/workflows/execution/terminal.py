@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import os
+import re
 import shutil
 import signal
 import sys
@@ -21,6 +22,22 @@ _VISUAL_RESTORE_SEQUENCE = (
     b"\x1b[?2004l"  # disable bracketed paste
     b"\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l"  # disable common mouse modes
 )
+_ANSI_CSI_RE = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
+_HARMLESS_CSI_FINALS = {b"m"}
+_HARMLESS_CSI_SEQUENCES = {
+    b"\x1b[?25h",  # show cursor
+    b"\x1b[?25l",  # hide cursor
+    b"\x1b[?2004h",  # enable bracketed paste
+    b"\x1b[?2004l",  # disable bracketed paste
+    b"\x1b[?1000h",
+    b"\x1b[?1000l",
+    b"\x1b[?1002h",
+    b"\x1b[?1002l",
+    b"\x1b[?1003h",
+    b"\x1b[?1003l",
+    b"\x1b[?1006h",
+    b"\x1b[?1006l",
+}
 
 
 class RealTerminal:
@@ -114,6 +131,62 @@ class RealTerminal:
         if sys.stdout.isatty():
             self.write_stdout(_VISUAL_RESTORE_SEQUENCE)
 
+    def separate_interactive_region(
+        self,
+        *,
+        had_output: bool,
+        ended_with_newline: bool,
+        had_screen_rewriting_output: bool,
+    ) -> None:
+        """Move following output below a just-finished interactive/TUI region.
+
+        Plain line-oriented output gets a small gap. Screen-rewriting output gets
+        enough blank lines to scroll the old region into scrollback without
+        clearing it, leaving room for later explicit session-boundary text.
+        """
+
+        if not sys.stdout.isatty():
+            return
+        self.restore_visual_state()
+        if had_screen_rewriting_output:
+            rows, _columns = self.winsize()
+            self.write_stdout(b"\r\n" * max(1, rows))
+        elif had_output:
+            line_breaks = 2 if ended_with_newline else 1
+            self.write_stdout(b"\r\n" * line_breaks)
+
     def _handle_winch(self, _signum: int, _frame: Any) -> None:
         if self.on_resize is not None:
             self.on_resize(self.winsize())
+
+
+def strip_ansi_csi(data: bytes) -> bytes:
+    """Remove CSI terminal-control sequences for line-boundary tracking."""
+
+    return _ANSI_CSI_RE.sub(b"", data)
+
+
+def has_screen_rewriting_control(data: bytes) -> bool:
+    """Return true for terminal controls that make the final screen non-linear."""
+
+    if has_bare_carriage_return(data):
+        return True
+    for match in _ANSI_CSI_RE.finditer(data):
+        sequence = match.group(0)
+        if sequence in _HARMLESS_CSI_SEQUENCES:
+            continue
+        if sequence[-1:] in _HARMLESS_CSI_FINALS:
+            continue
+        return True
+    return False
+
+
+def has_bare_carriage_return(data: bytes) -> bool:
+    index = 0
+    while True:
+        index = data.find(b"\r", index)
+        if index == -1:
+            return False
+        if index + 1 >= len(data) or data[index + 1 : index + 2] != b"\n":
+            return True
+        index += 2
