@@ -16,6 +16,17 @@ and ask away!
 - `How do skills work?`
 - `Help me build a workflow for ...`
 
+Notable changes:
+
+- No more `.myteam` folder; store your skills and workflows however you'd like.
+- No more *roles* or *tasks*; use *workflows* instead.
+- No more YAML workflows; use Python workflows instead.
+- Improved handling of agent sessions in the terminal.
+- Skills and workflows are identified by filename, not by stem. 
+- Python skills and workflows use YAML frontmatter in the module docstring.
+- Clearer mapping between Markdown workflow frontmatter and `run_agent` parameters.
+- Roster-management functionality removed (at least for now)
+
 ## 0.2.27
 
 - Renamed workflow commands and docs to tasks.
