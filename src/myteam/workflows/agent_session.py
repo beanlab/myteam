@@ -15,9 +15,8 @@ import sys
 import time
 from typing import Any
 
-from jinja2 import Template
-
 from .. import templates
+from ..prompt_rendering import render_prompt_text
 from ..config import WorkflowDefaults, load_myteam_config
 from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
@@ -61,7 +60,7 @@ def run_agent(
         effective_extra_args = tuple(str(item) for item in effective_extra_args)
 
     session_nonce = secrets.token_urlsafe(16)
-    rendered_prompt = _render_prompt(prompt, input or {})
+    rendered_prompt = render_prompt_text(prompt, input or {})
     agent_prompt = build_agent_prompt(
         rendered_prompt,
         session_nonce=session_nonce,
@@ -131,7 +130,7 @@ def build_agent_prompt(
     ]
 
     if output_schema is not None:
-        result_instructions = _render_prompt(
+        result_instructions = render_prompt_text(
             templates.get_template("agent_result_instructions.md"),
             {
                 # Don't sort the keys so the order the user provided is preserved
@@ -141,12 +140,6 @@ def build_agent_prompt(
         sections.append(result_instructions)
 
     return "\n\n".join(section for section in sections if section)
-
-
-def _render_prompt(prompt: str, input_values: dict[str, Any]) -> str:
-    if not input_values:
-        return prompt
-    return Template(prompt).render(**input_values)
 
 
 def _load_defaults(cwd: Path) -> WorkflowDefaults:

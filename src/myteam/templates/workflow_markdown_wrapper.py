@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from myteam.frontmatter import split_markdown_frontmatter
+from myteam.prompt_rendering import render_markdown_body
 from myteam.workflows import report_workflow_result, run_agent
 from myteam.workflows.commands import resolve_agent_settings
 
@@ -13,13 +14,14 @@ from myteam.workflows.commands import resolve_agent_settings
 def main(markdown_file: Path, workflow_inputs: str = "{}") -> None:
     input_values = _load_json_object(workflow_inputs)
     frontmatter, content = split_markdown_frontmatter(markdown_file.read_text(encoding="utf-8"))
+    rendered_content = render_markdown_body(content, source_path=markdown_file, input_values=input_values)
 
     settings = resolve_agent_settings(frontmatter)
     output_schema = frontmatter.get("output")
 
     result = run_agent(
-        prompt=content,
-        input=input_values,
+        prompt=rendered_content,
+        input=None,
         output=output_schema if isinstance(output_schema, dict) else None,
         **settings,
     )
