@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import io
 import os
 import subprocess
 import sys
-from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,9 +13,6 @@ SRC = ROOT / "src"
 
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-
-from myteam.cli import main as cli_main
-
 
 @dataclass
 class CommandResult:
@@ -50,44 +45,3 @@ def run_myteam(monkeypatch):
 
     return runner
 
-
-@pytest.fixture
-def run_myteam_inprocess(monkeypatch):
-    def runner(project_dir: Path, *args: str) -> CommandResult:
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        monkeypatch.chdir(project_dir)
-        monkeypatch.setattr(sys, "argv", ["myteam", *args])
-
-        exit_code = 0
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            try:
-                cli_main()
-            except SystemExit as exc:
-                code = exc.code
-                if code is None:
-                    exit_code = 0
-                elif isinstance(code, int):
-                    exit_code = code
-                else:
-                    exit_code = 1
-
-        return CommandResult(
-            exit_code=exit_code,
-            stdout=stdout.getvalue(),
-            stderr=stderr.getvalue(),
-        )
-
-    return runner
-
-
-@pytest.fixture
-def initialized_project(tmp_path: Path) -> Path:
-    """Temporary project root used by legacy tests during the test-suite refactor.
-
-    `myteam init` is no longer part of the documented public contract, so this
-    fixture intentionally does not initialize an old `.myteam` tree. Tests that
-    still rely on that legacy shape will be removed or rewritten in later phases.
-    """
-
-    return tmp_path
