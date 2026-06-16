@@ -1,50 +1,44 @@
 """Command-line interface wiring for the myteam package."""
 from __future__ import annotations
 
+import functools
+
 import fire
 
-from .commands import (
-    changelog,
-    download_roster,
-    get_role,
-    get_skill,
-    init,
-    list_available_rosters,
-    new_role,
-    new_skill,
-    new_workflow,
-    remove,
-    start,
-    update_roster,
-    version,
-    workflow_result,
-)
+from .commands import changelog, onboard, version
+from .explain import explain_resources
+from .listing import list_resources
+from .skills import new_skill, load_skill
+from .workflows import new_workflow, start_workflow_cli, report_result
 
 
-def main(argv: list[str] | None = None):
+def printed(func):
+    @functools.wraps(func)
+    def new_func(*args, **kwargs):
+        result = func(*args, **kwargs)
+        if result is not None:
+            print(result, end="")
+    return new_func
+
+
+def main():
     commands = {
-        "init": init,
+        "explain": printed(explain_resources),
+        "list": printed(list_resources),
         "new": {
-            "role": new_role,
             "skill": new_skill,
-            "workflow": new_workflow,
+            "workflow": new_workflow
         },
-        "remove": remove,
-        "get": {
-            "role": get_role,
-            "skill": get_skill,
-        },
-        "download": download_roster,
-        "update": update_roster,
-        "list": list_available_rosters,
-        "start": start,
-        "workflow-result": workflow_result,
+        "load": printed(load_skill),
+        "onboard": printed(onboard),
+        "start": start_workflow_cli,
+        "result": report_result,
+        "version": version,
         "changelog": changelog,
-        "--version": version,
     }
 
     fire.Fire(commands)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

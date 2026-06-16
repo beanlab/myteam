@@ -5,8 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from myteam.workflow.terminal.session import run_terminal_session
-from myteam.workflow.agents.backends import PTY_RIGHT_ARROW
+from myteam.tasks.terminal.session import run_terminal_session
+from myteam.tasks.agents.agent_utils import PTY_RIGHT_ARROW
 
 
 def _dog_monitor():

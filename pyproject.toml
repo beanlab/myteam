@@ -1,6 +1,6 @@
 [project]
 name = "myteam"
-version = "0.2.26"
+version = "0.3.0"
 description = "Agent roster CLI"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,6 +10,7 @@ dependencies = [
     "requests>=2.32.5",
     "pyyaml>=6.0",
     "pyparsing>=3.3.2",
+    "jinja2>=3.1.6",
 ]
 authors = [{ name = "BeanLab" }]
 license = { file = "LICENSE" }

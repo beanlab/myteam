@@ -1,271 +1,57 @@
 """Command implementations for the myteam CLI."""
 from __future__ import annotations
 
-import os
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-from . import __version__
-from .disclosure import PROJECT_ROOT_ENV_VAR, builtin_skill_dir, is_role_dir, is_skill_dir
-from .paths import (
-    APP_NAME,
-    BUILTIN_ROOT_NAME,
-    DEFAULT_LOCAL_ROOT,
-    ENCODING,
-    agents_root,
-    base_dir,
-    role_dir,
-    workflow_path,
-)
-from .rosters import download_roster, list_available_rosters, update_roster
-from .templates import get_template
-from .upgrade import packaged_changelog_text, write_tracked_version
-from .workflow.engine import run_workflow
-from .workflow.parser import load_workflow
-from .workflow.result_tool import workflow_result as submit_workflow_result
 
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def write_py_script(path: Path, contents: str) -> None:
-    path.write_text(contents, encoding=ENCODING)
-
-
-def _selected_root(prefix: str | None) -> Path:
-    try:
-        return agents_root(base_dir(), prefix)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(1)
-
-
-def new_dir(
-        base: Path,
-        dir_type: str,
-        name_parts: list[str],
-        instruction_text: str,
-        load_text: str,
-) -> None:
-    name_dir = base.joinpath(*name_parts)
-    name = "/".join(name_parts)
-    if name_dir.exists():
-        print(f"{dir_type.title()} '{name}' already exists at {name_dir}", file=sys.stderr)
-        raise SystemExit(1)
-
-    ensure_dir(name_dir)
-    (name_dir / f"{dir_type}.md").write_text(instruction_text, encoding=ENCODING)
-    write_py_script(name_dir / "load.py", load_text)
-
-
-def init(prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Initialize the myteam directory with default role."""
-    root = _selected_root(prefix)
-    new_dir(
-        base_dir(),
-        "role",
-        list(root.relative_to(base_dir()).parts),
-        "",
-        get_template("root_role_load_template.py"),
-    )
-    write_tracked_version(root)
-
-    agents_md = base_dir() / "AGENTS.md"
-    if not agents_md.exists():
-        agents_md.write_text(get_template("agents_md_template.md"), encoding=ENCODING)
-
-
-def new_role(role: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Create a new role directory with placeholder files."""
-    new_dir(
-        _selected_root(prefix),
-        "role",
-        role.split("/"),
-        get_template("role_definition_template.md"),
-        get_template("role_load_template.py"),
-    )
-
-
-def new_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
-        print(f"Skill path '{skill}' uses the reserved built-in namespace '{BUILTIN_ROOT_NAME}'.", file=sys.stderr)
-        raise SystemExit(1)
-    new_dir(
-        _selected_root(prefix),
-        "skill",
-        skill.split("/"),
-        get_template("skill_definition_template.md"),
-        get_template("skill_load_template.py"),
-    )
-
-
-def new_workflow(workflow: str = "agent", prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    workflow_root = _selected_root(prefix)
-    workflow_path = workflow_root.joinpath(*workflow.split("/")).with_suffix(".py")
-    if workflow_path.exists():
-        print(f"Workflow '{workflow}' already exists at {workflow_path}", file=sys.stderr)
-        raise SystemExit(1)
-
-    ensure_dir(workflow_path.parent)
-    template = get_template("workflow_definition_template.py").removesuffix("\n")
-    write_py_script(workflow_path, template)
-
-
-def remove(name: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Delete the directory for a role or skill if it exists."""
-    target_dir = role_dir(base_dir(), name, prefix)  # TODO fix for skills
-    if not target_dir.exists():
-        print(f"'{name}' not found at {target_dir}", file=sys.stderr)
-        raise SystemExit(1)
-
-    if not target_dir.is_dir():
-        print(f"Path for '{name}' is not a directory: {target_dir}", file=sys.stderr)
-        raise SystemExit(1)
-
-    try:
-        shutil.rmtree(target_dir)
-    except OSError as exc:
-        print(f"Failed to remove '{name}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-
-
-def get_name(dir_type: str, name_dir: Path, name: str | None, *, project_root: Path) -> None:
-    if not name_dir.exists():
-        print(
-            f"{dir_type.title()} '{name}' not found. Run 'myteam new {dir_type} {name}' to create it.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
-
-    load_py = name_dir / "load.py"
-    if not load_py.exists():
-        print(f"No load.py found for {dir_type} '{name}'.", file=sys.stderr)
-        raise SystemExit(1)
-
-    try:
-        env = dict(os.environ)
-        env[PROJECT_ROOT_ENV_VAR] = str(project_root)
-        result = subprocess.run([sys.executable, str(load_py)], cwd=name_dir, env=env, check=False)
-        raise SystemExit(result.returncode)
-    except OSError as exc:
-        print(f"Failed to execute load.py for {dir_type} '{name}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-
-
-def get_role(role: str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Print the instructions for the given role if available."""
-    project_root = _selected_root(prefix)
-    folder = project_root
-    if role is not None:
-        folder = folder.joinpath(*role.split("/"))
-
-    if not is_role_dir(folder):
-        print(f"Not a role: {role}", file=sys.stderr)
-        raise SystemExit(1)
-    get_name("role", folder, role, project_root=project_root)
-
-
-def get_skill(skill: str, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    """Print the instructions for the given skill if available."""
-    project_root = _selected_root(prefix)
-    if skill == BUILTIN_ROOT_NAME or skill.startswith(f"{BUILTIN_ROOT_NAME}/"):
-        folder = builtin_skill_dir(skill)
-        if not is_skill_dir(folder):
-            print(f"Not a skill: {skill}", file=sys.stderr)
-            raise SystemExit(1)
-        get_name("skill", folder, skill, project_root=project_root)
-
-    folder = project_root.joinpath(*skill.split("/"))
-    if is_skill_dir(folder):
-        get_name("skill", folder, skill, project_root=project_root)
-    print(f"Not a skill: {skill}", file=sys.stderr)
-    raise SystemExit(1)
-
-
-def _log(message: str) -> None:
-    print(message, file=sys.stderr)
-
-
-def _run_python_workflow(path: Path, *, project_root: Path) -> int:
-    env = dict(os.environ)
-    env[PROJECT_ROOT_ENV_VAR] = str(project_root)
-    result = subprocess.run([sys.executable, str(path)], cwd=path.parent, env=env, check=False)
-    return result.returncode
-
-
-def start(workflow: str, prefix: str = DEFAULT_LOCAL_ROOT, verbose: bool = False) -> None:
-    logger = _log if verbose else (lambda msg: None)
-
-    try:
-        path = workflow_path(base_dir(), workflow, prefix)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Resolved workflow '{workflow}' to {path}")
-
-    if path.suffix == ".py":
-        try:
-            returncode = _run_python_workflow(path, project_root=agents_root(base_dir(), prefix))
-        except OSError as exc:
-            print(f"Failed to execute Python workflow '{workflow}': {exc}", file=sys.stderr)
-            raise SystemExit(1)
-        if returncode != 0:
-            raise SystemExit(returncode)
-        logger(f"Workflow '{workflow}' completed successfully.")
-        return
-
-    try:
-        workflow_definition = load_workflow(path)
-    except (OSError, ValueError) as exc:
-        print(f"Failed to load workflow '{workflow}': {exc}", file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Loaded workflow with {len(workflow_definition)} step(s)")
-
-    result = run_workflow(workflow_definition, logger=logger)
-    if result.status != "completed":
-        failed_step = result.failed_step_name or "<unknown>"
-        if result.error_message:
-            print(
-                f"Workflow '{workflow}' failed at step '{failed_step}': {result.error_message}",
-                file=sys.stderr,
-            )
-        else:
-            print(f"Workflow '{workflow}' failed at step '{failed_step}'.", file=sys.stderr)
-        raise SystemExit(1)
-
-    logger(f"Workflow '{workflow}' completed successfully.")
-
-
-def workflow_result(json: str | None = None, text: str | None = None) -> None:
-    submit_workflow_result(json=json, text=text)
+APP_NAME = 'myteam'
+GOVERNING_DOCS_ROOT = Path(__file__).resolve().parents[1] / "governing_docs"
 
 
 def version() -> str:
+    from . import __version__
+
     return f"{APP_NAME} {__version__}"
 
 
 def changelog() -> str:
+    from .upgrade import packaged_changelog_text
+
     return packaged_changelog_text().rstrip()
 
 
-__all__ = [
-    "download_roster",
-    "get_role",
-    "get_skill",
-    "init",
-    "list_available_rosters",
-    "new_role",
-    "new_skill",
-    "new_workflow",
-    "remove",
-    "start",
-    "workflow_result",
-    "update_roster",
-    "changelog",
-    "version",
-]
+def onboard(root: str | Path | None = None) -> str:
+    docs_root = Path(root) if root is not None else GOVERNING_DOCS_ROOT
+    docs_root = docs_root.resolve()
+
+    if not docs_root.exists() or not docs_root.is_dir():
+        print(f"Not a governing docs folder: {docs_root}", file=sys.stderr)
+        raise SystemExit(1)
+
+    files = _ordered_governing_docs(docs_root)
+    return "\n\n".join(_format_document(file, docs_root) for file in files)
+
+
+def _ordered_governing_docs(root: Path) -> list[Path]:
+    overview = root / "application-overview.md"
+    files = [overview] if overview.exists() and overview.is_file() else []
+    files.extend(
+        sorted(
+            (
+                path
+                for path in root.rglob("*")
+                if path.is_file() and path != overview
+            ),
+            key=lambda path: path.relative_to(root).as_posix().lower(),
+        )
+    )
+    return files
+
+
+def _format_document(file: Path, root: Path) -> str:
+    relative_name = file.relative_to(root).as_posix()
+    body = file.read_text(encoding="utf-8").rstrip("\n")
+    if not body:
+        return f"----{relative_name}----"
+    return f"----{relative_name}----\n{body}"

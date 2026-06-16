@@ -1,5 +1,51 @@
 # Change Log
 
+## 0.3.0 **Major Rewrite**
+
+`myteam` now focuses on agent *workflows* and progressive disclosure of dynamic *skills*. The concepts of *roles* and *tasks* are superseded by workflows.
+
+Rather than describe it all here, open your favorite agent session, paste in 
+
+```text
+Run `myteam onboard` and prepare to answer my questions about `myteam`. Say "Ready" when you are ready to help me.
+```
+
+and ask away!
+
+- `How do workflows work?`
+- `How do skills work?`
+- `Help me build a workflow for ...`
+
+Notable changes:
+
+- No more `.myteam` folder; store your skills and workflows however you'd like.
+- No more *roles* or *tasks*; use *workflows* instead.
+- No more YAML workflows; use Python workflows instead.
+- Improved handling of agent sessions in the terminal.
+- Skills and workflows are identified by filename, not by stem. 
+- Python skills and workflows use YAML frontmatter in the module docstring.
+- Clearer mapping between Markdown workflow frontmatter and `run_agent` parameters.
+- Roster-management functionality removed (at least for now)
+
+## 0.2.27
+
+- Renamed workflow commands and docs to tasks.
+- Tasks can now start subtasks with `myteam task start`.
+- Renamed `myteam workflow-result` to `myteam task result`.
+- `myteam new task <name>.<ext>` create `.py`, `.md`, `.yaml`, or `.yml` task templates.
+- Task definitions can now progressively disclose skills and subtasks using `skills` and
+  `tasks` arguments. 
+- Task commands now use the session nonce instead of environment variables, enabling
+  concurrent runs.
+- Removed task tool support.
+
+### myteam start behavior
+
+- `myteam start` runs a built-in default task when called without arguments.
+- `myteam start` and `myteam task start` now accept `<name>.<ext>`.
+  - Extensionless names with multiple matches resolve in `.py`, `.md`, `.yaml`, `.yml` order.
+- Markdown tasks can define optional frontmatter input and accept it with `--input <JSON>`.
+
 ## 0.2.26
 
 - `run_agent(...)` now defaults to arguments configured in `.myteam/.config.yaml` if they aren't

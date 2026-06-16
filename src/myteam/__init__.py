@@ -1,11 +1,27 @@
-"""Myteam package for managing agent role directories."""
+"""myteam framework and CLI for skills, workflows, and agent sessions."""
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import tomllib
 
-__all__ = ["__version__"]
+from .commands import onboard
+from .explain import explain_resources
+from .listing import list_resources
+from .skills import load_skill
+from .workflows import SessionResult, UsageInfo, report_workflow_result, run_agent
+
+__all__ = [
+    "__version__",
+    "explain_resources",
+    "list_resources",
+    "load_skill",
+    "onboard",
+    "run_agent",
+    "report_workflow_result",
+    "SessionResult",
+    "UsageInfo",
+]
 
 
 def _project_version() -> str:
