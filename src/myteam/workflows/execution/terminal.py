@@ -14,7 +14,13 @@ from typing import Any
 Winsize = tuple[int, int]
 
 
-_VISUAL_RESTORE_SEQUENCE = b"\x1b[0m\x1b[?25h"
+_VISUAL_RESTORE_SEQUENCE = (
+    b"\x1b[?1049l"  # leave alternate screen
+    b"\x1b[0m"  # reset attributes
+    b"\x1b[?25h"  # show cursor
+    b"\x1b[?2004l"  # disable bracketed paste
+    b"\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l"  # disable common mouse modes
+)
 
 
 class RealTerminal:
@@ -102,12 +108,9 @@ class RealTerminal:
     def restore_visual_state(self) -> None:
         """Restore terminal-emulator state that termios cannot represent."""
 
-        # This intentionally fixes the common post-TUI symptom where the cursor
-        # remains hidden after child PTY teardown bytes were suppressed. If users
-        # report broader leftover TUI state (for example: still in alternate
-        # screen, mouse reporting/bracketed paste left enabled, or visible raw
-        # escape artifacts), consider a more selective post-result PTY cleanup
-        # pass-through/filter instead of only forcing this small local reset.
+        # Child TUI teardown bytes may be lost or suppressed during PTY shutdown.
+        # Force the common terminal-emulator modes back to normal before caller
+        # output (for example, explicit workflow result text) is printed.
         if sys.stdout.isatty():
             self.write_stdout(_VISUAL_RESTORE_SEQUENCE)
 

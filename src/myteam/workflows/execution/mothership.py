@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import os
 from queue import Empty, Queue
+import re
 import secrets
 import select
 import socket
@@ -91,6 +92,9 @@ class Mothership:
         self._wakeup_r = -1
         self._wakeup_w = -1
         self._terminal = RealTerminal(on_resize=self._resize_sessions)
+        self._forwarded_live_output = False
+        self._forwarded_screen_rewriting_output = False
+        self._live_output_ended_with_newline = True
 
     def __enter__(self) -> "Mothership":
         self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-mothership-")
@@ -156,6 +160,7 @@ class Mothership:
                 self._reap_exited_active_session(terminal=terminal, live_forwarding=live_forwarding)
 
                 if top_request_id in self.results:
+                    self._ensure_final_output_separator(terminal, live_forwarding=live_forwarding)
                     return self.results[top_request_id]
                 if self.active is None and not self.stack and self._commands.empty():
                     return None
@@ -166,12 +171,13 @@ class Mothership:
                         self._drain_wakeup_pipe()
                     continue
 
-                stderr_writer = _stderr_writer() if live_forwarding else None
+                stdout_writer = self._live_stdout_writer(terminal, live_forwarding=live_forwarding)
+                stderr_writer = self._live_stderr_writer(live_forwarding=live_forwarding)
                 activity = pump_pty_once(
                     self.active,
                     terminal,
                     timeout=0.1,
-                    stdout_writer=terminal.write_stdout if live_forwarding else None,
+                    stdout_writer=stdout_writer,
                     stderr_writer=stderr_writer,
                     forward_stdout=live_forwarding,
                     forward_stderr=live_forwarding,
@@ -184,7 +190,7 @@ class Mothership:
                 if activity.stdout_eof:
                     self._handle_workflow_exit(
                         self.active,
-                        stdout_writer=terminal.write_stdout if live_forwarding else None,
+                        stdout_writer=stdout_writer,
                         stderr_writer=stderr_writer,
                         forward_stdout=live_forwarding,
                         forward_stderr=live_forwarding,
@@ -416,8 +422,8 @@ class Mothership:
         if self.active is not None and self.active.poll() is not None:
             self._handle_workflow_exit(
                 self.active,
-                stdout_writer=terminal.write_stdout if live_forwarding else None,
-                stderr_writer=_stderr_writer() if live_forwarding else None,
+                stdout_writer=self._live_stdout_writer(terminal, live_forwarding=live_forwarding),
+                stderr_writer=self._live_stderr_writer(live_forwarding=live_forwarding),
                 forward_stdout=live_forwarding,
                 forward_stderr=live_forwarding,
             )
@@ -443,6 +449,48 @@ class Mothership:
     def _resize_sessions(self, winsize: Winsize) -> None:
         for session in self.sessions.values():
             session.resize(winsize)
+
+    def _live_stdout_writer(self, terminal: RealTerminal, *, live_forwarding: bool):
+        if not live_forwarding:
+            return None
+
+        def _write(data: bytes) -> None:
+            self._notice_live_output(data)
+            terminal.write_stdout(data)
+
+        return _write
+
+    def _live_stderr_writer(self, *, live_forwarding: bool):
+        writer = _stderr_writer() if live_forwarding else None
+        if writer is None:
+            return None
+
+        def _write(data: bytes) -> None:
+            self._notice_live_output(data)
+            writer(data)
+
+        return _write
+
+    def _notice_live_output(self, data: bytes) -> None:
+        if _has_screen_rewriting_control(data):
+            self._forwarded_screen_rewriting_output = True
+        display_text = _strip_ansi_csi(data)
+        if not display_text:
+            return
+        self._forwarded_live_output = True
+        self._live_output_ended_with_newline = display_text.endswith(b"\n")
+
+    def _ensure_final_output_separator(self, terminal: RealTerminal, *, live_forwarding: bool) -> None:
+        if not live_forwarding:
+            return
+        terminal.restore_visual_state()
+        if self._forwarded_screen_rewriting_output:
+            terminal.clear()
+            self._live_output_ended_with_newline = True
+            return
+        if self._forwarded_live_output and not self._live_output_ended_with_newline:
+            terminal.write_stdout(b"\r\n")
+            self._live_output_ended_with_newline = True
 
     def _store_result(self, request_id: str, *, status: str, result: Any) -> None:
         self.results[request_id] = {"status": status, "result": result}
@@ -474,8 +522,58 @@ class Mothership:
             pass
 
 
+_ANSI_CSI_RE = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
+_HARMLESS_CSI_FINALS = {b"m"}
+_HARMLESS_CSI_SEQUENCES = {
+    b"\x1b[?25h",  # show cursor
+    b"\x1b[?25l",  # hide cursor
+    b"\x1b[?2004h",  # enable bracketed paste
+    b"\x1b[?2004l",  # disable bracketed paste
+    b"\x1b[?1000h",
+    b"\x1b[?1000l",
+    b"\x1b[?1002h",
+    b"\x1b[?1002l",
+    b"\x1b[?1003h",
+    b"\x1b[?1003l",
+    b"\x1b[?1006h",
+    b"\x1b[?1006l",
+}
+
+
 def _normalize_pty_text(text: str) -> str:
     return text.replace("\r\n", "\n")
+
+
+def _strip_ansi_csi(data: bytes) -> bytes:
+    """Remove CSI terminal-control sequences for line-boundary tracking."""
+
+    return _ANSI_CSI_RE.sub(b"", data)
+
+
+def _has_screen_rewriting_control(data: bytes) -> bool:
+    """Return true for terminal controls that make the final screen non-linear."""
+
+    if _has_bare_carriage_return(data):
+        return True
+    for match in _ANSI_CSI_RE.finditer(data):
+        sequence = match.group(0)
+        if sequence in _HARMLESS_CSI_SEQUENCES:
+            continue
+        if sequence[-1:] in _HARMLESS_CSI_FINALS:
+            continue
+        return True
+    return False
+
+
+def _has_bare_carriage_return(data: bytes) -> bool:
+    index = 0
+    while True:
+        index = data.find(b"\r", index)
+        if index == -1:
+            return False
+        if index + 1 >= len(data) or data[index + 1 : index + 2] != b"\n":
+            return True
+        index += 2
 
 
 def _stderr_writer():

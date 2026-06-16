@@ -8,15 +8,23 @@ from __future__ import annotations
 
 import pytest
 
-from myteam.workflows.execution.mothership import Mothership, RequestRecord
+from myteam.workflows.execution.mothership import Mothership, RequestRecord, _has_screen_rewriting_control
 
 
 class FakeTerminal:
     def __init__(self) -> None:
         self.output = b""
+        self.visual_state_restored = False
+        self.cleared = False
 
     def write_stdout(self, data: bytes) -> None:
         self.output += data
+
+    def clear(self) -> None:
+        self.cleared = True
+
+    def restore_visual_state(self) -> None:
+        self.visual_state_restored = True
 
 
 class FakeRecording:
@@ -115,6 +123,7 @@ def test_final_result_is_separated_from_unterminated_live_output() -> None:
     mothership._notice_live_output(b"status line without newline")
     mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
 
+    assert terminal.visual_state_restored is True
     assert terminal.output == b"\r\n"
 
 
@@ -126,4 +135,25 @@ def test_final_result_separator_ignores_visual_restore_sequences() -> None:
     mothership._notice_live_output(b"\x1b[0m\x1b[?25h")
     mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
 
+    assert terminal.visual_state_restored is True
+    assert terminal.cleared is False
     assert terminal.output == b""
+
+
+def test_final_result_clears_after_screen_rewriting_live_output() -> None:
+    mothership = Mothership()
+    terminal = FakeTerminal()
+
+    mothership._notice_live_output(b"thinking\x1b[2K\rfinal tui line")
+    mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
+
+    assert terminal.visual_state_restored is True
+    assert terminal.cleared is True
+    assert terminal.output == b""
+
+
+def test_screen_rewriting_detection_ignores_plain_lines_and_style_controls() -> None:
+    assert _has_screen_rewriting_control(b"plain line\r\n") is False
+    assert _has_screen_rewriting_control(b"\x1b[31mred\x1b[0m\r\n") is False
+    assert _has_screen_rewriting_control(b"line\rrewritten") is True
+    assert _has_screen_rewriting_control(b"\x1b[2K") is True
