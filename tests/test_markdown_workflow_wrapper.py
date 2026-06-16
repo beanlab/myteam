@@ -51,7 +51,7 @@ def test_markdown_wrapper_passes_body_unrendered_and_input_to_run_agent(
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert reported == [json.dumps({"summary": "ok"}) + "\n"]
+    assert reported == [json.dumps({"summary": "ok"})]
     assert seen == {
         "prompt": "Review {{ topic }}.\n",
         "input": {"topic": "release"},

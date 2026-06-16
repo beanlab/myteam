@@ -11,7 +11,7 @@ def test_nested_start_returns_child_reported_result_to_parent_without_child_live
     child.write_text(
         "from myteam.workflows import report_workflow_result\n"
         "print('child live display')\n"
-        "report_workflow_result('child result\\n')\n",
+        "report_workflow_result('child result')\n",
         encoding="utf-8",
     )
     parent = tmp_path / "parent.py"
@@ -25,7 +25,7 @@ def test_nested_start_returns_child_reported_result_to_parent_without_child_live
         "    capture_output=True,\n"
         "    check=False,\n"
         ")\n"
-        "report_workflow_result(f'parent saw: {completed.stdout}')\n",
+        "report_workflow_result(f'parent saw: {completed.stdout}', end='')\n",
         encoding="utf-8",
     )
 

@@ -19,7 +19,7 @@ def test_mothership_runs_workflow_process(tmp_path: Path) -> None:
     workflow.write_text(
         "from myteam.workflows import report_workflow_result\n"
         "print('live log')\n"
-        "report_workflow_result('{\"answer\": \"ok\"}\\n')\n",
+        "report_workflow_result('{\"answer\": \"ok\"}')\n",
         encoding="utf-8",
     )
 

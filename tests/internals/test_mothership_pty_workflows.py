@@ -30,7 +30,7 @@ def test_workflow_runs_with_tty_stdin_and_stdout(tmp_path: Path) -> None:
         "import sys\n"
         "from myteam.workflows import report_workflow_result\n"
         "print(f'stdin={sys.stdin.isatty()} stdout={sys.stdout.isatty()} stderr={sys.stderr.isatty()}')\n"
-        "report_workflow_result('done\\n')\n",
+        "report_workflow_result('done')\n",
         encoding="utf-8",
     )
 
@@ -47,7 +47,7 @@ def test_nested_start_runs_child_and_resumes_parent(tmp_path: Path) -> None:
     child.write_text(
         "from myteam.workflows import report_workflow_result\n"
         "print('child live output')\n"
-        "report_workflow_result('child result\\n')\n",
+        "report_workflow_result('child result')\n",
         encoding="utf-8",
     )
     parent = tmp_path / "parent.py"
@@ -57,7 +57,7 @@ def test_nested_start_runs_child_and_resumes_parent(tmp_path: Path) -> None:
         "print('parent before')\n"
         "start_workflow_cli('child.py')\n"
         "print('parent after')\n"
-        "report_workflow_result('parent result\\n')\n",
+        "report_workflow_result('parent result')\n",
         encoding="utf-8",
     )
 

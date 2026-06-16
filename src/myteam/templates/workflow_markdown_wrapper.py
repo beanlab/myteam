@@ -24,7 +24,7 @@ def main(markdown_file: Path, workflow_inputs: str = "{}") -> None:
         **settings,
     )
     if result.output is not None:
-        report_workflow_result(json.dumps(result.output) + "\n")
+        report_workflow_result(json.dumps(result.output))
     else:
         report_workflow_result(None)
 

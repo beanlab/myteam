@@ -39,10 +39,12 @@ def test_report_workflow_result_sends_rpc(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv(ENV_WORKFLOW_INVOCATION_ID, "workflow-1")
     monkeypatch.setattr("myteam.workflows.workflow_result.RpcClient", FakeRpcClient)
 
-    report_workflow_result("hello\n")
+    report_workflow_result("hello")
+    report_workflow_result("no newline", end="")
     report_workflow_result(None)
 
     assert calls == [
         ("/tmp/myteam.sock", KIND_WORKFLOW_RESULT, {"request_id": "workflow-1", "text": "hello\n"}),
+        ("/tmp/myteam.sock", KIND_WORKFLOW_RESULT, {"request_id": "workflow-1", "text": "no newline"}),
         ("/tmp/myteam.sock", KIND_WORKFLOW_RESULT, {"request_id": "workflow-1", "text": None}),
     ]

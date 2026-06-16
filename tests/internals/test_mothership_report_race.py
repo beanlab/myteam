@@ -11,6 +11,14 @@ import pytest
 from myteam.workflows.execution.mothership import Mothership, RequestRecord
 
 
+class FakeTerminal:
+    def __init__(self) -> None:
+        self.output = b""
+
+    def write_stdout(self, data: bytes) -> None:
+        self.output += data
+
+
 class FakeRecording:
     def snapshot(self) -> str:
         return "live transcript"
@@ -98,3 +106,24 @@ def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.Mo
     assert mothership.results[session.request_id]["status"] == "exited"
     assert mothership.results[session.request_id]["result"]["exit_code"] == 7
     assert mothership.results[session.request_id]["result"]["result_text"] == "partial\n"
+
+
+def test_final_result_is_separated_from_unterminated_live_output() -> None:
+    mothership = Mothership()
+    terminal = FakeTerminal()
+
+    mothership._notice_live_output(b"status line without newline")
+    mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
+
+    assert terminal.output == b"\r\n"
+
+
+def test_final_result_separator_ignores_visual_restore_sequences() -> None:
+    mothership = Mothership()
+    terminal = FakeTerminal()
+
+    mothership._notice_live_output(b"finished\n")
+    mothership._notice_live_output(b"\x1b[0m\x1b[?25h")
+    mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
+
+    assert terminal.output == b""

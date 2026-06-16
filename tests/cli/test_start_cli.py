@@ -48,9 +48,9 @@ def test_start_python_workflow_prints_only_reported_result_text(run_myteam, tmp_
         "from myteam.workflows import report_workflow_result\n"
         "print('live stdout')\n"
         "print('live stderr', file=sys.stderr)\n"
-        "report_workflow_result('first\\n')\n"
+        "report_workflow_result('first')\n"
         "report_workflow_result(None)\n"
-        "report_workflow_result('second\\n')\n",
+        "report_workflow_result('second')\n",
         encoding="utf-8",
     )
 
@@ -66,7 +66,7 @@ def test_start_python_workflow_propagates_exit_code_and_passes_args(run_myteam, 
     workflow.write_text(
         "import sys\n"
         "from myteam.workflows import report_workflow_result\n"
-        "report_workflow_result('args=' + ','.join(sys.argv[1:]) + '\\n')\n"
+        "report_workflow_result('args=' + ','.join(sys.argv[1:]))\n"
         "sys.exit(5)\n",
         encoding="utf-8",
     )

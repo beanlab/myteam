@@ -53,8 +53,8 @@ def test_start_workflow_returns_explicit_workflow_result_text(tmp_path: Path, mo
     workflow.write_text(
         "from myteam.workflows import report_workflow_result\n"
         "print('live log')\n"
-        "report_workflow_result('first line\\n')\n"
-        "report_workflow_result('{\"not\": \"parsed\"}\\n')\n",
+        "report_workflow_result('first line')\n"
+        "report_workflow_result('{\"not\": \"parsed\"}')\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
@@ -87,7 +87,7 @@ def test_start_workflow_cli_prints_result_text_and_exits_with_code(
         "from myteam.workflows import report_workflow_result\n"
         "print('live out')\n"
         "print('live err', file=sys.stderr)\n"
-        "report_workflow_result('result out\\n')\n"
+        "report_workflow_result('result out')\n"
         "sys.exit(7)\n",
         encoding="utf-8",
     )
@@ -111,7 +111,7 @@ def test_start_workflow_result_preserves_result_text_and_exit_code(
         "from myteam.workflows import report_workflow_result\n"
         "print('live out')\n"
         "print('live err', file=sys.stderr)\n"
-        "report_workflow_result('explicit result\\n')\n"
+        "report_workflow_result('explicit result')\n"
         "sys.exit(3)\n",
         encoding="utf-8",
     )

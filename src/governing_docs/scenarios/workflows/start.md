@@ -13,8 +13,10 @@ This behaves like a small purpose-built terminal multiplexer with stack-based pr
 ```python
 from myteam.workflows import report_workflow_result
 
-report_workflow_result("final text returned by myteam start\n")
+report_workflow_result("final text returned by myteam start")
 ```
+
+`report_workflow_result(...)` appends a newline by default (`end="\n"`), matching Python's `print(...)`. Pass `end=""` to report text exactly as supplied.
 
 `report_workflow_result(...)` may be called multiple times. The supervisor concatenates non-`None` text fragments in call order. Calling `report_workflow_result(None)` appends no text. If a workflow reports no text, `myteam start` prints nothing for that workflow result.
 

@@ -29,7 +29,7 @@ def main():
     step1 = run_agent(...)
     step2 = run_agent(input=step1.output, ...)
     if step2.output is not None:
-        report_workflow_result(json.dumps(step2.output) + "\n")
+        report_workflow_result(json.dumps(step2.output))
 
 
 if __name__ == '__main__':
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 A workflow may also report free-form text:
 
 ```python
-report_workflow_result("Review complete. See scratch/review.md for details.\n")
+report_workflow_result("Review complete. See scratch/review.md for details.")
 ```
 
 ### Markdown
@@ -52,7 +52,7 @@ Additional `run_agent` parameters specified in the frontmatter (e.g. `agent`, `m
 
 Markdown workflows automatically convert the single `run_agent` result into workflow result text:
 
-- if `SessionResult.output` is not `None`, the wrapper reports `json.dumps(result.output) + "\n"` with `report_workflow_result(...)`;
+- if `SessionResult.output` is not `None`, the wrapper reports `json.dumps(result.output)` with `report_workflow_result(...)`, relying on the default `end="\n"`;
 - if `SessionResult.output` is `None`, the wrapper reports no text, and `myteam start` prints nothing.
 
 #### Schemas
