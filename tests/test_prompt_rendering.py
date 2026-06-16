@@ -46,6 +46,50 @@ def test_render_markdown_body_reads_files_relative_to_the_document(tmp_path: Pat
     assert rendered == "from docs\n"
 
 
+def test_render_markdown_body_recursively_renders_jinja_included_files(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "fragment.jinja").write_text("Hello {{ name }}", encoding="utf-8")
+
+    rendered = prompt_rendering.render_markdown_body(
+        "Start {{ read_file('fragment.jinja') }} End",
+        source_path=docs / "skill.md",
+        input_values={"name": "world"},
+    )
+
+    assert rendered == "Start Hello world End"
+
+
+def test_render_markdown_body_resolves_nested_jinja_includes_relative_to_each_file(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    nested = docs / "parts"
+    nested.mkdir(parents=True)
+    (nested / "inner.jinja").write_text("INNER", encoding="utf-8")
+    (nested / "outer.jinja").write_text("Outer: {{ read_file('inner.jinja') }}", encoding="utf-8")
+
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ read_file('parts/outer.jinja') }}",
+        source_path=docs / "skill.md",
+        input_values={},
+    )
+
+    assert rendered == "Outer: INNER"
+
+
+def test_render_markdown_body_rejects_recursive_include_cycles(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.jinja").write_text("A -> {{ read_file('b.jinja') }}", encoding="utf-8")
+    (docs / "b.jinja").write_text("B -> {{ read_file('a.jinja') }}", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="cycle|recursive"):
+        prompt_rendering.render_markdown_body(
+            "{{ read_file('a.jinja') }}",
+            source_path=docs / "skill.md",
+            input_values={},
+        )
+
+
 def test_render_markdown_body_exposes_helper_functions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     docs = tmp_path / "docs"
     resources = docs / "resources"

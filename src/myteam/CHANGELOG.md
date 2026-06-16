@@ -1,6 +1,15 @@
 # Change Log
 
-## 0.3.0 **Major Rewrite**
+## 0.3.1
+
+- Added Jinja2 rendering for Markdown skills and workflows, including workflow input values as template variables.
+- Added prompt template helper functions for `myteam_explain()`, `myteam_onboard()`, `myteam_list(path)`, and `read_file(file)`.
+- Made `read_file(file)` resolve paths relative to the Markdown document so skills and workflows can compose prompt text from nearby files.
+- Added recursive rendering for included `.jinja` files, with cycle detection for recursive includes.
+
+## 0.3.0 
+
+**Major Rewrite**
 
 `myteam` now focuses on agent *workflows* and progressive disclosure of dynamic *skills*. The concepts of *roles* and *tasks* are superseded by workflows.
 
