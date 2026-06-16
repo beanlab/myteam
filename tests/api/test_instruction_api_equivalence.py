@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam import explain_resources, list_resources, load_skill
+from myteam import explain_resources, list_resources, load_skill, onboard
 
 
 def test_explain_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
@@ -54,3 +54,10 @@ def test_load_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert result.stdout == load_skill(str(skill))
+
+
+def test_onboard_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
+    result = run_myteam(tmp_path, "onboard")
+
+    assert result.exit_code == 0
+    assert result.stdout == onboard()

@@ -5,7 +5,7 @@ import functools
 
 import fire
 
-from .commands import changelog, version
+from .commands import changelog, onboard, version
 from .explain import explain_resources
 from .listing import list_resources
 from .skills import new_skill, load_skill
@@ -30,6 +30,7 @@ def main():
             "workflow": new_workflow
         },
         "load": printed(load_skill),
+        "onboard": printed(onboard),
         "start": start_workflow_cli,
         "result": report_result,
         "version": version,

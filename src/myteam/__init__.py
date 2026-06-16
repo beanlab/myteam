@@ -5,6 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import tomllib
 
+from .commands import onboard
 from .explain import explain_resources
 from .listing import list_resources
 from .skills import load_skill
@@ -15,6 +16,7 @@ __all__ = [
     "explain_resources",
     "list_resources",
     "load_skill",
+    "onboard",
     "run_agent",
     "report_workflow_result",
     "SessionResult",

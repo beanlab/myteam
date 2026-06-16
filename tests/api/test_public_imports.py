@@ -8,6 +8,7 @@ def test_public_api_imports() -> None:
         explain_resources,
         list_resources,
         load_skill,
+        onboard,
         report_workflow_result,
         run_agent,
     )
@@ -21,6 +22,7 @@ def test_public_api_imports() -> None:
     assert callable(explain_resources)
     assert callable(list_resources)
     assert callable(load_skill)
+    assert callable(onboard)
     assert run_agent is workflow_run_agent
     assert report_workflow_result is workflow_report_workflow_result
     assert SessionResult is WorkflowSessionResult
