@@ -38,6 +38,8 @@ The skill name should be exactly what was displayed to you.
 Skills might come with information about additional resources. 
 These will be described when you load the skill.
 
+**If you need a skill, use `myteam load <skill>`; do *not* read the skill manually.**
+
 ## Workflows
 
 A workflow is a managed agent session or chain of sessions. Workflows are predefined units of execution that can have a defined input and output schema.
