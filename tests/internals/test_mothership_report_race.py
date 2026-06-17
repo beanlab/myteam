@@ -6,10 +6,14 @@ error instead of a flaky end-to-end timeout.
 """
 from __future__ import annotations
 
+import threading
+
 import pytest
 
-from myteam.workflows.execution.mothership import Mothership, RequestRecord
+from myteam.workflows.execution.live_output import LiveOutputTracker
+from myteam.workflows.execution.mothership import Mothership
 from myteam.workflows.execution.terminal import has_screen_rewriting_control
+from myteam.workflows.execution.workflow_store import WorkflowStore
 
 
 class FakeTerminal:
@@ -34,11 +38,11 @@ class FakeRecording:
 
 
 class FakeSession:
-    session_id = "request-1"
-    request_id = "request-1"
     recording = FakeRecording()
 
-    def __init__(self, exit_code: int = 0) -> None:
+    def __init__(self, request_id: str, exit_code: int = 0) -> None:
+        self.session_id = request_id
+        self.request_id = request_id
         self.exit_code = exit_code
 
     def poll(self) -> int:
@@ -55,86 +59,171 @@ class FakeSession:
 
 
 def test_workflow_result_is_stored_as_soon_as_rpc_is_accepted() -> None:
-    mothership = Mothership()
-    mothership.requests["request-1"] = RequestRecord(
-        request_id="request-1",
-        kind="workflow",
-        status="running",
-    )
+    store = WorkflowStore()
+    record = store.create_request()
+    store.mark_running(record.request_id)
 
-    response = mothership._report_workflow_result(
+    response = store.report_workflow_result(
         {
-            "request_id": "request-1",
+            "request_id": record.request_id,
             "text": "first\n",
         }
     )
-    mothership._report_workflow_result({"request_id": "request-1", "text": None})
-    mothership._report_workflow_result({"request_id": "request-1", "text": "second\n"})
+    store.report_workflow_result({"request_id": record.request_id, "text": None})
+    store.report_workflow_result({"request_id": record.request_id, "text": "second\n"})
 
     assert response == {"ok": True}
-    assert mothership.requests["request-1"].workflow_result_parts == ["first\n", "second\n"]
+    assert store.result_text(record.request_id) == "first\nsecond\n"
+
+
+def test_workflow_store_poll_and_ack_lifecycle() -> None:
+    store = WorkflowStore()
+    record = store.create_request()
+
+    assert store.poll_result({"request_id": record.request_id}) == {"ok": True, "ready": False}
+
+    parent_session_id = store.complete_request(record.request_id, status="ok", result={"exit_code": 0})
+
+    assert parent_session_id is None
+    assert store.poll_result({"request_id": record.request_id}) == {
+        "ok": True,
+        "ready": True,
+        "status": "ok",
+        "result": {"exit_code": 0},
+    }
+    assert store.get_result(record.request_id) == {"status": "ok", "result": {"exit_code": 0}}
+    assert store.ack_result({"request_id": record.request_id}) == {"ok": True}
+    assert store.get_result(record.request_id) is None
+    assert store.parent_session_id(record.request_id) is None
+
+
+def test_workflow_store_complete_request_returns_parent_session_id() -> None:
+    store = WorkflowStore()
+    record = store.create_request(parent_session_id="parent-1")
+
+    parent_session_id = store.complete_request(record.request_id, status="ok", result={"exit_code": 0})
+
+    assert parent_session_id == "parent-1"
+
+
+def test_workflow_store_complete_exit_request_captures_text_and_finalizes() -> None:
+    store = WorkflowStore()
+    record = store.create_request(parent_session_id="parent-1")
+    store.mark_running(record.request_id)
+    store.report_workflow_result({"request_id": record.request_id, "text": "first\n"})
+    store.report_workflow_result({"request_id": record.request_id, "text": "second\n"})
+
+    parent_session_id = store.complete_exit_request(
+        record.request_id,
+        exit_code=0,
+        transcript="live transcript",
+        stderr_transcript="",
+    )
+
+    assert parent_session_id == "parent-1"
+    assert store.get_result(record.request_id) == {
+        "status": "ok",
+        "result": {
+            "exit_code": 0,
+            "result_text": "first\nsecond\n",
+            "transcript": "live transcript",
+            "stderr_transcript": "",
+        },
+    }
+    with pytest.raises(ValueError, match="Workflow is not active"):
+        store.report_workflow_result({"request_id": record.request_id, "text": "late\n"})
+
+
+def test_workflow_store_rejects_reports_after_final_result() -> None:
+    store = WorkflowStore()
+    record = store.create_request()
+    store.mark_running(record.request_id)
+    store.complete_request(record.request_id, status="ok", result={"exit_code": 0})
+
+    with pytest.raises(ValueError, match="Workflow is not active"):
+        store.report_workflow_result({"request_id": record.request_id, "text": "late\n"})
+
+
+def test_workflow_store_accepts_concurrent_result_reports() -> None:
+    store = WorkflowStore()
+    record = store.create_request()
+    store.mark_running(record.request_id)
+    expected = {f"part-{index}\n" for index in range(20)}
+
+    threads = [
+        threading.Thread(
+            target=store.report_workflow_result,
+            args=({"request_id": record.request_id, "text": text},),
+        )
+        for text in expected
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=1)
+
+    assert set(store.result_text(record.request_id).splitlines(keepends=True)) == expected
 
 
 def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("myteam.workflows.execution.mothership.drain_pty_output", lambda *_args, **_kwargs: None)
     mothership = Mothership()
-    session = FakeSession()
-    mothership.active = session  # type: ignore[assignment]
-    mothership.sessions[session.session_id] = session  # type: ignore[assignment]
-    mothership.requests[session.request_id] = RequestRecord(
-        request_id=session.request_id,
-        kind="workflow",
-        status="running",
-    )
-    mothership.requests[session.request_id].workflow_result_parts.extend(["first\n", "second\n"])
+    record = mothership.store.create_request()
+    mothership.store.mark_running(record.request_id)
+    session = FakeSession(record.request_id)
+    mothership._stack.active = session  # type: ignore[assignment]
+    mothership._stack.sessions[session.session_id] = session  # type: ignore[assignment]
+    mothership.store.report_workflow_result({"request_id": session.request_id, "text": "first\n"})
+    mothership.store.report_workflow_result({"request_id": session.request_id, "text": "second\n"})
 
     mothership._handle_workflow_exit(session)  # type: ignore[arg-type]
     mothership._drain_commands()
 
-    assert mothership.results[session.request_id]["status"] == "ok"
-    assert mothership.results[session.request_id]["result"]["result_text"] == "first\nsecond\n"
-    assert mothership.results[session.request_id]["result"]["transcript"] == "live transcript"
+    result = mothership.store.get_result(session.request_id)
+    assert result is not None
+    assert result["status"] == "ok"
+    assert result["result"]["result_text"] == "first\nsecond\n"
+    assert result["result"]["transcript"] == "live transcript"
 
 
 def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("myteam.workflows.execution.mothership.drain_pty_output", lambda *_args, **_kwargs: None)
     mothership = Mothership()
-    session = FakeSession(exit_code=7)
-    mothership.active = session  # type: ignore[assignment]
-    mothership.sessions[session.session_id] = session  # type: ignore[assignment]
-    mothership.requests[session.request_id] = RequestRecord(
-        request_id=session.request_id,
-        kind="workflow",
-        status="running",
-    )
-    mothership.requests[session.request_id].workflow_result_parts.append("partial\n")
+    record = mothership.store.create_request()
+    mothership.store.mark_running(record.request_id)
+    session = FakeSession(record.request_id, exit_code=7)
+    mothership._stack.active = session  # type: ignore[assignment]
+    mothership._stack.sessions[session.session_id] = session  # type: ignore[assignment]
+    mothership.store.report_workflow_result({"request_id": session.request_id, "text": "partial\n"})
 
     mothership._handle_workflow_exit(session)  # type: ignore[arg-type]
     mothership._drain_commands()
 
-    assert mothership.results[session.request_id]["status"] == "exited"
-    assert mothership.results[session.request_id]["result"]["exit_code"] == 7
-    assert mothership.results[session.request_id]["result"]["result_text"] == "partial\n"
+    result = mothership.store.get_result(session.request_id)
+    assert result is not None
+    assert result["status"] == "exited"
+    assert result["result"]["exit_code"] == 7
+    assert result["result"]["result_text"] == "partial\n"
 
 
 def test_final_result_is_separated_from_unterminated_live_output() -> None:
-    mothership = Mothership()
+    live_output = LiveOutputTracker()
     terminal = FakeTerminal()
 
-    mothership._notice_live_output(b"status line without newline")
-    mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
+    live_output.notice(b"status line without newline")
+    live_output.finish(terminal, enabled=True)  # type: ignore[arg-type]
 
     assert terminal.visual_state_restored is True
     assert terminal.output == b"\r\n"
 
 
 def test_final_result_separator_ignores_visual_restore_sequences() -> None:
-    mothership = Mothership()
+    live_output = LiveOutputTracker()
     terminal = FakeTerminal()
 
-    mothership._notice_live_output(b"finished\n")
-    mothership._notice_live_output(b"\x1b[0m\x1b[?25h")
-    mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
+    live_output.notice(b"finished\n")
+    live_output.notice(b"\x1b[0m\x1b[?25h")
+    live_output.finish(terminal, enabled=True)  # type: ignore[arg-type]
 
     assert terminal.visual_state_restored is True
     assert terminal.cleared is False
@@ -142,11 +231,11 @@ def test_final_result_separator_ignores_visual_restore_sequences() -> None:
 
 
 def test_final_result_clears_after_screen_rewriting_live_output() -> None:
-    mothership = Mothership()
+    live_output = LiveOutputTracker()
     terminal = FakeTerminal()
 
-    mothership._notice_live_output(b"thinking\x1b[2K\rfinal tui line")
-    mothership._ensure_final_output_separator(terminal, live_forwarding=True)  # type: ignore[arg-type]
+    live_output.notice(b"thinking\x1b[2K\rfinal tui line")
+    live_output.finish(terminal, enabled=True)  # type: ignore[arg-type]
 
     assert terminal.visual_state_restored is True
     assert terminal.cleared is True

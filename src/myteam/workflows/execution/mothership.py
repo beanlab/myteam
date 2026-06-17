@@ -6,64 +6,25 @@ channel, not through this supervisor.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import os
 from queue import Empty, Queue
-import secrets
 import select
-import socket
 import subprocess
 import sys
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from .protocol import (
-    ENV_SOCKET,
-    ENV_WORKFLOW_INPUT_JSON,
-    ENV_WORKFLOW_INVOCATION_ID,
-    KIND_ACK_RESULT,
-    KIND_POLL_RESULT,
-    KIND_START_WORKFLOW,
-    KIND_WORKFLOW_RESULT,
-    json_response,
-    load_json_object,
-    read_all,
-    safe_unlink,
-)
-from .pty_forwarding import drain_pty_output, os_fd_writer, pump_pty_once
+from .live_output import LiveOutputTracker
+from .protocol import safe_unlink
+from .pty_forwarding import drain_pty_output, pump_pty_once
 from .pty_process import ManagedPtyProcess
-from .terminal import RealTerminal, Winsize, has_screen_rewriting_control, strip_ansi_csi
-
-
-@dataclass
-class StartWorkflowCommand:
-    request_id: str
-    argv: list[str]
-    parent_session_id: str | None
-    cwd: str | None
-    input_json: str | None
-
-
-@dataclass
-class WorkflowCompletedCommand:
-    request_id: str
-    status: str
-    result: Any
-
-
-Command = StartWorkflowCommand | WorkflowCompletedCommand
-
-
-@dataclass
-class RequestRecord:
-    request_id: str
-    kind: Literal["workflow"]
-    status: Literal["pending", "running", "ok", "error", "exited"] = "pending"
-    parent_session_id: str | None = None
-    result: Any = None
-    workflow_result_parts: list[str] = field(default_factory=list)
+from .terminal import RealTerminal, Winsize
+from .workflow_commands import Command, StartWorkflowCommand
+from .workflow_rpc import WorkflowRpcServer
+from .workflow_stack import WorkflowStack, WorkflowStartError
+from .workflow_store import WorkflowStore
 
 
 class Mothership:
@@ -77,23 +38,16 @@ class Mothership:
 
     def __init__(self) -> None:
         self.socket_path = ""
-        self.requests: dict[str, RequestRecord] = {}
-        self.results: dict[str, dict[str, Any]] = {}
-        self.active: ManagedPtyProcess | None = None
-        self.stack: list[ManagedPtyProcess] = []
-        self.sessions: dict[str, ManagedPtyProcess] = {}
-
+        self.store = WorkflowStore()
         self._tmpdir: tempfile.TemporaryDirectory[str] | None = None
-        self._server: socket.socket | None = None
-        self._server_thread: threading.Thread | None = None
+        self._rpc_server: WorkflowRpcServer | None = None
         self._closed = threading.Event()
         self._commands: Queue[Command] = Queue()
         self._wakeup_r = -1
         self._wakeup_w = -1
         self._terminal = RealTerminal(on_resize=self._resize_sessions)
-        self._forwarded_live_output = False
-        self._forwarded_screen_rewriting_output = False
-        self._live_output_ended_with_newline = True
+        self._stack = WorkflowStack(self._terminal)
+        self._live_output = LiveOutputTracker()
 
     def __enter__(self) -> "Mothership":
         self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-mothership-")
@@ -101,28 +55,23 @@ class Mothership:
         self._wakeup_r, self._wakeup_w = os.pipe()
         os.set_blocking(self._wakeup_r, False)
 
-        self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self._server.bind(self.socket_path)
-        self._server.listen()
-        self._server.settimeout(0.1)
-        self._server_thread = threading.Thread(target=self._serve, name="myteam-mothership-rpc", daemon=True)
-        self._server_thread.start()
+        self._rpc_server = WorkflowRpcServer(
+            socket_path=self.socket_path,
+            store=self.store,
+            commands=self._commands,
+            wake=self._wake,
+            closed=self._closed,
+        )
+        self._rpc_server.start()
         return self
 
     def __exit__(self, _exc_type: Any, _exc: Any, _tb: Any) -> None:
         self._terminal.flush_input()
         self._terminal.restore()
         self._closed.set()
-        if self._server is not None:
-            try:
-                self._server.close()
-            except OSError:
-                pass
-        if self._server_thread is not None:
-            self._server_thread.join(timeout=1)
-        for session in list(self.sessions.values()):
-            session.terminate()
-            session.close()
+        if self._rpc_server is not None:
+            self._rpc_server.close()
+        self._stack.close_all()
         for fd in (self._wakeup_r, self._wakeup_w):
             if fd >= 0:
                 try:
@@ -135,8 +84,7 @@ class Mothership:
             self._tmpdir.cleanup()
 
     def start_top_level_workflow(self, *, argv: list[str], cwd: str | None, input_json: str | None) -> str:
-        request_id = self._new_request_id()
-        self.requests[request_id] = RequestRecord(request_id=request_id, kind="workflow", status="pending")
+        request_id = self.store.create_request().request_id
         self._commands.put(
             StartWorkflowCommand(
                 request_id=request_id,
@@ -158,22 +106,23 @@ class Mothership:
                 self._drain_commands()
                 self._reap_exited_active_session(terminal=terminal, live_forwarding=live_forwarding)
 
-                if top_request_id in self.results:
-                    self._ensure_final_output_separator(terminal, live_forwarding=live_forwarding)
-                    return self.results[top_request_id]
-                if self.active is None and not self.stack and self._commands.empty():
+                result = self.store.get_result(top_request_id)
+                if result is not None:
+                    self._live_output.finish(terminal, enabled=live_forwarding)
+                    return result
+                if self._stack.active is None and not self._stack.stack and self._commands.empty():
                     return None
 
-                if self.active is None:
+                if self._stack.active is None:
                     ready, _, _ = select.select([self._wakeup_r], [], [], 0.1)
                     if self._wakeup_r in ready:
                         self._drain_wakeup_pipe()
                     continue
 
-                stdout_writer = self._live_stdout_writer(terminal, live_forwarding=live_forwarding)
-                stderr_writer = self._live_stderr_writer(live_forwarding=live_forwarding)
+                stdout_writer = self._live_output.stdout_writer(terminal, enabled=live_forwarding)
+                stderr_writer = self._live_output.stderr_writer(enabled=live_forwarding)
                 activity = pump_pty_once(
-                    self.active,
+                    self._stack.active,
                     terminal,
                     timeout=0.1,
                     stdout_writer=stdout_writer,
@@ -188,7 +137,7 @@ class Mothership:
                     continue
                 if activity.stdout_eof:
                     self._handle_workflow_exit(
-                        self.active,
+                        self._stack.active,
                         stdout_writer=stdout_writer,
                         stderr_writer=stderr_writer,
                         forward_stdout=live_forwarding,
@@ -198,183 +147,20 @@ class Mothership:
 
         return None
 
-    def _serve(self) -> None:
-        assert self._server is not None
-        while not self._closed.is_set():
-            try:
-                connection, _ = self._server.accept()
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-            threading.Thread(target=self._handle_connection, args=(connection,), daemon=True).start()
-
-    def _handle_connection(self, connection: socket.socket) -> None:
-        with connection:
-            try:
-                message = load_json_object(read_all(connection))
-                kind = message.get("kind")
-                if kind == KIND_START_WORKFLOW:
-                    response, command = self._accept_start_workflow(message)
-                    connection.sendall(json_response(**response))
-                    self._commands.put(command)
-                    self._wake()
-                    return
-                if kind == KIND_POLL_RESULT:
-                    response = self._poll_result(message)
-                elif kind == KIND_ACK_RESULT:
-                    response = self._ack_result(message)
-                elif kind == KIND_WORKFLOW_RESULT:
-                    response = self._report_workflow_result(message)
-                else:
-                    response = {"ok": False, "error": f"Unsupported RPC kind: {kind!r}"}
-            except Exception as exc:  # return friendly errors over the socket
-                response = {"ok": False, "error": str(exc)}
-            try:
-                connection.sendall(json_response(**response))
-            except OSError:
-                pass
-
-    def _accept_start_workflow(self, message: dict[str, Any]) -> tuple[dict[str, Any], StartWorkflowCommand]:
-        argv = self._require_argv(message, KIND_START_WORKFLOW)
-        parent_session_id = message.get("parent_session_id")
-        if parent_session_id is not None and not isinstance(parent_session_id, str):
-            raise ValueError("parent_session_id must be a string or null.")
-        cwd = message.get("cwd")
-        if cwd is not None and not isinstance(cwd, str):
-            raise ValueError("cwd must be a string or null.")
-        input_json = message.get("input_json")
-        if input_json is not None and not isinstance(input_json, str):
-            raise ValueError("input_json must be a string or null.")
-
-        request_id = self._new_request_id()
-        self.requests[request_id] = RequestRecord(
-            request_id=request_id,
-            kind="workflow",
-            status="pending",
-            parent_session_id=parent_session_id,
-        )
-        command = StartWorkflowCommand(
-            request_id=request_id,
-            argv=argv,
-            parent_session_id=parent_session_id,
-            cwd=cwd,
-            input_json=input_json,
-        )
-        return {"ok": True, "request_id": request_id}, command
-
-    def _poll_result(self, message: dict[str, Any]) -> dict[str, Any]:
-        request_id = message.get("request_id")
-        if not isinstance(request_id, str) or not request_id:
-            raise ValueError("poll_result requires request_id.")
-        if request_id not in self.results:
-            return {"ok": True, "ready": False}
-        return {"ok": True, "ready": True, **self.results[request_id]}
-
-    def _ack_result(self, message: dict[str, Any]) -> dict[str, Any]:
-        request_id = message.get("request_id")
-        if not isinstance(request_id, str) or not request_id:
-            raise ValueError("ack_result requires request_id.")
-        self.results.pop(request_id, None)
-        self.requests.pop(request_id, None)
-        return {"ok": True}
-
-    def _report_workflow_result(self, message: dict[str, Any]) -> dict[str, Any]:
-        request_id = message.get("request_id")
-        if not isinstance(request_id, str) or not request_id:
-            raise ValueError("workflow_result requires request_id.")
-        text = message.get("text")
-        if text is not None and not isinstance(text, str):
-            raise ValueError("workflow_result text must be a string or null.")
-        record = self.requests.get(request_id)
-        if record is None:
-            raise ValueError("Unknown workflow request_id.")
-        if record.status not in {"pending", "running"}:
-            raise ValueError("Workflow is not active.")
-        if text is not None:
-            record.workflow_result_parts.append(text)
-        return {"ok": True}
-
     def _drain_commands(self) -> None:
         while True:
             try:
                 command = self._commands.get_nowait()
             except Empty:
                 return
-            if isinstance(command, StartWorkflowCommand):
-                self._start_workflow(command)
-            else:
-                self._complete_workflow(command)
+            self._start_workflow(command)
 
     def _start_workflow(self, command: StartWorkflowCommand) -> None:
-        record = self.requests[command.request_id]
-        record.status = "running"
-
-        if command.parent_session_id is not None:
-            if self.active is None or self.active.session_id != command.parent_session_id:
-                self._store_result(
-                    command.request_id,
-                    status="error",
-                    result={
-                        "exit_code": 1,
-                        "result_text": "",
-                        "error_text": "Parent workflow is not the active managed workflow.\n",
-                    },
-                )
-                return
-            self._terminal.flush_input()
-            self.active.suspend()
-            self.stack.append(self.active)
-            self.active = None
-            if sys.stdout.isatty():
-                self._terminal.clear()
-            self._terminal.flush_input()
-        elif self.active is not None:
-            self._store_result(
-                command.request_id,
-                status="error",
-                result={
-                    "exit_code": 1,
-                    "result_text": "",
-                    "error_text": "Another workflow is already active.\n",
-                },
-            )
-            return
-
-        session = self._launch_workflow(command)
-        self.sessions[session.session_id] = session
-        self.active = session
-        if sys.stdout.isatty():
-            self._terminal.clear()
-        self._terminal.flush_input()
-
-    def _launch_workflow(self, command: StartWorkflowCommand) -> ManagedPtyProcess:
-        env = {
-            **os.environ,
-            ENV_SOCKET: self.socket_path,
-            ENV_WORKFLOW_INVOCATION_ID: command.request_id,
-        }
-        if command.input_json is not None:
-            env[ENV_WORKFLOW_INPUT_JSON] = command.input_json
-
-        return ManagedPtyProcess.launch(
-            session_id=command.request_id,
-            request_id=command.request_id,
-            argv=command.argv,
-            env=env,
-            cwd=command.cwd,
-            winsize=self._terminal.winsize(),
-            parent_session_id=command.parent_session_id,
-            merge_stderr=False,
-        )
-
-    def _complete_workflow(self, command: WorkflowCompletedCommand) -> None:
-        self._store_result(command.request_id, status=command.status, result=command.result)
-        record = self.requests.get(command.request_id)
-        if record is not None and record.parent_session_id is not None:
-            self._resume_previous_workflow()
-        else:
-            self._wake()
+        self.store.mark_running(command.request_id)
+        try:
+            self._stack.start(command, socket_path=self.socket_path)
+        except WorkflowStartError as exc:
+            self.store.store_result(command.request_id, status="error", result=exc.result_payload)
 
     def _handle_workflow_exit(
         self,
@@ -399,113 +185,34 @@ class Mothership:
             forward_stdout=forward_stdout,
             forward_stderr=forward_stderr,
         )
-        record = self.requests.get(session.request_id)
-        result_text = "" if record is None else "".join(record.workflow_result_parts)
-        result = {
-            "exit_code": exit_code,
-            "result_text": result_text,
-            "transcript": _normalize_pty_text(session.recording.snapshot()),
-            "stderr_transcript": session.stderr_snapshot(),
-        }
-        self._remove_session(session)
-        self._commands.put(
-            WorkflowCompletedCommand(
-                request_id=session.request_id,
-                status="ok" if exit_code == 0 else "exited",
-                result=result,
-            )
+        parent_session_id = self.store.complete_exit_request(
+            session.request_id,
+            exit_code=exit_code,
+            transcript=_normalize_pty_text(session.recording.snapshot()),
+            stderr_transcript=session.stderr_snapshot(),
         )
-        self._wake()
+        self._stack.remove(session)
+        self._finish_completed_request(parent_session_id)
+
+    def _finish_completed_request(self, parent_session_id: str | None) -> None:
+        if parent_session_id is not None:
+            if not self._stack.resume_previous():
+                self._wake()
+        else:
+            self._wake()
 
     def _reap_exited_active_session(self, *, terminal: RealTerminal, live_forwarding: bool) -> None:
-        if self.active is not None and self.active.poll() is not None:
+        if self._stack.active is not None and self._stack.active.poll() is not None:
             self._handle_workflow_exit(
-                self.active,
-                stdout_writer=self._live_stdout_writer(terminal, live_forwarding=live_forwarding),
-                stderr_writer=self._live_stderr_writer(live_forwarding=live_forwarding),
+                self._stack.active,
+                stdout_writer=self._live_output.stdout_writer(terminal, enabled=live_forwarding),
+                stderr_writer=self._live_output.stderr_writer(enabled=live_forwarding),
                 forward_stdout=live_forwarding,
                 forward_stderr=live_forwarding,
             )
 
-    def _resume_previous_workflow(self) -> None:
-        if self.stack:
-            self._terminal.flush_input()
-            self.active = self.stack.pop()
-            self.active.resume()
-            if sys.stdout.isatty():
-                self._terminal.clear()
-            self._terminal.flush_input()
-        else:
-            self.active = None
-            self._wake()
-
-    def _remove_session(self, session: ManagedPtyProcess) -> None:
-        self.sessions.pop(session.session_id, None)
-        if self.active is session:
-            self.active = None
-        session.close()
-
     def _resize_sessions(self, winsize: Winsize) -> None:
-        for session in self.sessions.values():
-            session.resize(winsize)
-
-    def _live_stdout_writer(self, terminal: RealTerminal, *, live_forwarding: bool):
-        if not live_forwarding:
-            return None
-
-        def _write(data: bytes) -> None:
-            self._notice_live_output(data)
-            terminal.write_stdout(data)
-
-        return _write
-
-    def _live_stderr_writer(self, *, live_forwarding: bool):
-        writer = _stderr_writer() if live_forwarding else None
-        if writer is None:
-            return None
-
-        def _write(data: bytes) -> None:
-            self._notice_live_output(data)
-            writer(data)
-
-        return _write
-
-    def _notice_live_output(self, data: bytes) -> None:
-        if has_screen_rewriting_control(data):
-            self._forwarded_screen_rewriting_output = True
-        display_text = strip_ansi_csi(data)
-        if not display_text:
-            return
-        self._forwarded_live_output = True
-        self._live_output_ended_with_newline = display_text.endswith(b"\n")
-
-    def _ensure_final_output_separator(self, terminal: RealTerminal, *, live_forwarding: bool) -> None:
-        if not live_forwarding:
-            return
-        terminal.restore_visual_state()
-        if self._forwarded_screen_rewriting_output:
-            terminal.clear()
-            self._live_output_ended_with_newline = True
-            return
-        if self._forwarded_live_output and not self._live_output_ended_with_newline:
-            terminal.write_stdout(b"\r\n")
-            self._live_output_ended_with_newline = True
-
-    def _store_result(self, request_id: str, *, status: str, result: Any) -> None:
-        self.results[request_id] = {"status": status, "result": result}
-        record = self.requests.get(request_id)
-        if record is not None:
-            record.status = status if status in {"ok", "error", "exited"} else "ok"
-            record.result = result
-
-    def _require_argv(self, message: dict[str, Any], kind: str) -> list[str]:
-        argv = message.get("argv")
-        if not isinstance(argv, list) or not argv or not all(isinstance(item, str) for item in argv):
-            raise ValueError(f"{kind} requires a non-empty argv list.")
-        return argv
-
-    def _new_request_id(self) -> str:
-        return secrets.token_urlsafe(12)
+        self._stack.resize(winsize)
 
     def _wake(self) -> None:
         try:
@@ -524,9 +231,3 @@ class Mothership:
 def _normalize_pty_text(text: str) -> str:
     return text.replace("\r\n", "\n")
 
-
-def _stderr_writer():
-    try:
-        return os_fd_writer(sys.stderr.fileno())
-    except (OSError, ValueError, AttributeError):
-        return None
