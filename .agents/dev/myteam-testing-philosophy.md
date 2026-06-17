@@ -1,6 +1,6 @@
 # Testing Philosophy
 
-`myteam` tests should protect the application's public contracts, not its implementation details.
+Tests should protect the application's public contracts, not its implementation details.
 
 The governing documents describe the interface and user experience of the application. Tests should do the same: confirm what a user, workflow author, or library consumer can rely on, while leaving room to change the internal design.
 
@@ -8,7 +8,7 @@ The governing documents describe the interface and user experience of the applic
 
 Prefer tests at the outermost meaningful boundary.
 
-For `myteam`, the important boundaries are:
+The important boundaries are:
 
 1. **CLI behavior**: what happens when a user or agent runs `myteam ...`.
 2. **Public Python API behavior**: what workflow authors and library consumers can import, call, receive, and depend on.
