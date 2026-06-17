@@ -1,3 +1,8 @@
+---
+type: skill
+description: load this skill if you will write or change any tests.
+---
+
 # Testing Philosophy
 
 Tests should protect the application's public contracts, not its implementation details.

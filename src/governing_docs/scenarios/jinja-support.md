@@ -12,7 +12,7 @@ The following `myteam` functions are also included in the jinja environment:
 
 The following utility functions are also included in the jinja environment:
 
-- `read_file(file)` - injects the contents of the file; useful for composing a skill/workflow from multiple documents; if the included file has `jinja` included in the suffix, it is also rendered in the same environment before inclusion.
+- `read_file(file)` - injects the contents of the file; useful for composing a skill/workflow from multiple documents. The included file is jinja-rendered in the same environment before inclusion by default. To opt out, use `read_file(file, render=False)`.
 
 Paths are relative to the Markdown document, not the current directory of whoever is invoking the document.
 
