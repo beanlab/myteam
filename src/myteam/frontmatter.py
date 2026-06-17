@@ -52,35 +52,4 @@ def split_markdown_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     return data, body
 
 
-def format_frontmatter_info(frontmatter: dict[str, Any]) -> str:
-    lines: list[str] = []
-
-    description = frontmatter.get("description")
-    if isinstance(description, str) and description.strip():
-        lines.append(description.strip())
-
-    input_value = frontmatter.get("input")
-    if input_value is not None:
-        lines.append("input:")
-        if isinstance(input_value, dict):
-            for key, value in input_value.items():
-                lines.append(f"  {key}: {value}")
-        else:
-            lines.append(f"  {input_value}")
-
-    return "\n".join(lines)
-
-
-def _strip_yaml_frontmatter(text: str) -> str:
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return text
-
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            body = "\n".join(lines[i + 1:])
-            if text.endswith("\n"):
-                body += "\n"
-            return body
-    return text
 
