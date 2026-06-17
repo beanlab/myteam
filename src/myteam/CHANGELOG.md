@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.3
+
+- Changed the jinja environment `read_file(file)` function so included files render with Jinja by default, with `render=False` to include raw contents.
+
 ## 0.3.2
 
 - Internal code improvements

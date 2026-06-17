@@ -60,9 +60,9 @@ def _resolve_base_dir(source_path: Path | str | None) -> Path:
 
 
 def _make_read_file_helper(base_dir: Path, *, input_values: dict[str, Any], include_stack: list[Path]):
-    def read_file(file: str | Path) -> str:
+    def read_file(file: str | Path, render: bool = True) -> str:
         file_path = (base_dir / Path(file)).resolve()
-        if file_path.suffix.lower() == ".jinja":
+        if render:
             return _render_included_template(file_path, input_values=input_values, include_stack=include_stack)
         return file_path.read_text(encoding="utf-8")
 
