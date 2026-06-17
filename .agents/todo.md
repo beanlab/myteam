@@ -1,4 +1,5 @@
-- jinja template functions to load files, explain, list dirs, etc.
+- support reading just the body from files with frontmatter
+- support jinja rendering on all imports (not just `.jinja` files)
 - fix usage
 - print usage only on master `myteam start` invocation
 - command-line args to override md workflow settings (agent, model, reasoning, interactive)
@@ -9,6 +10,7 @@
 - instructions/principles for agent to build workflows
 - 3rd party skills/workflows as python packages
 - start a skill like you do a Markdown workflow
+- support pydantic for output, with validation
 
 # Harnesses
 

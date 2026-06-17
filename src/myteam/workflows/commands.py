@@ -12,7 +12,7 @@ from .. import templates
 from ..config import WorkflowDefaults
 from ..templates import get_template_file
 from .agent_session import build_agent_prompt
-from .execution.mothership import Mothership
+from .execution.supervisor import Supervisor
 from .execution.protocol import (
     ENV_SOCKET,
     ENV_WORKFLOW_INVOCATION_ID,
@@ -192,20 +192,20 @@ def _start_workflow_result(
     parent_session_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
 
     if socket_path:
-        return _start_workflow_via_existing_mothership(
+        return _start_workflow_via_existing_supervisor(
             socket_path=socket_path,
             parent_session_id=parent_session_id,
             argv=argv,
             workflow_input_json=workflow_input_json,
         )
 
-    with Mothership() as mothership:
-        request_id = mothership.start_top_level_workflow(
+    with Supervisor() as supervisor:
+        request_id = supervisor.start_top_level_workflow(
             argv=argv,
             cwd=os.getcwd(),
             input_json=workflow_input_json,
         )
-        result = mothership.run_until_complete(request_id)
+        result = supervisor.run_until_complete(request_id)
 
     if result is None:
         return WorkflowProcessResult(exit_code=1, result_text="", error_text="Workflow did not produce a result.\n")
@@ -213,7 +213,7 @@ def _start_workflow_result(
     return _workflow_process_result_from_supervisor_result(result)
 
 
-def _start_workflow_via_existing_mothership(
+def _start_workflow_via_existing_supervisor(
     *,
     socket_path: str,
     parent_session_id: str | None,

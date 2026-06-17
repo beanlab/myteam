@@ -52,7 +52,6 @@ def resolve_agent_runtime_config(
     logger: Callable[[str], None] | None = None,
 ) -> AgentRuntimeConfig:
     agent_name = _require_agent_name(name)
-    local_error: Exception | None = None
     local_path = _local_agent_config_path(project_root, agent_name)
 
     if local_path is not None:
@@ -66,15 +65,10 @@ def resolve_agent_runtime_config(
                 session_context=session_context,
             )
         except Exception as exc:
-            local_error = exc
-            _log(
-                logger,
-                f"Local workflow agent config '{local_path}' is unusable: {exc}. "
-                "Falling back to packaged default.",
-            )
-        else:
-            _log(logger, f"Using local workflow agent config '{local_path}'.")
-            return config
+            raise KeyError(f"Invalid local workflow agent config for {agent_name}: {exc}") from exc
+
+        _log(logger, f"Using local workflow agent config '{local_path}'.")
+        return config
 
     try:
         module = importlib.import_module(f"myteam.workflows.agents.{agent_name}")
@@ -86,10 +80,6 @@ def resolve_agent_runtime_config(
         )
     except ModuleNotFoundError as exc:
         if exc.name == f"myteam.workflows.agents.{agent_name}":
-            if local_error is not None:
-                raise KeyError(
-                    f"Invalid local workflow agent config for {agent_name}: {local_error}"
-                ) from local_error
             raise KeyError(f"Unknown workflow agent: {agent_name}") from exc
         raise
     except AgentConfigError as exc:

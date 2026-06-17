@@ -9,17 +9,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from myteam.workflows.execution.mothership import Mothership
+from myteam.workflows.execution.supervisor import Supervisor
 
 
 def run_workflow(workflow: Path, cwd: Path) -> dict:
-    with Mothership() as mothership:
-        request_id = mothership.start_top_level_workflow(
+    with Supervisor() as supervisor:
+        request_id = supervisor.start_top_level_workflow(
             argv=[sys.executable, str(workflow)],
             cwd=str(cwd),
             input_json=None,
         )
-        result = mothership.run_until_complete(request_id)
+        result = supervisor.run_until_complete(request_id)
     assert result is not None
     return result
 

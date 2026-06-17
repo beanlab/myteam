@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.3.2
+
+- Internal code improvements
+- Better error handling around agent configs
+
 ## 0.3.1
 
 - Added Jinja2 rendering for Markdown skills and workflows, including workflow input values as template variables.

@@ -177,7 +177,7 @@ def _forward_pty_until_complete(
 ) -> tuple[AgentReportedResult | None, int]:
     """Proxy the caller's terminal to an agent PTY while waiting for completion.
 
-    This restores the old mothership behavior for agent sessions: the bytes read
+    This restores the old supervisor behavior for agent sessions: the bytes read
     from the PTY master are both written to the caller's stdout and recorded by
     ``ManagedPtyProcess.read()`` for the session transcript. When the caller has
     an interactive stdin, input is forwarded into the child PTY as well.
