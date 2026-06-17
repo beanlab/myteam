@@ -7,11 +7,16 @@ import sys
 
 from conftest import SRC
 from myteam.workflows.agent_result_channel import AgentResultServer
-from myteam.workflows.execution.protocol import ENV_AGENT_SESSION_RESULT_SOCKET
+from myteam.workflows.execution.protocol import (
+    ENV_AGENT_SESSION_NONCE,
+    ENV_AGENT_SESSION_RESULT_SOCKET,
+)
 
 
 def run_myteam_with_input(project_dir: Path, *args: str, input_text: str = "", env: dict[str, str] | None = None):
     full_env = os.environ.copy()
+    full_env.pop(ENV_AGENT_SESSION_RESULT_SOCKET, None)
+    full_env.pop(ENV_AGENT_SESSION_NONCE, None)
     existing_pythonpath = full_env.get("PYTHONPATH")
     full_env["PYTHONPATH"] = str(SRC) if not existing_pythonpath else f"{SRC}{os.pathsep}{existing_pythonpath}"
     if env:
