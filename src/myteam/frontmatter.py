@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 from typing import Any
 
 import yaml
@@ -85,27 +84,3 @@ def _strip_yaml_frontmatter(text: str) -> str:
             return body
     return text
 
-
-def parse_frontmatter(file: Path) -> dict[str, Any]:
-    if not file.exists():
-        return {}
-    if file.suffix == ".py":
-        return _parse_python_module_docstring(file)
-    text = file.read_text(encoding="utf-8")
-    parsed, _ = split_markdown_frontmatter(text)
-    if parsed:
-        return parsed
-
-    if file.suffix.lower() in {".yaml", ".yml"}:
-        try:
-            loaded = yaml.safe_load(text)
-        except yaml.YAMLError:
-            return {}
-        if isinstance(loaded, dict):
-            data: dict[str, Any] = {}
-            for key, value in loaded.items():
-                if value is None:
-                    continue
-                data[str(key).lower()] = value
-            return data
-    return {}
