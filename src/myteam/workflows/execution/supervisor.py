@@ -27,7 +27,7 @@ from .workflow_stack import WorkflowStack, WorkflowStartError
 from .workflow_store import WorkflowStore
 
 
-class Mothership:
+class Supervisor:
     """Small workflow supervisor and nested `myteam start` RPC server.
 
     Workflows are launched under PTYs. The supervisor owns the user's real
@@ -49,9 +49,9 @@ class Mothership:
         self._stack = WorkflowStack(self._terminal)
         self._live_output = LiveOutputTracker()
 
-    def __enter__(self) -> "Mothership":
-        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-mothership-")
-        self.socket_path = str(Path(self._tmpdir.name) / "mothership.sock")
+    def __enter__(self) -> "Supervisor":
+        self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-supervisor-")
+        self.socket_path = str(Path(self._tmpdir.name) / "supervisor.sock")
         self._wakeup_r, self._wakeup_w = os.pipe()
         os.set_blocking(self._wakeup_r, False)
 

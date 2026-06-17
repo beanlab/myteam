@@ -9,7 +9,7 @@ from typing import Any
 
 VERSION = 1
 
-ENV_SOCKET = "MYTEAM_MOTHERSHIP_SOCKET"
+ENV_SOCKET = "MYTEAM_SUPERVISOR_SOCKET"
 ENV_AGENT_SESSION_RESULT_SOCKET = "MYTEAM_AGENT_SESSION_RESULT_SOCKET"
 ENV_AGENT_SESSION_NONCE = "MYTEAM_AGENT_SESSION_NONCE"
 ENV_WORKFLOW_INVOCATION_ID = "MYTEAM_WORKFLOW_INVOCATION_ID"
@@ -38,12 +38,12 @@ class RpcClient:
         try:
             response = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise RuntimeError("Mothership returned an invalid JSON response.") from exc
+            raise RuntimeError("Supervisor returned an invalid JSON response.") from exc
 
         if not isinstance(response, dict):
-            raise RuntimeError("Mothership returned a non-object JSON response.")
+            raise RuntimeError("Supervisor returned a non-object JSON response.")
         if not response.get("ok"):
-            raise RuntimeError(str(response.get("error") or "Mothership request failed."))
+            raise RuntimeError(str(response.get("error") or "Supervisor request failed."))
         return response
 
 

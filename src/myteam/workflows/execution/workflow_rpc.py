@@ -45,7 +45,7 @@ class WorkflowRpcServer:
         self._server.bind(self.socket_path)
         self._server.listen()
         self._server.settimeout(0.1)
-        self._thread = threading.Thread(target=self._serve, name="myteam-mothership-rpc", daemon=True)
+        self._thread = threading.Thread(target=self._serve, name="myteam-supervisor-rpc", daemon=True)
         self._thread.start()
 
     def close(self):

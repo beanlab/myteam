@@ -11,7 +11,7 @@ import threading
 import pytest
 
 from myteam.workflows.execution.live_output import LiveOutputTracker
-from myteam.workflows.execution.mothership import Mothership
+from myteam.workflows.execution.supervisor import Supervisor
 from myteam.workflows.execution.terminal import has_screen_rewriting_control
 from myteam.workflows.execution.workflow_store import WorkflowStore
 
@@ -166,20 +166,20 @@ def test_workflow_store_accepts_concurrent_result_reports() -> None:
 
 
 def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("myteam.workflows.execution.mothership.drain_pty_output", lambda *_args, **_kwargs: None)
-    mothership = Mothership()
-    record = mothership.store.create_request()
-    mothership.store.mark_running(record.request_id)
+    monkeypatch.setattr("myteam.workflows.execution.supervisor.drain_pty_output", lambda *_args, **_kwargs: None)
+    supervisor = Supervisor()
+    record = supervisor.store.create_request()
+    supervisor.store.mark_running(record.request_id)
     session = FakeSession(record.request_id)
-    mothership._stack.active = session  # type: ignore[assignment]
-    mothership._stack.sessions[session.session_id] = session  # type: ignore[assignment]
-    mothership.store.report_workflow_result({"request_id": session.request_id, "text": "first\n"})
-    mothership.store.report_workflow_result({"request_id": session.request_id, "text": "second\n"})
+    supervisor._stack.active = session  # type: ignore[assignment]
+    supervisor._stack.sessions[session.session_id] = session  # type: ignore[assignment]
+    supervisor.store.report_workflow_result({"request_id": session.request_id, "text": "first\n"})
+    supervisor.store.report_workflow_result({"request_id": session.request_id, "text": "second\n"})
 
-    mothership._handle_workflow_exit(session)  # type: ignore[arg-type]
-    mothership._drain_commands()
+    supervisor._handle_workflow_exit(session)  # type: ignore[arg-type]
+    supervisor._drain_commands()
 
-    result = mothership.store.get_result(session.request_id)
+    result = supervisor.store.get_result(session.request_id)
     assert result is not None
     assert result["status"] == "ok"
     assert result["result"]["result_text"] == "first\nsecond\n"
@@ -187,19 +187,19 @@ def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest
 
 
 def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("myteam.workflows.execution.mothership.drain_pty_output", lambda *_args, **_kwargs: None)
-    mothership = Mothership()
-    record = mothership.store.create_request()
-    mothership.store.mark_running(record.request_id)
+    monkeypatch.setattr("myteam.workflows.execution.supervisor.drain_pty_output", lambda *_args, **_kwargs: None)
+    supervisor = Supervisor()
+    record = supervisor.store.create_request()
+    supervisor.store.mark_running(record.request_id)
     session = FakeSession(record.request_id, exit_code=7)
-    mothership._stack.active = session  # type: ignore[assignment]
-    mothership._stack.sessions[session.session_id] = session  # type: ignore[assignment]
-    mothership.store.report_workflow_result({"request_id": session.request_id, "text": "partial\n"})
+    supervisor._stack.active = session  # type: ignore[assignment]
+    supervisor._stack.sessions[session.session_id] = session  # type: ignore[assignment]
+    supervisor.store.report_workflow_result({"request_id": session.request_id, "text": "partial\n"})
 
-    mothership._handle_workflow_exit(session)  # type: ignore[arg-type]
-    mothership._drain_commands()
+    supervisor._handle_workflow_exit(session)  # type: ignore[arg-type]
+    supervisor._drain_commands()
 
-    result = mothership.store.get_result(session.request_id)
+    result = supervisor.store.get_result(session.request_id)
     assert result is not None
     assert result["status"] == "exited"
     assert result["result"]["exit_code"] == 7

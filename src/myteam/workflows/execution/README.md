@@ -9,7 +9,7 @@ Workflow-level supervision and nested workflow runtime.
 - `myteam.workflows.agent_result_channel` owns the per-`run_agent` result socket used by `myteam result`.
 - `myteam.workflows.results` owns `SessionResult`, `UsageInfo`, and `myteam result` reporting.
 - `myteam.workflows.workflow_result` owns explicit workflow result text reporting for `myteam start`.
-- `mothership.py` is the workflow supervisor facade and main PTY forwarding loop.
+- `supervisor.py` is the workflow supervisor facade and main PTY forwarding loop.
 - `workflow_rpc.py` owns the workflow supervisor Unix-socket RPC server and RPC payload validation.
 - `workflow_store.py` owns workflow request records, explicit workflow result text, poll/ack state, and final result storage.
 - `workflow_stack.py` owns active/suspended workflow PTY process lifecycle, parent suspension/resume, resize, and shutdown.

@@ -113,7 +113,7 @@ The inner
 The presence of an existing supervisor can be detected through environment variables injected into managed child workflows, for example:
 
 ```text
-MYTEAM_MOTHERSHIP_SOCKET=/path/to/socket
+MYTEAM_SUPERVISOR_SOCKET=/path/to/socket
 MYTEAM_WORKFLOW_INVOCATION_ID=<current-workflow-process-id>
 ```
 
