@@ -1,5 +1,7 @@
 # Using `myteam`
 
+*This document gives you a **why** overview of `myteam`. The rest of `governing_docs/` give you the technical **how** of `myteam`.*
+
 ## Harness
 
 A harness is the way you run an agent or team of agents. The task of the harness is to manage the information—or context—available to an agent session. 
@@ -118,7 +120,11 @@ If you have too many skills in your context, organize them in folders.
 
 If you need dynamic skill content, use `.py` skills.
 
-If you need a sequence of steps performed, use workflows.
+If you need a sequence of steps performed reliably, use workflows.
+
+If you want defined outputs from a session, use workflows.
+
+If you want defined roles for different sessions, use workflows. 
 
 If you want to release information one stage at a time, resume prior sessions with a workflow.
 
