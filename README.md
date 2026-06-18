@@ -14,6 +14,8 @@ Please run `myteam onboard` and briefly explain to me how you can help me build 
 
 See also:
 
+- [demos](src/docs/demos/)
+- [users-guide.md](src/governing_docs/users-guide.md)
 - [governing documents](src/governing_docs) (which is what `myteam onboard` prints).
 - [motivating philosophy](src/governing_docs/myteam-philosophy.md)
 
