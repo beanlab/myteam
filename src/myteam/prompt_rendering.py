@@ -48,6 +48,7 @@ def _build_environment(
         myteam_explain=explain_resources,
         myteam_onboard=onboard,
         myteam_list=_make_list_helper(base_dir),
+        myteam_load=_make_load_helper(base_dir),
         read_file=_make_read_file_helper(base_dir, input_values=input_values, include_stack=include_stack),
     )
     return environment
@@ -75,6 +76,16 @@ def _make_list_helper(base_dir: Path):
         return list_resources(str(target))
 
     return myteam_list
+
+
+def _make_load_helper(base_dir: Path):
+    def myteam_load(skill: str | Path) -> str:
+        from .skills import load_skill
+
+        target = (base_dir / Path(skill)).resolve()
+        return load_skill(str(target))
+
+    return myteam_load
 
 
 def _render_included_template(file_path: Path, *, input_values: dict[str, Any], include_stack: list[Path]) -> str:

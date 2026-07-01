@@ -7,8 +7,9 @@ The fields of the input dictionary (for workflows, if provided) are passed as va
 The following `myteam` functions are also included in the jinja environment:
 
 - `myteam_explain()` - i.e. `myteam explain`, injects instructions to the agent for how to use `myteam` skills and workflows 
-- `myteam_list(path)` - i.e. `myteam list <path>`; lists the `myteam` resources in the specified directory (you'll want to also use `explain` if you list resources)
 - `myteam_onboard()` - i.e. `myteam onboard`, injects the governing docs for `myteam`; useful if you want your agent to help you develop a harness.
+- `myteam_list(path)` - i.e. `myteam list <path>`; lists the `myteam` resources in the specified directory (you'll want to also use `explain` if you list resources; `path` is relative to the document)
+- `myteam_load(skill)` - i.e. `myteam load <skill>`; loads the specified skill content into the document (skill path is relative to the document)
 
 The following utility functions are also included in the jinja environment:
 
