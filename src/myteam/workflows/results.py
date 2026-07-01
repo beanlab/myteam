@@ -33,7 +33,7 @@ class UsageInfo:
 @dataclass
 class SessionResult:
     exit_code: int
-    output: dict[str, Any] | None
+    output: Any | None
     usage: list[UsageInfo]
     transcript: str
     session_id: str | None = None

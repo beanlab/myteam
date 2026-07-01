@@ -146,7 +146,7 @@ def test_run_agent_populates_nonzero_exit_code_without_result(tmp_path: Path, mo
     assert result.output is None
 
 
-def test_run_agent_wraps_text_reported_by_myteam_result(tmp_path: Path, monkeypatch) -> None:
+def test_run_agent_preserves_text_reported_by_myteam_result(tmp_path: Path, monkeypatch) -> None:
     write_fake_agent_project(
         tmp_path,
         """
@@ -160,10 +160,10 @@ def test_run_agent_wraps_text_reported_by_myteam_result(tmp_path: Path, monkeypa
     result = run_agent(prompt="Report text", agent="fake-agent")
 
     assert result.exit_code == 0
-    assert result.output == {"value": "plain text result"}
+    assert result.output == "plain text result"
 
 
-def test_run_agent_suppresses_terminal_bytes_after_reported_result(
+def test_run_agent_forwards_terminal_bytes_after_reported_result(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -191,5 +191,5 @@ def test_run_agent_suppresses_terminal_bytes_after_reported_result(
     assert result.exit_code == 0
     assert result.output == {"done": True}
     assert "visible before result" in captured.out
-    assert "DANGLING-BYTES-AFTER-RESULT" not in captured.out
+    assert "DANGLING-BYTES-AFTER-RESULT" in captured.out
     assert "DANGLING-BYTES-AFTER-RESULT" in result.transcript

@@ -82,9 +82,8 @@ def pump_pty_once(
 ) -> PtyPumpResult:
     """Forward one select cycle between ``terminal`` and ``session``.
 
-    All bytes read from the PTY are recorded by ``ManagedPtyProcess.read()`` /
-    ``read_stderr()`` regardless of whether they are visibly forwarded. This
-    lets callers suppress teardown noise while still preserving transcripts.
+    Bytes read from the PTY are recorded by ``ManagedPtyProcess.read()`` /
+    ``read_stderr()`` and forwarded to the provided writers when requested.
     """
 
     stderr_fd = session.stderr_fd()
@@ -157,7 +156,7 @@ def drain_pty_output(
 
     A zero-timeout select can miss bytes that arrive immediately after process
     exit. This bounded quiet drain is used by both the workflow supervisor and
-    ``run_agent`` so final output/transcripts are handled consistently.
+    ``run_agent`` so final output is not lost.
     """
 
     stdout_open = True

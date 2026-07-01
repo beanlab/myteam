@@ -291,18 +291,15 @@ def _session_result_from_payload(payload: Any) -> SessionResult:
         return SessionResult(exit_code=0, output=None, usage=[], transcript="", session_id=None)
 
     if not isinstance(payload, dict):
-        return SessionResult(exit_code=0, output={"value": payload}, usage=[], transcript="", session_id=None)
+        return SessionResult(exit_code=0, output=payload, usage=[], transcript="", session_id=None)
 
     if not _is_session_result_payload(payload):
         return SessionResult(exit_code=0, output=payload, usage=[], transcript="", session_id=None)
 
     usage = [UsageInfo(**item) for item in payload.get("usage", []) if isinstance(item, dict)]
-    output_value = payload.get("output")
-    if output_value is not None and not isinstance(output_value, dict):
-        output_value = {"value": output_value}
     return SessionResult(
         exit_code=_coerce_exit_code(payload.get("exit_code")),
-        output=output_value,
+        output=payload.get("output"),
         usage=usage,
         transcript=str(payload.get("transcript") or ""),
         session_id=payload.get("session_id"),

@@ -24,7 +24,7 @@ from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_age
 from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
 from .execution.pty_forwarding import binary_output_stream, drain_pty_output, pump_pty_once, write_bytes
 from .execution.pty_process import ManagedPtyProcess
-from .execution.terminal import RealTerminal, has_screen_rewriting_control, strip_ansi_csi
+from .execution.terminal import RealTerminal
 from .results import SessionResult, UsageInfo
 
 
@@ -103,8 +103,6 @@ def run_agent(
             session.close()
 
     output_value = reported_result.output if reported_result is not None else None
-    if output_value is not None and not isinstance(output_value, dict):
-        output_value = {"value": output_value}
     if reported_result is not None and reported_result.status != "ok":
         raise RuntimeError(json.dumps({"status": reported_result.status, "output": output_value}))
 
@@ -175,69 +173,39 @@ def _forward_pty_until_complete(
     *,
     exit_sequence: bytes,
 ) -> tuple[AgentReportedResult | None, int]:
-    """Proxy the caller's terminal to an agent PTY while waiting for completion.
-
-    This restores the old supervisor behavior for agent sessions: the bytes read
-    from the PTY master are both written to the caller's stdout and recorded by
-    ``ManagedPtyProcess.read()`` for the session transcript. When the caller has
-    an interactive stdin, input is forwarded into the child PTY as well.
-    """
+    """Forward the caller's terminal to an agent PTY until the agent exits."""
 
     reported_result: AgentReportedResult | None = None
     exit_deadline: float | None = None
     output = binary_output_stream(sys.stdout)
-    forwarded_live_output = False
-    forwarded_screen_rewriting_output = False
-    live_output_ended_with_newline = True
 
-    def notice_reported_result() -> bool:
+    def poll_result_channel() -> None:
         nonlocal reported_result, exit_deadline
+        if reported_result is not None:
+            return
+        reported_result = result_server.wait_for_result(timeout=0)
         if reported_result is None:
-            reported_result = result_server.wait_for_result(timeout=0)
-            if reported_result is not None:
-                _request_agent_exit(session, exit_sequence)
-                exit_deadline = time.monotonic() + _AGENT_EXIT_TIMEOUT_SECONDS
-        return reported_result is not None
+            return
+        _request_agent_exit(session, exit_sequence)
+        exit_deadline = time.monotonic() + _AGENT_EXIT_TIMEOUT_SECONDS
 
     def stdout_writer(chunk: bytes) -> None:
-        nonlocal forwarded_live_output, forwarded_screen_rewriting_output, live_output_ended_with_newline
-        # A result may arrive while select() is waiting for PTY output. Check the
-        # result channel again immediately before visible forwarding so bytes
-        # emitted after `myteam result` don't leak to the user's terminal.
-        if not notice_reported_result():
-            if has_screen_rewriting_control(chunk):
-                forwarded_screen_rewriting_output = True
-            display_text = strip_ansi_csi(chunk)
-            if display_text:
-                forwarded_live_output = True
-                live_output_ended_with_newline = display_text.endswith(b"\n")
-            write_bytes(output, chunk)
+        write_bytes(output, chunk)
 
     with RealTerminal(on_resize=session.resize) as terminal:
         session.resize(terminal.winsize())
         while True:
-            notice_reported_result()
+            poll_result_channel()
 
             code = session.poll()
             if code is not None:
-                # After a result has been reported, shutdown/TUI cleanup bytes are
-                # still recorded but no longer visibly forwarded. This keeps the
-                # terminal clean after run_agent semantically completes.
-                drain_pty_output(
-                    session,
-                    stdout_writer=stdout_writer,
-                    forward_stdout=reported_result is None,
-                )
-                terminal.separate_interactive_region(
-                    had_output=forwarded_live_output,
-                    ended_with_newline=live_output_ended_with_newline,
-                    had_screen_rewriting_output=forwarded_screen_rewriting_output,
-                )
+                drain_pty_output(session, stdout_writer=stdout_writer)
                 reported_result = _collect_reported_result(reported_result, result_server)
                 return reported_result, code
 
             if exit_deadline is not None and time.monotonic() >= exit_deadline:
                 session.terminate()
+                exit_deadline = None
                 continue
 
             activity = pump_pty_once(
@@ -245,20 +213,13 @@ def _forward_pty_until_complete(
                 terminal,
                 timeout=_AGENT_RESULT_POLL_SECONDS,
                 stdout_writer=stdout_writer,
-                forward_stdout=reported_result is None,
             )
             if activity.stdout_eof:
-                code = session.poll()
-                if code is None:
-                    try:
-                        code = session.wait(timeout=0.1)
-                    except subprocess.TimeoutExpired:
-                        code = 0
-                terminal.separate_interactive_region(
-                    had_output=forwarded_live_output,
-                    ended_with_newline=live_output_ended_with_newline,
-                    had_screen_rewriting_output=forwarded_screen_rewriting_output,
-                )
+                try:
+                    code = session.wait(timeout=0.1)
+                except subprocess.TimeoutExpired:
+                    code = session.poll()
+                drain_pty_output(session, stdout_writer=stdout_writer)
                 reported_result = _collect_reported_result(reported_result, result_server)
                 return reported_result, code if isinstance(code, int) else 0
 

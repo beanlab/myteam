@@ -16,7 +16,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from .live_output import LiveOutputTracker
+from .live_output import stderr_writer, terminal_stdout_writer
 from .protocol import safe_unlink
 from .pty_forwarding import drain_pty_output, pump_pty_once
 from .pty_process import ManagedPtyProcess
@@ -47,7 +47,6 @@ class Supervisor:
         self._wakeup_w = -1
         self._terminal = RealTerminal(on_resize=self._resize_sessions)
         self._stack = WorkflowStack(self._terminal)
-        self._live_output = LiveOutputTracker()
 
     def __enter__(self) -> "Supervisor":
         self._tmpdir = tempfile.TemporaryDirectory(prefix="myteam-supervisor-")
@@ -108,7 +107,6 @@ class Supervisor:
 
                 result = self.store.get_result(top_request_id)
                 if result is not None:
-                    self._live_output.finish(terminal, enabled=live_forwarding)
                     return result
                 if self._stack.active is None and not self._stack.stack and self._commands.empty():
                     return None
@@ -119,14 +117,14 @@ class Supervisor:
                         self._drain_wakeup_pipe()
                     continue
 
-                stdout_writer = self._live_output.stdout_writer(terminal, enabled=live_forwarding)
-                stderr_writer = self._live_output.stderr_writer(enabled=live_forwarding)
+                stdout_writer = terminal_stdout_writer(terminal, enabled=live_forwarding)
+                stderr_output_writer = stderr_writer(enabled=live_forwarding)
                 activity = pump_pty_once(
                     self._stack.active,
                     terminal,
                     timeout=0.1,
                     stdout_writer=stdout_writer,
-                    stderr_writer=stderr_writer,
+                    stderr_writer=stderr_output_writer,
                     forward_stdout=live_forwarding,
                     forward_stderr=live_forwarding,
                     extra_fds=[self._wakeup_r],
@@ -139,7 +137,7 @@ class Supervisor:
                     self._handle_workflow_exit(
                         self._stack.active,
                         stdout_writer=stdout_writer,
-                        stderr_writer=stderr_writer,
+                        stderr_writer=stderr_output_writer,
                         forward_stdout=live_forwarding,
                         forward_stderr=live_forwarding,
                     )
@@ -188,8 +186,6 @@ class Supervisor:
         parent_session_id = self.store.complete_exit_request(
             session.request_id,
             exit_code=exit_code,
-            transcript=_normalize_pty_text(session.recording.snapshot()),
-            stderr_transcript=session.stderr_snapshot(),
         )
         self._stack.remove(session)
         self._finish_completed_request(parent_session_id)
@@ -205,8 +201,8 @@ class Supervisor:
         if self._stack.active is not None and self._stack.active.poll() is not None:
             self._handle_workflow_exit(
                 self._stack.active,
-                stdout_writer=self._live_output.stdout_writer(terminal, enabled=live_forwarding),
-                stderr_writer=self._live_output.stderr_writer(enabled=live_forwarding),
+                stdout_writer=terminal_stdout_writer(terminal, enabled=live_forwarding),
+                stderr_writer=stderr_writer(enabled=live_forwarding),
                 forward_stdout=live_forwarding,
                 forward_stderr=live_forwarding,
             )
@@ -226,8 +222,3 @@ class Supervisor:
                 pass
         except (BlockingIOError, OSError):
             pass
-
-
-def _normalize_pty_text(text: str) -> str:
-    return text.replace("\r\n", "\n")
-

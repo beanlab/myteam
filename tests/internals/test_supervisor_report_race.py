@@ -1,8 +1,8 @@
-"""Implementation-level tests for workflow result race handling.
+"""Implementation-level tests for workflow result handling.
 
 Result reports may arrive immediately before process exit. These tests exercise
-the supervisor's storage path directly so race regressions fail with a focused
-error instead of a flaky end-to-end timeout.
+the supervisor's storage path directly so regressions fail with a focused error
+instead of a flaky end-to-end timeout.
 """
 from __future__ import annotations
 
@@ -10,36 +10,11 @@ import threading
 
 import pytest
 
-from myteam.workflows.execution.live_output import LiveOutputTracker
 from myteam.workflows.execution.supervisor import Supervisor
-from myteam.workflows.execution.terminal import has_screen_rewriting_control
 from myteam.workflows.execution.workflow_store import WorkflowStore
 
 
-class FakeTerminal:
-    def __init__(self) -> None:
-        self.output = b""
-        self.visual_state_restored = False
-        self.cleared = False
-
-    def write_stdout(self, data: bytes) -> None:
-        self.output += data
-
-    def clear(self) -> None:
-        self.cleared = True
-
-    def restore_visual_state(self) -> None:
-        self.visual_state_restored = True
-
-
-class FakeRecording:
-    def snapshot(self) -> str:
-        return "live transcript"
-
-
 class FakeSession:
-    recording = FakeRecording()
-
     def __init__(self, request_id: str, exit_code: int = 0) -> None:
         self.session_id = request_id
         self.request_id = request_id
@@ -50,9 +25,6 @@ class FakeSession:
 
     def wait(self, timeout=None) -> int:
         return self.exit_code
-
-    def stderr_snapshot(self) -> str:
-        return ""
 
     def close(self) -> None:
         pass
@@ -113,12 +85,7 @@ def test_workflow_store_complete_exit_request_captures_text_and_finalizes() -> N
     store.report_workflow_result({"request_id": record.request_id, "text": "first\n"})
     store.report_workflow_result({"request_id": record.request_id, "text": "second\n"})
 
-    parent_session_id = store.complete_exit_request(
-        record.request_id,
-        exit_code=0,
-        transcript="live transcript",
-        stderr_transcript="",
-    )
+    parent_session_id = store.complete_exit_request(record.request_id, exit_code=0)
 
     assert parent_session_id == "parent-1"
     assert store.get_result(record.request_id) == {
@@ -126,8 +93,6 @@ def test_workflow_store_complete_exit_request_captures_text_and_finalizes() -> N
         "result": {
             "exit_code": 0,
             "result_text": "first\nsecond\n",
-            "transcript": "live transcript",
-            "stderr_transcript": "",
         },
     }
     with pytest.raises(ValueError, match="Workflow is not active"):
@@ -182,8 +147,7 @@ def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest
     result = supervisor.store.get_result(session.request_id)
     assert result is not None
     assert result["status"] == "ok"
-    assert result["result"]["result_text"] == "first\nsecond\n"
-    assert result["result"]["transcript"] == "live transcript"
+    assert result["result"] == {"exit_code": 0, "result_text": "first\nsecond\n"}
 
 
 def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -202,48 +166,4 @@ def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.Mo
     result = supervisor.store.get_result(session.request_id)
     assert result is not None
     assert result["status"] == "exited"
-    assert result["result"]["exit_code"] == 7
-    assert result["result"]["result_text"] == "partial\n"
-
-
-def test_final_result_is_separated_from_unterminated_live_output() -> None:
-    live_output = LiveOutputTracker()
-    terminal = FakeTerminal()
-
-    live_output.notice(b"status line without newline")
-    live_output.finish(terminal, enabled=True)  # type: ignore[arg-type]
-
-    assert terminal.visual_state_restored is True
-    assert terminal.output == b"\r\n"
-
-
-def test_final_result_separator_ignores_visual_restore_sequences() -> None:
-    live_output = LiveOutputTracker()
-    terminal = FakeTerminal()
-
-    live_output.notice(b"finished\n")
-    live_output.notice(b"\x1b[0m\x1b[?25h")
-    live_output.finish(terminal, enabled=True)  # type: ignore[arg-type]
-
-    assert terminal.visual_state_restored is True
-    assert terminal.cleared is False
-    assert terminal.output == b""
-
-
-def test_final_result_clears_after_screen_rewriting_live_output() -> None:
-    live_output = LiveOutputTracker()
-    terminal = FakeTerminal()
-
-    live_output.notice(b"thinking\x1b[2K\rfinal tui line")
-    live_output.finish(terminal, enabled=True)  # type: ignore[arg-type]
-
-    assert terminal.visual_state_restored is True
-    assert terminal.cleared is True
-    assert terminal.output == b""
-
-
-def test_screen_rewriting_detection_ignores_plain_lines_and_style_controls() -> None:
-    assert has_screen_rewriting_control(b"plain line\r\n") is False
-    assert has_screen_rewriting_control(b"\x1b[31mred\x1b[0m\r\n") is False
-    assert has_screen_rewriting_control(b"line\rrewritten") is True
-    assert has_screen_rewriting_control(b"\x1b[2K") is True
+    assert result["result"] == {"exit_code": 7, "result_text": "partial\n"}
