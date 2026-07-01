@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import sys
 from typing import Any
 
 from .protocol import ENV_SOCKET, ENV_WORKFLOW_INPUT_JSON, ENV_WORKFLOW_INVOCATION_ID
@@ -33,20 +32,23 @@ class WorkflowStack:
         session = self._launch(command, socket_path=socket_path)
         self.sessions[session.session_id] = session
         self.active = session
-        self._clear_if_interactive()
         self.terminal.flush_input()
         return session
 
     def resume_previous(self) -> bool:
         if self.stack:
             self.terminal.flush_input()
+            self._scroll_current_view_offscreen()
             self.active = self.stack.pop()
             self.active.resume()
-            self._clear_if_interactive()
             self.terminal.flush_input()
             return True
         self.active = None
         return False
+
+    def _scroll_current_view_offscreen(self):
+        rows, _ = self.terminal.winsize()
+        self.terminal.write_stdout(b"\r\n" * rows)
 
     def remove(self, session: ManagedPtyProcess):
         self.sessions.pop(session.session_id, None)
@@ -89,7 +91,6 @@ class WorkflowStack:
         self.active.suspend()
         self.stack.append(self.active)
         self.active = None
-        self._clear_if_interactive()
         self.terminal.flush_input()
 
     def _launch(self, command: StartWorkflowCommand, *, socket_path: str) -> ManagedPtyProcess:
@@ -111,7 +112,3 @@ class WorkflowStack:
             parent_session_id=command.parent_session_id,
             merge_stderr=False,
         )
-
-    def _clear_if_interactive(self):
-        if sys.stdout.isatty():
-            self.terminal.clear()

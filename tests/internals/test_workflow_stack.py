@@ -12,16 +12,16 @@ from myteam.workflows.execution.workflow_stack import WorkflowStack, WorkflowSta
 class FakeTerminal:
     def __init__(self) -> None:
         self.flush_count = 0
-        self.clear_count = 0
+        self.output = b""
 
     def flush_input(self):
         self.flush_count += 1
 
-    def clear(self):
-        self.clear_count += 1
-
     def winsize(self) -> tuple[int, int]:
         return (24, 80)
+
+    def write_stdout(self, data: bytes):
+        self.output += data
 
 
 class FakeSession:

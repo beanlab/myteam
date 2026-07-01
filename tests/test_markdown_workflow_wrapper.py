@@ -9,7 +9,7 @@ from myteam.templates import workflow_markdown_wrapper
 from myteam.workflows.results import SessionResult
 
 
-def test_markdown_wrapper_renders_body_before_running_agent(
+def test_markdown_wrapper_passes_raw_body_and_source_path_to_run_agent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -53,8 +53,9 @@ def test_markdown_wrapper_renders_body_before_running_agent(
     assert captured.out == ""
     assert reported == [json.dumps({"summary": "ok"})]
     assert seen == {
-        "prompt": "Review release.\n",
-        "input": None,
+        "prompt": "Review {{ topic }}.\n",
+        "input": {"topic": "release"},
+        "prompt_source_path": workflow,
         "output": {"summary": "short summary"},
         "agent": "fake-agent",
         "model": "fake-model",
@@ -63,7 +64,7 @@ def test_markdown_wrapper_renders_body_before_running_agent(
     }
 
 
-def test_markdown_wrapper_renders_body_even_without_input_schema(
+def test_markdown_wrapper_passes_raw_body_even_without_input_schema(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -89,8 +90,9 @@ def test_markdown_wrapper_renders_body_even_without_input_schema(
     workflow_markdown_wrapper.main(workflow, '{"topic": "release"}')
 
     assert reported == [None]
-    assert seen["prompt"] == "Use release.\n"
-    assert seen["input"] is None
+    assert seen["prompt"] == "Use {{ topic }}.\n"
+    assert seen["input"] == {"topic": "release"}
+    assert seen["prompt_source_path"] == workflow
 
 
 def test_markdown_wrapper_reports_no_text_for_none_output(

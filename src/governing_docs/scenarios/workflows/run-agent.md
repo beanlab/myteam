@@ -26,6 +26,7 @@ def run_agent(
         interactive: bool | None = None,
         session_id: str | None = None,
         fork: bool | None = None,
+        prompt_source_path: Path | str | None = None,
     ) -> SessionResult:
 ```
 
@@ -42,7 +43,7 @@ def run_agent(
 - `session_id`: indicates the prior agent session to resume; this value is whatever session ID the agent uses and can be obtained from a prior `SessionResult`
 - `fork`: determines whether the specified session is forked or resumed. When `False`, the session is resumed in place; when `True`, it is forked and a new session is created from the history of the specified session. Fork is examined only if `session_id` is provided. 
 
-Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template.
+Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. If `prompt_source_path` is provided, relative helper paths are resolved against that document.
 
 In effect (pseudocode):
 

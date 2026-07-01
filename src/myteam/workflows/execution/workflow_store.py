@@ -76,8 +76,6 @@ class WorkflowStore:
         request_id: str,
         *,
         exit_code: int,
-        transcript: str,
-        stderr_transcript: str,
     ) -> str | None:
         status = "ok" if exit_code == 0 else "exited"
         with self._lock:
@@ -85,8 +83,6 @@ class WorkflowStore:
             result = {
                 "exit_code": exit_code,
                 "result_text": "" if record is None else "".join(record.workflow_result_parts),
-                "transcript": transcript,
-                "stderr_transcript": stderr_transcript,
             }
             self._results[request_id] = {"status": status, "result": result}
             if record is None:

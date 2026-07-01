@@ -46,6 +46,29 @@ def test_no_payload_becomes_none_output() -> None:
     assert result.usage == []
 
 
+def test_raw_non_dict_workflow_output_is_preserved() -> None:
+    result = _session_result_from_payload("plain text")
+
+    assert result.exit_code == 0
+    assert result.output == "plain text"
+
+
+def test_session_result_payload_preserves_non_dict_output() -> None:
+    result = _session_result_from_payload(
+        {
+            "output": ["first", "second"],
+            "usage": [],
+            "transcript": "session transcript",
+            "session_id": "native-session-id",
+        }
+    )
+
+    assert result.exit_code == 0
+    assert result.output == ["first", "second"]
+    assert result.transcript == "session transcript"
+    assert result.session_id == "native-session-id"
+
+
 def test_session_result_payload_preserves_none_output() -> None:
     result = _session_result_from_payload(
         {

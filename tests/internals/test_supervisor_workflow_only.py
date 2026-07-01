@@ -36,8 +36,6 @@ def test_supervisor_runs_workflow_process(tmp_path: Path) -> None:
         "result": {
             "exit_code": 0,
             "result_text": '{"answer": "ok"}\n',
-            "transcript": "live log\n",
-            "stderr_transcript": "",
         },
     }
 

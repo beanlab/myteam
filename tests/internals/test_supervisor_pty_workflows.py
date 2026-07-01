@@ -29,8 +29,7 @@ def test_workflow_runs_with_tty_stdin_and_stdout(tmp_path: Path) -> None:
     workflow.write_text(
         "import sys\n"
         "from myteam.workflows import report_workflow_result\n"
-        "print(f'stdin={sys.stdin.isatty()} stdout={sys.stdout.isatty()} stderr={sys.stderr.isatty()}')\n"
-        "report_workflow_result('done')\n",
+        "report_workflow_result(f'stdin={sys.stdin.isatty()} stdout={sys.stdout.isatty()} stderr={sys.stderr.isatty()}')\n",
         encoding="utf-8",
     )
 
@@ -38,8 +37,8 @@ def test_workflow_runs_with_tty_stdin_and_stdout(tmp_path: Path) -> None:
 
     assert result["status"] == "ok"
     assert result["result"]["exit_code"] == 0
-    assert result["result"]["result_text"] == "done\n"
-    assert "stdin=True stdout=True" in result["result"]["transcript"]
+    assert "stdin=True stdout=True" in result["result"]["result_text"]
+    assert "transcript" not in result["result"]
 
 
 def test_nested_start_runs_child_and_resumes_parent(tmp_path: Path) -> None:
@@ -66,6 +65,4 @@ def test_nested_start_runs_child_and_resumes_parent(tmp_path: Path) -> None:
     assert result["status"] == "ok"
     assert result["result"]["exit_code"] == 0
     assert result["result"]["result_text"] == "parent result\n"
-    assert "parent before" in result["result"]["transcript"]
-    assert "child result\n" in result["result"]["transcript"]
-    assert "child live output" not in result["result"]["transcript"]
+    assert "transcript" not in result["result"]
