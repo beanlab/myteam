@@ -10,9 +10,10 @@ from myteam.workflows.execution.workflow_stack import WorkflowStack, WorkflowSta
 
 
 class FakeTerminal:
-    def __init__(self) -> None:
+    def __init__(self, *, can_display_live_output: bool = True) -> None:
         self.flush_count = 0
         self.output = b""
+        self.can_display_live_output = can_display_live_output
 
     def flush_input(self):
         self.flush_count += 1

@@ -50,6 +50,10 @@ class RealTerminal:
     def can_read_stdin(self) -> bool:
         return self.stdin_fd is not None
 
+    @property
+    def can_display_live_output(self) -> bool:
+        return os.isatty(self.stdout_fd)
+
     def read_stdin(self, size: int = 4096) -> bytes:
         if self.stdin_fd is None:
             return b""
