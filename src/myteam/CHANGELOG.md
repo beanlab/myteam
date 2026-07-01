@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.3.5
+
+- Fixed bug in jinja handling of Markdown workflow prompts (affecting `myteam_onboard()` content)
+- Simplified handling of terminal outputs between sessions in a workflow or nested session
+
 ## 0.3.4
 
 - Additional guidance documentation available in README and in `myteam onboard`.
