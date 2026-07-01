@@ -14,14 +14,6 @@ from typing import Any
 Winsize = tuple[int, int]
 
 
-_VISUAL_RESTORE_SEQUENCE = (
-    b"\x1b[?1049l"  # leave alternate screen
-    b"\x1b[0m"  # reset attributes
-    b"\x1b[?25h"  # show cursor
-    b"\x1b[?2004l"  # disable bracketed paste
-    b"\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l"  # disable common mouse modes
-)
-
 
 class RealTerminal:
     """Owns raw-mode setup, output, input, restore, and resize callbacks."""
@@ -99,13 +91,6 @@ class RealTerminal:
         if self._restore_tty is not None and self.stdin_fd is not None:
             termios.tcsetattr(self.stdin_fd, termios.TCSADRAIN, self._restore_tty)
             self._restore_tty = None
-        self.restore_visual_state()
-
-    def restore_visual_state(self) -> None:
-        """Restore terminal-emulator state that termios cannot represent."""
-
-        if sys.stdout.isatty():
-            self.write_stdout(_VISUAL_RESTORE_SEQUENCE)
 
     def _handle_winch(self, _signum: int, _frame: Any) -> None:
         if self.on_resize is not None:

@@ -38,12 +38,17 @@ class WorkflowStack:
     def resume_previous(self) -> bool:
         if self.stack:
             self.terminal.flush_input()
+            self._scroll_current_view_offscreen()
             self.active = self.stack.pop()
             self.active.resume()
             self.terminal.flush_input()
             return True
         self.active = None
         return False
+
+    def _scroll_current_view_offscreen(self):
+        rows, _ = self.terminal.winsize()
+        self.terminal.write_stdout(b"\r\n" * rows)
 
     def remove(self, session: ManagedPtyProcess):
         self.sessions.pop(session.session_id, None)
