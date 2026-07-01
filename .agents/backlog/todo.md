@@ -11,6 +11,8 @@
 - 3rd party skills/workflows as python packages
 - start a skill like you do a Markdown workflow
 - support pydantic for output, with validation
+- `myteam start <workflow.md> --fork` forks the current session and injects the specified prompt; not sure this makes sense for python workflows, but does work for MD workflows.  
+- expose workflow-level transcripts for debugging (decide UX)
 
 # Harnesses
 
