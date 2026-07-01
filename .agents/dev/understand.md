@@ -26,7 +26,7 @@ After you have read these instructions, say Ready.
 
 Gather information about the user's desired code change. 
 
-DO NOT make any changes. 
+**DO NOT make any changes.** The purpose of this session is to understand and report on the user's intent. 
 
 Make sure you understand what the project does, how it is organized, and how it is intended to be used.
 

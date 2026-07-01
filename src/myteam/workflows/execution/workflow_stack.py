@@ -47,6 +47,8 @@ class WorkflowStack:
         return False
 
     def _scroll_current_view_offscreen(self):
+        if not self.terminal.can_display_live_output:
+            return
         rows, _ = self.terminal.winsize()
         self.terminal.write_stdout(b"\r\n" * rows)
 

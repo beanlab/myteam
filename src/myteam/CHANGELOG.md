@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.6
+
+-  added `myteam_load(skill)` to jinja environments. Skill path is relative to the document.
+
 ## 0.3.5
 
 - Fixed bug in jinja handling of Markdown workflow prompts (affecting `myteam_onboard()` content)

@@ -104,16 +104,22 @@ def test_render_markdown_body_exposes_helper_functions(tmp_path: Path, monkeypat
         seen["prefix"] = prefix
         return "LIST"
 
+    def fake_load_skill(skill: str) -> str:
+        seen["skill"] = skill
+        return "LOAD"
+
     monkeypatch.setattr(prompt_rendering, "list_resources", fake_list_resources)
+    monkeypatch.setattr("myteam.skills.load_skill", fake_load_skill)
 
     rendered = prompt_rendering.render_markdown_body(
-        "{{ myteam_explain() }}|{{ myteam_onboard() }}|{{ myteam_list('resources') }}",
+        "{{ myteam_explain() }}|{{ myteam_onboard() }}|{{ myteam_list('resources') }}|{{ myteam_load('skills/demo.md') }}",
         source_path=docs / "skill.md",
         input_values={},
     )
 
-    assert rendered == "EXPLAIN|ONBOARD|LIST"
+    assert rendered == "EXPLAIN|ONBOARD|LIST|LOAD"
     assert Path(seen["prefix"]).resolve() == resources.resolve()
+    assert Path(seen["skill"]).resolve() == (docs / "skills" / "demo.md").resolve()
 
 
 def test_render_markdown_body_can_opt_out_of_rendering_included_files(tmp_path: Path) -> None:
