@@ -44,6 +44,8 @@ def run_agent(
     interactive: bool | None = None,
     session_id: str | None = None,
     fork: bool | None = None,
+    prompt_source_path: Path | str | None = None,
+
 ) -> SessionResult:
     cwd = Path.cwd().resolve()
     defaults = _load_defaults(cwd)
@@ -60,7 +62,7 @@ def run_agent(
         effective_extra_args = tuple(str(item) for item in effective_extra_args)
 
     session_nonce = secrets.token_urlsafe(16)
-    rendered_prompt = render_prompt_text(prompt, input or {})
+    rendered_prompt = render_prompt_text(prompt, input or {}, source_path=prompt_source_path)
     agent_prompt = build_agent_prompt(
         rendered_prompt,
         session_nonce=session_nonce,
