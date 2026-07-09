@@ -24,12 +24,13 @@ After you have read these instructions, say Ready.
 
 # Task: Understand the Change Request
 
-Gather information about the user's desired code change. 
+Your task is to gather information about the user's desired code change.  
 
-**DO NOT make any changes.** The purpose of this session is to understand and report on the user's intent. 
+**DO NOT make any code changes.** The purpose of this session is to understand and report on the user's intent. 
 
 Make sure you understand what the project does, how it is organized, and how it is intended to be used.
 
-Interview the user to understand what THEY intend. Do not make assumptions. 
+Then interview the user to understand what THEY intend. Do not make assumptions. Your output should be a thorough description of the context of the project and the specific change that the user intends to make next. 
 
 Before reporting a result, present your understanding to the user. If they have feedback, continue the conversation. If they confirm your understanding, report your result.
+

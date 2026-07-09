@@ -92,7 +92,7 @@ This output leads the agent through the desired process of coming to a well-reas
 
 If you want to share information from one session with code or another agent, specify the information you need in the output schema. You can then inject these values into the prompt of a downstream agent or process them with code.
 
-When an agent reports the output via `myteam result`, the session automatically closes. Thus, agents can determine when an interactive conversation has fulfilled the objective and move to the next step of the workflow. 
+When an agent reports valid JSON output via `myteam result`, the session automatically closes. If `myteam result` receives malformed JSON, it reports an error, exits non-zero, and leaves the session open so the agent can try again. Thus, agents can determine when an interactive conversation has fulfilled the objective and move to the next step of the workflow. 
 
 If you want an agent to be able to report information but not end the session, use the resuming-session feature.
 

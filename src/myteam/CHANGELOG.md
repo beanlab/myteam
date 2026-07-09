@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.3.7
+
+- improved working in system prompt explaining `myteam result` usage
+- better error handling around malformed JSON passed to `myteam result`
+
 ## 0.3.6
 
 -  added `myteam_load(skill)` to jinja environments. Skill path is relative to the document.

@@ -63,7 +63,7 @@ def test_result_reads_stdin_for_managed_agent_session(tmp_path: Path) -> None:
     assert reported.output == {"from": "stdin"}
 
 
-def test_result_preserves_non_json_text_for_managed_agent_session(tmp_path: Path) -> None:
+def test_result_rejects_non_json_argument_without_completing_session(tmp_path: Path) -> None:
     with AgentResultServer() as server:
         completed = run_myteam_with_input(
             tmp_path,
@@ -71,11 +71,26 @@ def test_result_preserves_non_json_text_for_managed_agent_session(tmp_path: Path
             "plain text",
             env={ENV_AGENT_SESSION_RESULT_SOCKET: server.socket_path},
         )
-        reported = server.wait_for_result(timeout=1)
+        reported = server.wait_for_result(timeout=0.1)
 
-    assert completed.returncode == 0
-    assert reported is not None
-    assert reported.output == "plain text"
+    assert completed.returncode != 0
+    assert "Invalid JSON for myteam result" in completed.stderr
+    assert reported is None
+
+
+def test_result_rejects_malformed_json_stdin_without_completing_session(tmp_path: Path) -> None:
+    with AgentResultServer() as server:
+        completed = run_myteam_with_input(
+            tmp_path,
+            "result",
+            input_text='{"answer": ',
+            env={ENV_AGENT_SESSION_RESULT_SOCKET: server.socket_path},
+        )
+        reported = server.wait_for_result(timeout=0.1)
+
+    assert completed.returncode != 0
+    assert "Invalid JSON for myteam result" in completed.stderr
+    assert reported is None
 
 
 def test_result_outside_managed_session_fails_clearly(run_myteam, tmp_path: Path) -> None:

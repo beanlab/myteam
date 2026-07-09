@@ -146,12 +146,12 @@ def test_run_agent_populates_nonzero_exit_code_without_result(tmp_path: Path, mo
     assert result.output is None
 
 
-def test_run_agent_preserves_text_reported_by_myteam_result(tmp_path: Path, monkeypatch) -> None:
+def test_run_agent_preserves_json_string_reported_by_myteam_result(tmp_path: Path, monkeypatch) -> None:
     write_fake_agent_project(
         tmp_path,
         """
         from myteam.workflows.results import report_result
-        report_result('plain text result')
+        report_result('"plain text result"')
         """,
     )
     monkeypatch.chdir(tmp_path)

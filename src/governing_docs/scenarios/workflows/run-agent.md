@@ -124,7 +124,9 @@ When an agent session starts, `myteam` augments the provided prompt with brief i
 - the expected output format, using the provided output schema;
 - how to report the result using `myteam result`.
 
-When the agent calls `myteam result`, that command connects to the `run_agent` result socket and sends a JSONL-RPC-style message containing the output JSON.
+When the agent calls `myteam result`, that command parses the reported value as JSON, connects to the `run_agent` result socket, and sends a JSONL-RPC-style message containing the output JSON.
+
+`myteam result` requires valid JSON. If the reported JSON is malformed, `myteam result` prints a helpful error, exits non-zero, and does not complete the managed session. The agent may fix the JSON and call `myteam result` again.
 
 A managed agent session may also end cleanly without calling `myteam result`, for example when a human user or agent enters `/quit`. This is treated as a successful no-result completion. `run_agent` records the session metadata, transcript, and usage as usual, but the session output is `None`. This is distinct from an agent deliberately reporting an empty object (`{}`) with `myteam result '{}'`.
 

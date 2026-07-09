@@ -79,8 +79,8 @@ def _load_result(result_json: Any | None) -> Any:
         return result_json
 
     if not text.strip():
-        return None
+        raise ValueError("myteam result requires valid JSON input.")
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
-        return text
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON for myteam result: {exc}.") from exc
