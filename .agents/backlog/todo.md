@@ -1,6 +1,8 @@
-- workflow descriptions include usage
+- make sure `myteam start` called by an agent tool works correctly
+- workflow descriptions include usage instructions
 - support pydantic for output, with validation
 - fix usage
+- reserve banner in terminal view for workflow messages
 - print usage only on master `myteam start` invocation
 - command-line args to override md workflow settings (agent, model, reasoning, interactive)
 - print session titles on start and resume to orient the user
