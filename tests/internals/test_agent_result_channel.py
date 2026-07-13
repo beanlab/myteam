@@ -58,16 +58,16 @@ def test_report_result_reads_stdin_for_agent_session_socket(monkeypatch: pytest.
     assert result.output == {"from": "stdin"}
 
 
-def test_report_result_preserves_non_json_text_for_agent_session_socket(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_report_result_rejects_non_json_text_without_completing_session(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_result_env(monkeypatch)
     with AgentResultServer() as server:
         monkeypatch.setenv(ENV_AGENT_SESSION_RESULT_SOCKET, server.socket_path)
 
-        report_result("plain text")
-        result = server.wait_for_result(timeout=1)
+        with pytest.raises(ValueError, match="Invalid JSON for myteam result"):
+            report_result("plain text")
+        result = server.wait_for_result(timeout=0.1)
 
-    assert result is not None
-    assert result.output == "plain text"
+    assert result is None
 
 
 def test_report_result_outside_managed_session_errors(monkeypatch: pytest.MonkeyPatch) -> None:

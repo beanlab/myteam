@@ -1,6 +1,8 @@
-- support reading just the body from files with frontmatter
-- support jinja rendering on all imports (not just `.jinja` files)
+- make sure `myteam start` called by an agent tool works correctly
+- workflow descriptions include usage instructions
+- support pydantic for output, with validation
 - fix usage
+- reserve banner in terminal view for workflow messages
 - print usage only on master `myteam start` invocation
 - command-line args to override md workflow settings (agent, model, reasoning, interactive)
 - print session titles on start and resume to orient the user
@@ -10,7 +12,6 @@
 - instructions/principles for agent to build workflows
 - 3rd party skills/workflows as python packages
 - start a skill like you do a Markdown workflow
-- support pydantic for output, with validation
 - `myteam start <workflow.md> --fork` forks the current session and injects the specified prompt; not sure this makes sense for python workflows, but does work for MD workflows.  
 - expose workflow-level transcripts for debugging (decide UX)
 
