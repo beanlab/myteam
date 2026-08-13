@@ -122,6 +122,42 @@ def test_render_markdown_body_exposes_helper_functions(tmp_path: Path, monkeypat
     assert Path(seen["skill"]).resolve() == (docs / "skills" / "demo.md").resolve()
 
 
+def test_render_markdown_body_expands_home_paths_for_path_helpers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "fragment.txt").write_text("from home", encoding="utf-8")
+    (home / "resources").mkdir()
+    (home / "skills").mkdir()
+    (home / "skills" / "demo.md").write_text("demo", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    seen: dict[str, object] = {}
+
+    def fake_list_resources(prefix: str | None = None) -> str:
+        seen["prefix"] = prefix
+        return "LIST"
+
+    def fake_load_skill(skill: str) -> str:
+        seen["skill"] = skill
+        return "LOAD"
+
+    monkeypatch.setattr(prompt_rendering, "list_resources", fake_list_resources)
+    monkeypatch.setattr("myteam.skills.load_skill", fake_load_skill)
+
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ read_file('~/fragment.txt') }}|{{ myteam_list('~/resources') }}|"
+        "{{ myteam_load('~/skills/demo.md') }}",
+        source_path=tmp_path / "docs" / "skill.md",
+        input_values={},
+    )
+
+    assert rendered == "from home|LIST|LOAD"
+    assert Path(seen["prefix"]).resolve() == (home / "resources").resolve()
+    assert Path(seen["skill"]).resolve() == (home / "skills" / "demo.md").resolve()
+
+
 def test_render_markdown_body_can_opt_out_of_rendering_included_files(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()

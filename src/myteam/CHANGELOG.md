@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.8
+
+- Added `~` home-directory expansion to Jinja path helpers: `read_file()`, `myteam_list()`, and `myteam_load()`.
+
 ## 0.3.7
 
 - improved working in system prompt explaining `myteam result` usage

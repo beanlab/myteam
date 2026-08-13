@@ -62,7 +62,7 @@ def _resolve_base_dir(source_path: Path | str | None) -> Path:
 
 def _make_read_file_helper(base_dir: Path, *, input_values: dict[str, Any], include_stack: list[Path]):
     def read_file(file: str | Path, render: bool = True) -> str:
-        file_path = (base_dir / Path(file)).resolve()
+        file_path = (base_dir / Path(file).expanduser()).resolve()
         if render:
             return _render_included_template(file_path, input_values=input_values, include_stack=include_stack)
         return file_path.read_text(encoding="utf-8")
@@ -72,7 +72,7 @@ def _make_read_file_helper(base_dir: Path, *, input_values: dict[str, Any], incl
 
 def _make_list_helper(base_dir: Path):
     def myteam_list(path: str | Path) -> str:
-        target = (base_dir / Path(path)).resolve()
+        target = (base_dir / Path(path).expanduser()).resolve()
         return list_resources(str(target))
 
     return myteam_list
@@ -82,7 +82,7 @@ def _make_load_helper(base_dir: Path):
     def myteam_load(skill: str | Path) -> str:
         from .skills import load_skill
 
-        target = (base_dir / Path(skill)).resolve()
+        target = (base_dir / Path(skill).expanduser()).resolve()
         return load_skill(str(target))
 
     return myteam_load
