@@ -61,3 +61,5 @@ myteam start dev/review --input '{"files-changed": ["src/foo.py", "src/bar.py"]}
 When a workflow finishes, it will return output that matches the schema described in the workflow description.
 
 A workflow might not have an input or an output defined. If `input` or `output` are not shown with the description, assume these are `null`. You do not need to provide `null` input, and you should ignore `null` output.
+
+When invoking a workflow, do so with an indefinite timeout. Imposing a timelimit will likely result in errors.
