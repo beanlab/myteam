@@ -1,8 +1,10 @@
 {{ read_file('~/.agents/general-agent-behavior.md') }}
 
-{{ read_file('dev/code-planning.md') }}
+{{ read_file('dev/project.md') }}
 
-{{ read_file('dev/code-style.md') }}
+{{ read_file('dev/feature-flow/code-planning.md') }}
+
+{{ read_file('dev/feature-flow/code-style.md') }}
 
 {{ myteam_explain() }}
 

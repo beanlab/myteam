@@ -1,0 +1,47 @@
+# Document the Completed Feature
+
+{{ read_file('general-project-prompt.md') }}
+
+## Responsibility
+
+Update the documentation required by the completed, reviewed feature. Do not change application or test code unless a documentation validation mechanism itself requires generated output already covered by the plan.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Approved execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+## Current implementation result
+
+{{ implementation_result | tojson(indent=2) }}
+
+## Approved code review
+
+{{ code_review | tojson(indent=2) }}
+
+{% if previous_documentation_result %}
+## Superseded documentation result
+
+{{ previous_documentation_result | tojson(indent=2) }}
+
+Reinspect the current implementation and produce a complete replacement documentation result.
+{% endif %}
+
+{% if feedback %}
+## Feedback behind this iteration
+
+Source: {{ feedback_source }}
+
+{{ feedback | tojson(indent=2) }}
+{% endif %}
+
+Inspect the actual changes and relevant existing documentation. Update all affected user-facing, developer-facing, integration-facing, and operational material. Keep authoritative project documentation aligned with intended public behavior. Do not document speculative behavior or merely copy the implementation plan.
+
+Preserve the documentation's existing organization and level of detail. Validate examples, commands, references, and generated documentation as appropriate. Record relevant documentation intentionally left unchanged and why.

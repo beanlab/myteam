@@ -14,6 +14,8 @@
 - start a skill like you do a Markdown workflow
 - `myteam start <workflow.md> --fork` forks the current session and injects the specified prompt; not sure this makes sense for python workflows, but does work for MD workflows.  
 - expose workflow-level transcripts for debugging (decide UX)
+- prompt_file arg for run_agent
+- pydantic support
 
 # Harnesses
 

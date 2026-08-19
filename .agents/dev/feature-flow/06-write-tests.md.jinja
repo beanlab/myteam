@@ -1,0 +1,57 @@
+# Establish the Baseline and Write Feature Tests
+
+{{ read_file('general-project-prompt.md') }}
+
+## Testing approach
+
+Prefer tests at the outermost meaningful boundary. Protect externally observable contracts without coupling tests to private implementation details. Use realistic fixtures or fakes rather than mocks of internal call choreography. Use lower-level tests only when they are needed to cover unusually risky internals.
+
+## Responsibility
+
+Establish the repository baseline and implement only the tests required by the approved plan. Do not implement the feature behavior.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Approved execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+{% if previous_test_state %}
+## Superseded test state
+
+{{ previous_test_state | tojson(indent=2) }}
+
+Reassess the tests against the current plan and produce a complete replacement test-state report.
+{% endif %}
+
+{% if previous_implementation_result %}
+## Existing implementation state
+
+{{ previous_implementation_result | tojson(indent=2) }}
+{% endif %}
+
+{% if feedback %}
+## Feedback behind this iteration
+
+Source: {{ feedback_source }}
+
+{{ feedback | tojson(indent=2) }}
+{% endif %}
+
+Before editing, run the relevant existing tests and establish the current repository baseline. Then add or update the minimum tests needed to protect the public contracts and unusually risky internals identified by the plan.
+
+Run the tests after editing. Do not weaken existing tests or encode private implementation choreography.
+
+{% if previous_implementation_result %}
+This is a correction iteration and an earlier implementation remains in the repository. When behavior must change, tests should expose the reported defect before its correction. Passing or unchanged tests are acceptable when the correction is documentation-only or the relevant behavior is already adequately covered. Do not revert working implementation merely to manufacture a failing test.
+{% else %}
+This is the initial implementation iteration. New tests should fail for the expected missing feature behavior, not because of syntax errors, broken fixtures, incorrect assumptions, or unrelated failures.
+{% endif %}
+
+Set `ready_for_implementation` to true only when the baseline is understood, coverage is sufficient for the planned work, and every failure is an expected consequence of behavior that still needs implementation. Report the complete current test state.

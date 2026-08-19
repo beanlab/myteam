@@ -1,0 +1,55 @@
+# Review the Feature Plan
+
+{{ read_file('general-project-prompt.md') }}
+
+{{ read_file('code-planning.md') }}
+
+## Testing approach
+
+Prefer tests at the outermost meaningful boundary. Protect externally observable contracts without coupling tests to private implementation details. Use lower-level tests only when they are needed to cover unusually risky internals.
+
+## Responsibility
+
+Independently review the complete execution plan. Do not modify files or rewrite the plan yourself.
+
+Inspect the relevant project documentation and repository code. Verify the plan against the confirmed feature and approved design rather than trusting its summary.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Proposed execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+{% if previous_plan_review %}
+## Previous review
+
+{{ previous_plan_review | tojson(indent=2) }}
+
+Verify that its findings were addressed, but review the whole replacement plan rather than only those findings.
+{% endif %}
+
+{% if feedback %}
+## Feedback that led to this plan
+
+Source: {{ feedback_source }}
+
+{{ feedback | tojson(indent=2) }}
+{% endif %}
+
+Review for correctness, completeness, unnecessary complexity, sequencing, compatibility, risk controls, and contract-level test coverage. Confirm that the plan names sufficiently concrete changes and validation commands while avoiding implementation-detail lock-in in tests.
+
+A blocking finding must be tied directly to the feature brief, approved design, a public contract, security, or correctness. Do not block approval for optional improvements, unrelated cleanup, or personal preferences. On re-review, do not introduce new findings unless they result from the revised plan or could not reasonably have been identified in the previous plan.
+
+Use `approved` only when the plan is ready to execute. Otherwise use `revise`, provide specific actionable revisions, and select exactly one return point:
+
+- `planning` when the feature and design remain sound but the execution plan must change;
+- `design` when the approved approach, tradeoffs, or compatibility policy must be reconsidered;
+- `discovery` when the requested behavior, scope, acceptance criteria, or public contract is unclear or incorrect.
+
+Choose the latest phase capable of correcting the problem. Do not ask a downstream phase to revise an upstream decision.

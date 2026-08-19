@@ -1,0 +1,59 @@
+# Plan the Feature Work
+
+{{ read_file('general-project-prompt.md') }}
+
+{{ read_file('code-planning.md') }}
+
+{{ read_file('code-style.md') }}
+
+## Testing approach
+
+Prefer tests at the outermost meaningful boundary. Protect externally observable contracts without coupling tests to private implementation details. Use lower-level tests only when they are needed to cover unusually risky internals.
+
+## Responsibility
+
+Produce an executable plan for the approved feature and design. Inspect the actual repository in enough detail to name concrete files, contracts, functions, and validation commands. Do not modify files.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+{% if previous_execution_plan %}
+## Superseded execution plan
+
+{{ previous_execution_plan | tojson(indent=2) }}
+
+This plan is historical context. Produce a complete replacement rather than a patch.
+{% endif %}
+
+{% if previous_implementation_result %}
+## Existing implementation state
+
+{{ previous_implementation_result | tojson(indent=2) }}
+{% endif %}
+
+{% if feedback %}
+## Feedback requiring replanning
+
+Source: {{ feedback_source }}
+
+{{ feedback | tojson(indent=2) }}
+{% endif %}
+
+Plan the smallest correct change. Describe:
+
+- baseline checks and existing failures that must be distinguished from feature work;
+- ordered prerequisite refactoring;
+- tests that protect public behavior and risky internals;
+- the expected failing behavior before implementation;
+- ordered implementation changes and code to reuse;
+- compatibility or migration work;
+- documentation changes;
+- exact files, classes, functions, and public contracts expected to change;
+- validation commands and risk safeguards.
+
+Do not add speculative abstractions or dependencies. If a new dependency is genuinely preferable, identify it as requiring user approval. The result must be a complete plan another agent can execute without reconstructing your reasoning.

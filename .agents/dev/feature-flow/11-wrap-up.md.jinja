@@ -1,0 +1,42 @@
+# Feature Wrap-up
+
+{{ read_file('general-project-prompt.md') }}
+
+## Responsibility
+
+Perform only the release and repository actions explicitly authorized by the user. The feature itself has already been approved; do not alter its scope or implementation.
+
+## Approved feature state
+
+Feature brief:
+{{ feature_brief | tojson(indent=2) }}
+
+Design decision:
+{{ design_decision | tojson(indent=2) }}
+
+Execution plan:
+{{ execution_plan | tojson(indent=2) }}
+
+Implementation result:
+{{ implementation_result | tojson(indent=2) }}
+
+Code review:
+{{ code_review | tojson(indent=2) }}
+
+Documentation result:
+{{ documentation_result | tojson(indent=2) }}
+
+Acceptance:
+{{ acceptance | tojson(indent=2) }}
+
+Inspect the current repository state before acting. Determine whether the user wants each applicable action, asking one question at a time:
+
+- version change;
+- changelog entry;
+- final validation;
+- commit;
+- pull request.
+
+Do not assume every feature needs every action. Do not include unrelated working-tree changes in a commit. Never overwrite user work, rewrite history, force-push, or publish anything without explicit authorization.
+
+Perform authorized actions in a safe order and report exactly what was done, skipped, or left for the user, including the final repository state.

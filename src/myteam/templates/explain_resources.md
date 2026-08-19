@@ -33,7 +33,7 @@ To load a skill, run:
 
 `myteam load <skillname>`
 
-The skill name should be exactly what was displayed to you.
+The skill name should be **exactly** what was displayed to you in a `myteam list` command, including the full path and file extension. 
 
 Skills might come with information about additional resources. 
 These will be described when you load the skill.
