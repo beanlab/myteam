@@ -6,7 +6,8 @@ usage: no arguments; the interactive discovery session will ask for the feature 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import time
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -208,6 +209,22 @@ class ReturnToDocumentation(ReturnToStep):
     """Requests another documentation pass followed by sign-off."""
 
 
+@dataclass(frozen=True)
+class UsageSnapshot:
+    sequence: int
+    step: str
+    session_family: str
+    agent: str
+    configured_model: str
+    reasoning: str
+    interactive: bool
+    session_mode: str
+    native_session_id: str | None
+    elapsed_seconds: float
+    outcome: str
+    usage: list[dict[str, Any]]
+
+
 @dataclass
 class FlowState:
     feature_brief: dict[str, Any] | None = None
@@ -231,9 +248,11 @@ class FlowState:
     delivery_session: SessionResult | None = None
     code_reviewer_session: SessionResult | None = None
     documentation_session: SessionResult | None = None
+    usage_snapshots: list[UsageSnapshot] = field(default_factory=list)
 
 
 def run_step(
+        state: FlowState,
         prompt_name: str,
         *,
         output: dict[str, Any],
@@ -254,6 +273,7 @@ def run_step(
         "workflow_step": prompt_name.removesuffix(".md.jinja"),
         "context_tags": context_tags,
     }
+    started_at = time.monotonic()
     result = run_agent(
         prompt=prompt_path.read_text(),
         prompt_source_path=prompt_path,
@@ -264,6 +284,22 @@ def run_step(
         reasoning=settings.reasoning,
         interactive=interactive,
         session_id=session_id,
+    )
+    state.usage_snapshots.append(
+        UsageSnapshot(
+            sequence=len(state.usage_snapshots) + 1,
+            step=prompt_name.removesuffix(".md.jinja"),
+            session_family=session_name,
+            agent=AGENT,
+            configured_model=settings.model,
+            reasoning=settings.reasoning,
+            interactive=interactive,
+            session_mode="resumed" if session_id is not None else "new",
+            native_session_id=result.session_id,
+            elapsed_seconds=time.monotonic() - started_at,
+            outcome="completed" if result.output is not None else "no_result",
+            usage=[asdict(item) for item in result.usage],
+        )
     )
     if result.output is None:
         raise WorkflowStopped(f"{prompt_name} ended without reporting a result")
@@ -280,6 +316,113 @@ def require_value(result: SessionResult, field: str, allowed: set[str]) -> str:
 
 def session_id(session: SessionResult | None) -> str | None:
     return session.session_id if session is not None else None
+
+
+def empty_usage(model: str | None = None) -> dict[str, Any]:
+    return {
+        "model": model,
+        "input_tokens": 0,
+        "cached_input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_output_tokens": 0,
+        "total_tokens": 0,
+        "estimated_cost": 0.0,
+    }
+
+
+def usage_delta(
+        current: dict[str, Any],
+        previous: dict[str, Any] | None,
+) -> dict[str, Any]:
+    delta = empty_usage(str(current.get("model", "")))
+    for field_name in delta.keys() - {"model"}:
+        current_value = current.get(field_name, 0)
+        previous_value = previous.get(field_name, 0) if previous is not None else 0
+        delta[field_name] = (
+            current_value - previous_value
+            if current_value >= previous_value
+            else current_value
+        )
+    return delta
+
+
+def add_usage(total: dict[str, Any], usage: dict[str, Any]):
+    for field_name in total.keys() - {"model"}:
+        total[field_name] += usage[field_name]
+
+
+def build_usage_report(state: FlowState) -> dict[str, Any]:
+    previous_usage: dict[tuple[str, str], dict[str, Any]] = {}
+    sessions: dict[str, dict[str, Any]] = {}
+    steps: dict[str, dict[str, Any]] = {}
+    totals_by_model: dict[str, dict[str, Any]] = {}
+
+    for snapshot in state.usage_snapshots:
+        step = steps.setdefault(
+            snapshot.step,
+            {
+                "step": snapshot.step,
+                "session_family": snapshot.session_family,
+                "invocation_count": 0,
+                "elapsed_seconds": 0.0,
+                "usage": {},
+            },
+        )
+        step["invocation_count"] += 1
+        step["elapsed_seconds"] += snapshot.elapsed_seconds
+
+        if snapshot.native_session_id is not None:
+            session = sessions.setdefault(
+                snapshot.native_session_id,
+                {
+                    "native_session_id": snapshot.native_session_id,
+                    "invocation_count": 0,
+                    "elapsed_seconds": 0.0,
+                    "steps": [],
+                    "usage": {},
+                },
+            )
+            session["invocation_count"] += 1
+            session["elapsed_seconds"] += snapshot.elapsed_seconds
+            if snapshot.step not in session["steps"]:
+                session["steps"].append(snapshot.step)
+
+        for current_usage in snapshot.usage:
+            model = str(current_usage.get("model", ""))
+            usage_key = (snapshot.native_session_id or f"unknown-{snapshot.sequence}", model)
+            delta = usage_delta(current_usage, previous_usage.get(usage_key))
+            previous_usage[usage_key] = current_usage
+
+            step_usage = step["usage"].setdefault(model, empty_usage(model))
+            add_usage(step_usage, delta)
+            model_total = totals_by_model.setdefault(model, empty_usage(model))
+            add_usage(model_total, delta)
+
+            if snapshot.native_session_id is not None:
+                sessions[snapshot.native_session_id]["usage"][model] = current_usage
+
+    session_reports = []
+    for session in sessions.values():
+        session["usage"] = list(session["usage"].values())
+        session_reports.append(session)
+
+    step_reports = []
+    for step in steps.values():
+        step["usage"] = list(step["usage"].values())
+        step_reports.append(step)
+
+    totals = empty_usage()
+    for model_total in totals_by_model.values():
+        add_usage(totals, model_total)
+    totals.pop("model")
+
+    return {
+        "snapshots": [asdict(snapshot) for snapshot in state.usage_snapshots],
+        "sessions": session_reports,
+        "steps": step_reports,
+        "models": list(totals_by_model.values()),
+        "totals": totals,
+    }
 
 
 def set_feedback(state: FlowState, signal: ReturnToStep):
@@ -321,6 +464,7 @@ def delivery_context(state: FlowState) -> dict[str, Any]:
 def run_discovery(state: FlowState) -> dict[str, Any]:
     while True:
         state.discovery_session = run_step(
+            state,
             "01-discover.md.jinja",
             input={
                 "previous_feature_brief": state.feature_brief,
@@ -343,6 +487,7 @@ def run_discovery(state: FlowState) -> dict[str, Any]:
 def run_design(state: FlowState) -> dict[str, Any]:
     while True:
         state.design_session = run_step(
+            state,
             "02-evaluate.md.jinja",
             input={
                 "feature_brief": state.feature_brief,
@@ -357,6 +502,7 @@ def run_design(state: FlowState) -> dict[str, Any]:
         state.solution_analysis = state.design_session.output
 
         state.design_session = run_step(
+            state,
             "03-select-approach.md.jinja",
             input={
                 "feature_brief": state.feature_brief,
@@ -381,6 +527,7 @@ def run_design(state: FlowState) -> dict[str, Any]:
 def run_planning(state: FlowState) -> dict[str, Any]:
     while True:
         state.planner_session = run_step(
+            state,
             "04-plan.md.jinja",
             input={
                 **project_context(state),
@@ -402,6 +549,7 @@ def run_planning(state: FlowState) -> dict[str, Any]:
 
 def run_plan_review(state: FlowState) -> dict[str, Any]:
     state.plan_reviewer_session = run_step(
+        state,
         "05-review-plan.md.jinja",
         input={
             **delivery_context(state),
@@ -429,6 +577,7 @@ def run_plan_review(state: FlowState) -> dict[str, Any]:
 
 def run_tests(state: FlowState) -> dict[str, Any]:
     state.delivery_session = run_step(
+        state,
         "06-write-tests.md.jinja",
         input={
             **delivery_context(state),
@@ -449,6 +598,7 @@ def run_tests(state: FlowState) -> dict[str, Any]:
 
 def run_initial_implementation(state: FlowState):
     state.delivery_session = run_step(
+        state,
         "07-implement.md.jinja",
         input={
             **delivery_context(state),
@@ -467,6 +617,7 @@ def run_initial_implementation(state: FlowState):
 
 def run_remediation(state: FlowState, review_feedback: dict[str, Any]):
     state.delivery_session = run_step(
+        state,
         "08-remediate.md.jinja",
         input={
             **delivery_context(state),
@@ -492,6 +643,7 @@ def run_remediation(state: FlowState, review_feedback: dict[str, Any]):
 
 def run_review_resolution(state: FlowState, reason: str) -> str:
     state.code_reviewer_session = run_step(
+        state,
         "08-resolve-review.md.jinja",
         input={
             **delivery_context(state),
@@ -554,6 +706,7 @@ def run_implementation(state: FlowState) -> dict[str, Any]:
 
 def run_code_review(state: FlowState) -> dict[str, Any]:
     state.code_reviewer_session = run_step(
+        state,
         "08-review-code.md.jinja",
         input={
             **delivery_context(state),
@@ -586,6 +739,7 @@ def run_code_review(state: FlowState) -> dict[str, Any]:
 def run_documentation(state: FlowState) -> dict[str, Any]:
     while True:
         state.documentation_session = run_step(
+            state,
             "09-document.md.jinja",
             input={
                 **delivery_context(state),
@@ -608,6 +762,7 @@ def run_documentation(state: FlowState) -> dict[str, Any]:
 
 def run_sign_off(state: FlowState) -> dict[str, Any]:
     state.discovery_session = run_step(
+        state,
         "10-sign-off.md.jinja",
         input={
             **delivery_context(state),
@@ -641,6 +796,7 @@ def run_sign_off(state: FlowState) -> dict[str, Any]:
 
 def run_wrap_up(state: FlowState) -> dict[str, Any]:
     wrap_up = run_step(
+        state,
         "11-wrap-up.md.jinja",
         input={
             **delivery_context(state),
@@ -671,10 +827,13 @@ def run_wrap_up(state: FlowState) -> dict[str, Any]:
 
 
 def main():
+    state = FlowState()
     try:
-        report_workflow_result(json.dumps(run_discovery(FlowState()), indent=2))
+        result = run_discovery(state)
     except WorkflowStopped as error:
-        report_workflow_result(json.dumps({"status": "stopped", "reason": str(error)}, indent=2))
+        result = {"status": "stopped", "reason": str(error)}
+    result["usage"] = build_usage_report(state)
+    report_workflow_result(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
