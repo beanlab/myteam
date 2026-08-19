@@ -55,6 +55,26 @@ Use strong models for ambiguity, architecture, implementation, testing, and inde
 
 Keep model names configurable because availability is specific to the selected agent runtime and project environment. Validate that every prompt maps to a known session family and every family has settings.
 
+## Preserve operational usage data
+
+Do not discard `SessionResult.usage` in multi-step workflows that need cost or model-selection visibility. Prefer framework-level usage logging when it provides the necessary labels and aggregation. Otherwise collect usage centrally around `run_agent()` rather than adding bookkeeping independently to every step.
+
+For each invocation, preserve a raw usage observation labeled with:
+
+- a stable workflow step and session family;
+- agent, configured model, and reasoning setting;
+- whether the session is new or resumed;
+- the native session ID when later investigation justifies retaining it;
+- interactive or headless mode;
+- elapsed time and completion outcome;
+- every runtime-reported model's token counts and estimated cost.
+
+Record usage before raising when a completed session returns `output=None`. Do not put prompt bodies, transcripts, secrets, or semantic workflow artifacts in usage metadata. Treat native session IDs as potentially sensitive operational identifiers.
+
+Preserve runtime-reported cumulative values as raw snapshots. For resumed sessions, derive invocation and step usage by subtracting the prior snapshot for the same native session and model; never sum cumulative snapshots directly. Session totals come from the latest snapshot. If a runtime reports invocation-scoped rather than cumulative usage, retain that scope instead of applying cumulative-delta logic.
+
+Report concise totals by step, session family, and model when useful, while retaining enough raw data to investigate unexpectedly costly sessions. Evaluate model changes using observed quality and review or replanning cycles alongside token cost—a cheaper step can increase total workflow cost if it causes another iteration.
+
 ## Make artifacts canonical
 
 Every step should return a complete artifact, not a patch to a previous artifact. Pass prior artifacts under names such as `previous_execution_plan` and tell the prompt they are superseded context.
