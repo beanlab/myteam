@@ -37,7 +37,7 @@ class AgentRuntimeConfig:
         list[str],
     ]
     source: Path | str
-    get_usage_info: Callable[[Path], UsageInfo | None] | None = None
+    get_usage_info: Callable[[Path], UsageInfo | list[UsageInfo] | None] | None = None
 
 
 class AgentConfigError(Exception):
@@ -230,7 +230,7 @@ def _get_session_info_callable(
 def _get_usage_info_callable(
     config_object: Any,
     session_context: AgentSessionContext,
-) -> Callable[[Path], UsageInfo | None] | None:
+) -> Callable[[Path], UsageInfo | list[UsageInfo] | None] | None:
     if not hasattr(config_object, "get_usage_info"):
         return None
 
@@ -242,7 +242,7 @@ def _get_usage_info_callable(
         error_message="get_usage_info must accept session_path",
     )
 
-    def get_usage_info(session_path: Path) -> UsageInfo | None:
+    def get_usage_info(session_path: Path) -> UsageInfo | list[UsageInfo] | None:
         return module_get_usage_info(session_path)
 
     return get_usage_info
