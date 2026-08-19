@@ -17,6 +17,7 @@
 - prompt_file arg for run_agent
 - pydantic support
 - figure out a way for simple sub-session bulk-prompting - i.e. pass a single string to stdin that is included as `{{ input }}`. Maybe the named values come as `--args`?
+- feature-flow resumability?
 
 # Harnesses
 
