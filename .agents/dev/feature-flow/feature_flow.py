@@ -27,12 +27,12 @@ class SessionSettings:
 
 
 SESSION_SETTINGS = {
-    "product": SessionSettings(model=STRONG_MODEL, reasoning="high"),
-    "design": SessionSettings(model=STRONG_MODEL, reasoning="high"),
-    "planning": SessionSettings(model=STRONG_MODEL, reasoning="high"),
-    "plan_review": SessionSettings(model=STRONG_MODEL, reasoning="high"),
-    "delivery": SessionSettings(model=STRONG_MODEL, reasoning="high"),
-    "code_review": SessionSettings(model=STRONG_MODEL, reasoning="high"),
+    "product": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
+    "design": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
+    "planning": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
+    "plan_review": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
+    "delivery": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
+    "code_review": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
     "documentation": SessionSettings(model=MID_MODEL, reasoning="medium"),
     "release": SessionSettings(model=ECONOMICAL_MODEL, reasoning="low"),
 }
