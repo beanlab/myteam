@@ -100,8 +100,9 @@ def test_render_markdown_body_exposes_helper_functions(tmp_path: Path, monkeypat
 
     seen: dict[str, object] = {}
 
-    def fake_list_resources(prefix: str | None = None) -> str:
-        seen["prefix"] = prefix
+    def fake_list_resources(*targets: str | Path, directory: bool = False) -> str:
+        seen["targets"] = targets
+        seen["directory"] = directory
         return "LIST"
 
     def fake_load_skill(skill: str) -> str:
@@ -112,13 +113,18 @@ def test_render_markdown_body_exposes_helper_functions(tmp_path: Path, monkeypat
     monkeypatch.setattr("myteam.skills.load_skill", fake_load_skill)
 
     rendered = prompt_rendering.render_markdown_body(
-        "{{ myteam_explain() }}|{{ myteam_onboard() }}|{{ myteam_list('resources') }}|{{ myteam_load('skills/demo.md') }}",
+        "{{ myteam_explain() }}|{{ myteam_onboard() }}|"
+        "{{ myteam_list('resources', 'other', directory=True) }}|{{ myteam_load('skills/demo.md') }}",
         source_path=docs / "skill.md",
         input_values={},
     )
 
     assert rendered == "EXPLAIN|ONBOARD|LIST|LOAD"
-    assert Path(seen["prefix"]).resolve() == resources.resolve()
+    assert tuple(Path(path).resolve() for path in seen["targets"]) == (
+        resources.resolve(),
+        (docs / "other").resolve(),
+    )
+    assert seen["directory"] is True
     assert Path(seen["skill"]).resolve() == (docs / "skills" / "demo.md").resolve()
 
 
@@ -135,8 +141,8 @@ def test_render_markdown_body_expands_home_paths_for_path_helpers(
 
     seen: dict[str, object] = {}
 
-    def fake_list_resources(prefix: str | None = None) -> str:
-        seen["prefix"] = prefix
+    def fake_list_resources(*targets: str | Path, directory: bool = False) -> str:
+        seen["targets"] = targets
         return "LIST"
 
     def fake_load_skill(skill: str) -> str:
@@ -147,15 +153,82 @@ def test_render_markdown_body_expands_home_paths_for_path_helpers(
     monkeypatch.setattr("myteam.skills.load_skill", fake_load_skill)
 
     rendered = prompt_rendering.render_markdown_body(
-        "{{ read_file('~/fragment.txt') }}|{{ myteam_list('~/resources') }}|"
+        "{{ read_file('~/fragment.txt') }}|{{ myteam_list('~/resources', 'local') }}|"
         "{{ myteam_load('~/skills/demo.md') }}",
         source_path=tmp_path / "docs" / "skill.md",
         input_values={},
     )
 
     assert rendered == "from home|LIST|LOAD"
-    assert Path(seen["prefix"]).resolve() == (home / "resources").resolve()
+    assert tuple(Path(path).resolve() for path in seen["targets"]) == (
+        (home / "resources").resolve(),
+        (tmp_path / "docs" / "local").resolve(),
+    )
     assert Path(seen["skill"]).resolve() == (home / "skills" / "demo.md").resolve()
+
+
+def test_myteam_list_without_paths_uses_the_document_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    seen: dict[str, object] = {}
+
+    def fake_list_resources(*targets: str | Path, directory: bool = False) -> str:
+        seen["targets"] = targets
+        seen["directory"] = directory
+        return "LIST"
+
+    monkeypatch.setattr(prompt_rendering, "list_resources", fake_list_resources)
+
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ myteam_list() }}",
+        source_path=docs / "skill.md",
+        input_values={},
+    )
+
+    assert rendered == "LIST"
+    assert tuple(Path(path).resolve() for path in seen["targets"]) == (docs.resolve(),)
+    assert seen["directory"] is False
+
+
+def test_myteam_list_symlink_loop_uses_listing_error_boundary(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "loop").symlink_to("loop")
+
+    with pytest.raises(SystemExit) as raised:
+        prompt_rendering.render_markdown_body(
+            "before {{ myteam_list('loop') }} after",
+            source_path=docs / "skill.md",
+            input_values={},
+        )
+
+    captured = capsys.readouterr()
+    assert raised.value.code == 1
+    assert captured.out == ""
+    assert "loop" in captured.err
+    assert "Too many levels of symbolic links" in captured.err
+
+
+def test_myteam_list_system_exit_aborts_template_rendering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def failing_list_resources(*targets: str | Path, directory: bool = False) -> str:
+        raise SystemExit(1)
+
+    monkeypatch.setattr(prompt_rendering, "list_resources", failing_list_resources)
+
+    with pytest.raises(SystemExit) as raised:
+        prompt_rendering.render_markdown_body(
+            "before {{ myteam_list('missing') }} after",
+            source_path=tmp_path / "docs" / "skill.md",
+            input_values={},
+        )
+
+    assert raised.value.code == 1
 
 
 def test_render_markdown_body_can_opt_out_of_rendering_included_files(tmp_path: Path) -> None:

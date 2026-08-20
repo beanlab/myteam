@@ -2,6 +2,8 @@
 
 ## 0.3.8
 
+- Expanded `myteam list`, `list_resources()`, and Jinja `myteam_list()` to accept multiple file or directory targets, with `-d`/`--directory` selection, deduplication, and root-cause filesystem diagnostics.
+- Replaced the Fire-generated CLI with explicit `argparse` commands. Undocumented Fire argument forms and the `list_resources(prefix=...)` keyword are no longer supported.
 - Added `~` home-directory expansion to Jinja path helpers: `read_file()`, `myteam_list()`, and `myteam_load()`.
 
 ## 0.3.7

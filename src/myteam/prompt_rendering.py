@@ -71,9 +71,10 @@ def _make_read_file_helper(base_dir: Path, *, input_values: dict[str, Any], incl
 
 
 def _make_list_helper(base_dir: Path):
-    def myteam_list(path: str | Path) -> str:
-        target = (base_dir / Path(path).expanduser()).resolve()
-        return list_resources(str(target))
+    def myteam_list(*paths: str | Path, directory: bool = False) -> str:
+        requested = paths or (base_dir,)
+        targets = tuple(base_dir / Path(path).expanduser() for path in requested)
+        return list_resources(*targets, directory=directory)
 
     return myteam_list
 

@@ -64,9 +64,9 @@ Instead of a single `AGENTS.md` that all agents use, define your various agent r
 
 For example, you might have separate roles for planning, implementing, reviewing, documenting, etc.  
 
-All Markdown bodies are rendered with jinja2. The environment comes with `read_file` so you can import content from other files and thus compose single documents from multiple sources.
+All Markdown bodies are rendered with Jinja2. The environment comes with `read_file` so you can import content from other files and thus compose single documents from multiple sources.
 
-You can also use the `myteam_explain()` to include instructions to your agent about how to use skills and workflows and `myteam_list(dir)` to list skills and workflows in the specified directory, the controlling which agents can use skills and workflows and which skills and workflows are visible to it.
+You can also use `myteam_explain()` to include instructions about skills and workflows and `myteam_list()` to control which resources are visible to an agent. See [Jinja template rendering](scenarios/jinja-support.md) for helper documentation.
 
 ### Defining Outputs
 
