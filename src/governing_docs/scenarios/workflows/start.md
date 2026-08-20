@@ -20,7 +20,7 @@ report_workflow_result("final text returned by myteam start")
 
 `report_workflow_result(...)` may be called multiple times. The supervisor concatenates non-`None` text fragments in call order. Calling `report_workflow_result(None)` appends no text. If a workflow reports no text, `myteam start` prints nothing for that workflow result.
 
-Workflow stdout/stderr are live display/logging streams. They are not the returned result of `myteam start`. The supervisor may record display transcripts for debugging, but PTY transcripts are not replayed as result text.
+Workflow stdout/stderr are live display/logging streams. They are not the explicit result of `myteam start`; that clean boundary is the text sent through `report_workflow_result(...)`. Live display, such as `run_agent` lifecycle indicators, may appear alongside command output. The supervisor may record display transcripts for debugging, but they are not replayed as result text.
 
 ## `myteam start` play-by-play
 

@@ -69,6 +69,7 @@ def write_recording_agent_project(tmp_path: Path) -> None:
     (tmp_path / ".myteam.yaml").write_text(
         "defaults:\n"
         "  agent: fake-agent\n"
+        "  session_name: Configured session\n"
         "  model: default-model\n"
         "  reasoning: low\n"
         "  interactive: false\n"
@@ -86,7 +87,7 @@ def read_observed_settings(tmp_path: Path) -> dict[str, object]:
     return json.loads((tmp_path / "observed-agent-settings.json").read_text(encoding="utf-8"))
 
 
-def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch) -> None:
+def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch, capsys) -> None:
     write_recording_agent_project(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -96,6 +97,9 @@ def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch) -> 
     assert result.session_id == "native-session-from-fake"
     assert result.output is not None
     assert "Hello Ada" in result.output["prompt"]
+    captured = capsys.readouterr()
+    assert 'name="Configured session"' in captured.out
+    assert "Configured session" not in result.transcript
     assert read_observed_settings(tmp_path) == {
         "model": "default-model",
         "reasoning": "low",
@@ -106,13 +110,14 @@ def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch) -> 
     }
 
 
-def test_run_agent_explicit_arguments_override_myteam_yaml_defaults(tmp_path: Path, monkeypatch) -> None:
+def test_run_agent_explicit_arguments_override_myteam_yaml_defaults(tmp_path: Path, monkeypatch, capsys) -> None:
     write_recording_agent_project(tmp_path)
     monkeypatch.chdir(tmp_path)
 
-    run_agent(
+    result = run_agent(
         prompt="Override test",
         agent="fake-agent",
+        session_name="Explicit session",
         model="explicit-model",
         reasoning="high",
         interactive=True,
@@ -121,6 +126,10 @@ def test_run_agent_explicit_arguments_override_myteam_yaml_defaults(tmp_path: Pa
         extra_args=("--explicit", "value"),
     )
 
+    captured = capsys.readouterr()
+    assert 'name="Explicit session"' in captured.out
+    assert "Configured session" not in captured.out
+    assert "Explicit session" not in result.transcript
     assert read_observed_settings(tmp_path) == {
         "model": "explicit-model",
         "reasoning": "high",

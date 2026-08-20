@@ -17,7 +17,7 @@ from typing import Any
 
 from .. import templates
 from ..prompt_rendering import render_prompt_text
-from ..config import WorkflowDefaults, load_myteam_config
+from ..config import WorkflowDefaults, load_myteam_config, normalize_session_name
 from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
@@ -30,6 +30,10 @@ from .results import SessionResult, UsageInfo
 
 _AGENT_RESULT_POLL_SECONDS = 0.05
 _AGENT_EXIT_TIMEOUT_SECONDS = 2.0
+_INDICATOR_WIDTH = 44
+_BLUE_BOLD = "\x1b[1;34m"
+_RED_BOLD = "\x1b[1;31m"
+_RESET = "\x1b[0m"
 
 
 def run_agent(
@@ -38,6 +42,7 @@ def run_agent(
     input: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
     agent: str | None = None,
+    session_name: str | None = None,
     model: str | None = None,
     reasoning: str | None = None,
     extra_args: tuple[str, ...] | list[str] | None = None,
@@ -45,11 +50,14 @@ def run_agent(
     session_id: str | None = None,
     fork: bool | None = None,
     prompt_source_path: Path | str | None = None,
-
 ) -> SessionResult:
     cwd = Path.cwd().resolve()
     defaults = _load_defaults(cwd)
     agent_name = _choose(agent, defaults.agent, DEFAULT_AGENT)
+    effective_session_name = normalize_session_name(
+        _choose(session_name, defaults.session_name, "New session")
+    )
+    assert effective_session_name is not None
     runtime_config = _resolve_runtime_config(agent_name, cwd)
 
     effective_model = _choose(model, defaults.model, None)
@@ -94,28 +102,153 @@ def run_agent(
             nonce=session_nonce,
             agent_name=agent_name,
         )
+        session_closed = False
+        end_started = False
         try:
+            _emit_indicator(
+                _format_start_indicator(
+                    name=effective_session_name,
+                    agent=agent_name,
+                    model=effective_model,
+                    reasoning=effective_reasoning,
+                    interactive=bool(effective_interactive),
+                    session_id=effective_session_id,
+                    fork=bool(effective_fork),
+                )
+            )
             reported_result, exit_code = _forward_pty_until_complete(
                 session,
                 result_server,
                 exit_sequence=runtime_config.exit_sequence,
             )
+            try:
+                _close_launched_session(session)
+            finally:
+                session_closed = True
             transcript = session.recording.snapshot()
-        finally:
-            session.close()
 
-    output_value = reported_result.output if reported_result is not None else None
-    if reported_result is not None and reported_result.status != "ok":
-        raise RuntimeError(json.dumps({"status": reported_result.status, "output": output_value}))
+            output_value = reported_result.output if reported_result is not None else None
+            if reported_result is not None and reported_result.status != "ok":
+                raise RuntimeError(json.dumps({"status": reported_result.status, "output": output_value}))
 
-    native_session_id, usage = _resolve_session_metadata(runtime_config, session_nonce)
-    return SessionResult(
-        exit_code=exit_code,
-        output=output_value,
-        usage=usage,
-        transcript=transcript,
-        session_id=native_session_id,
+            native_session_id, usage = _resolve_session_metadata(runtime_config, session_nonce)
+            result = SessionResult(
+                exit_code=exit_code,
+                output=output_value,
+                usage=usage,
+                transcript=transcript,
+                session_id=native_session_id,
+            )
+            end_started = True
+            _emit_indicator(_format_end_indicator(effective_session_name, result))
+            return result
+        except BaseException:
+            if not session_closed:
+                try:
+                    _close_launched_session(session)
+                except BaseException:
+                    pass
+            if not end_started:
+                try:
+                    _emit_indicator(_format_exception_end_indicator(effective_session_name))
+                except BaseException:
+                    pass
+            raise
+
+
+def _format_start_indicator(
+    *,
+    name: str,
+    agent: str,
+    model: str | None,
+    reasoning: str | None,
+    interactive: bool,
+    session_id: str | None,
+    fork: bool,
+) -> bytes:
+    title = "Session resumed" if session_id is not None and not fork else "Session started"
+    first_fields = [f"name={_quote(name)}", f"agent={_quote(agent)}"]
+    if session_id is not None:
+        source_name = "forked_from" if fork else "session_id"
+        first_fields.append(f"{source_name}={_quote(session_id)}")
+
+    second_fields = []
+    if model is not None:
+        second_fields.append(f"model={_quote(model)}")
+    if reasoning is not None:
+        second_fields.append(f"reasoning={_quote(reasoning)}")
+    second_fields.append(f"interactive={json.dumps(interactive)}")
+    return _format_indicator(
+        title,
+        [" ".join(first_fields), " ".join(second_fields)],
+        color=_BLUE_BOLD,
+        leading_newline=False,
     )
+
+
+def _format_end_indicator(name: str, result: SessionResult) -> bytes:
+    metadata = [f"name={_quote(name)}"]
+    if result.session_id is not None:
+        metadata.append(f"session_id={_quote(result.session_id)}")
+    color = _RED_BOLD if result.exit_code != 0 else _BLUE_BOLD
+    return _format_indicator(
+        "Session ended",
+        [" ".join(metadata)],
+        color=color,
+        leading_newline=True,
+    )
+
+
+def _format_exception_end_indicator(name: str) -> bytes:
+    return _format_indicator(
+        "Session ended",
+        [f"name={_quote(name)}"],
+        color=_BLUE_BOLD,
+        leading_newline=True,
+    )
+
+
+def _format_indicator(
+    title: str,
+    metadata: list[str],
+    *,
+    color: str,
+    leading_newline: bool,
+) -> bytes:
+    top = f"┌─ {title} "
+    top += "─" * max(1, _INDICATOR_WIDTH - len(top))
+    bottom = "└" + "─" * (_INDICATOR_WIDTH - 1)
+    plain = "NO_COLOR" in os.environ
+
+    if plain:
+        lines = [top, *(f"│ {line}" for line in metadata), bottom]
+    else:
+        lines = [
+            f"{color}{top}{_RESET}",
+            *(f"{color}│{_RESET} {line}" for line in metadata),
+            f"{color}{bottom}{_RESET}",
+        ]
+
+    prefix = "\n" if leading_newline else ""
+    return (prefix + "\n".join(lines) + "\n").encode("utf-8")
+
+
+def _quote(value: Any) -> str:
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def _emit_indicator(indicator: bytes) -> None:
+    write_bytes(binary_output_stream(sys.stdout), indicator)
+
+
+def _close_launched_session(session: ManagedPtyProcess) -> None:
+    output = binary_output_stream(sys.stdout)
+    try:
+        if session.poll() is None:
+            session.terminate()
+        drain_pty_output(session, stdout_writer=lambda chunk: write_bytes(output, chunk))
+    finally:
+        session.close()
 
 
 def build_agent_prompt(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ def test_load_myteam_config_parses_defaults_and_agents(tmp_path: Path) -> None:
     config_path.write_text(
         "defaults:\n"
         "  agent: myagent\n"
+        "  session_name: 1234\n"
         "  model: gpt-5.4-nano\n"
         "  reasoning: medium\n"
         "  interactive: true\n"
@@ -31,6 +33,7 @@ def test_load_myteam_config_parses_defaults_and_agents(tmp_path: Path) -> None:
     assert config is not None
     assert config.path == config_path
     assert config.defaults.agent == "myagent"
+    assert config.defaults.session_name == "1234"
     assert config.defaults.model == "gpt-5.4-nano"
     assert config.defaults.reasoning == "medium"
     assert config.defaults.interactive is True
@@ -41,6 +44,17 @@ def test_load_myteam_config_parses_defaults_and_agents(tmp_path: Path) -> None:
         "myagent": "agents/myagent.py::MyAgentConfig",
         "codex-mini": "agents/codex_mini.py::CodexMiniConfig",
     }
+
+
+@pytest.mark.parametrize("session_name", ["two\nlines", "carriage\rreturn"])
+def test_load_myteam_config_rejects_session_name_newlines(tmp_path: Path, session_name: str) -> None:
+    (tmp_path / ".myteam.yaml").write_text(
+        "defaults:\n  session_name: " + json.dumps(session_name) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="newline"):
+        load_myteam_config(tmp_path)
 
 
 def test_hyphenated_agent_name_can_resolve_from_myteam_yaml(tmp_path: Path) -> None:

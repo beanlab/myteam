@@ -8,7 +8,7 @@ Python workflows are invoked as executable scripts. These may use `run_agent` to
 
 The workflow can have any arguments it wants, but these should be described in the module frontmatter `usage` field with sufficient clarity that the caller knows what information to supply.
 
-The workflow can also print anything it wants as live display/logging. Printed stdout/stderr is not returned by `myteam start`; only text reported with `report_workflow_result(...)` is returned to the caller.
+The workflow can also print anything it wants as live display/logging. Live display, including `run_agent` lifecycle indicators, is separate from the workflow result. Only text reported with `report_workflow_result(...)` is returned to the caller; consumers needing clean result data should use that text or `SessionResult.output`.
 
 #### Example
 
@@ -48,7 +48,9 @@ Markdown files are treated as single-step workflows with a single call to `run_a
 
 In Markdown workflows, all `run_agent` arguments except `input` and `prompt` are specified in the frontmatter. The `prompt` argument is the body of the Markdown document. The `input` field in the frontmatter is a schema describing the expected input to the workflow. This input is passed using the `--input` argument when invoking the Markdown workflow.
 
-Additional `run_agent` parameters specified in the frontmatter (e.g. `agent`, `model`, `reasoning`, or `interactive`) will be passed to the underlying invocation of `run_agent`.
+Additional `run_agent` parameters specified in the frontmatter (e.g. `agent`, `session_name`, `model`, `reasoning`, or `interactive`) will be passed to the underlying invocation of `run_agent`.
+
+A Markdown session's display name resolves from frontmatter `session_name`, then `.myteam.yaml` `defaults.session_name`, then the workflow path exactly as supplied to `myteam start`. The fallback path is not resolved or normalized for display, so spelling such as `./docs/../docs/review.md` is preserved. An explicitly empty frontmatter name takes precedence.
 
 Markdown workflows automatically convert the single `run_agent` result into workflow result text:
 
@@ -72,6 +74,7 @@ Even when an output schema is present, a cleanly quit managed session can return
 type: workflow
 description: run this to review a scenario document
 agent: codex
+session_name: Review scenario
 model: gpt-5.4-mini
 input: 
   scenario_document: (str) path to the document to review

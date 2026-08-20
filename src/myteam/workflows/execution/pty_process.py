@@ -153,6 +153,7 @@ class ManagedPtyProcess:
                 self._signal_process_group(signal.SIGKILL)
             except OSError:
                 self.process.kill()
+            self.process.wait()
 
     def close(self) -> None:
         try:

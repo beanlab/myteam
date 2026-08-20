@@ -20,6 +20,8 @@ Workflow-level supervision and nested workflow runtime.
 
 A workflow invocation may call `run_agent(...)` many times. Those agent sessions are managed by `run_agent` itself, not by the workflow supervisor. Nested `myteam start` calls use the active supervisor socket, request a child workflow, poll for that workflow process result, then print the child workflow's explicit result text and exit with the child workflow exit code. Workflow stdout/stderr are live display/logging streams; they are not returned as the `myteam start` result.
 
+`run_agent(...)` owns its session lifecycle indicators and writes them directly to the normal stdout/PTY display stream. It does not feed framework indicators into the session's `TerminalRecording`, so a session transcript contains only native child bytes. An inner session's indicators can still appear naturally in an outer transcript when they travel through the outer child PTY. Explicit workflow result RPC text remains separate from this live display.
+
 The workflow supervisor control socket supports:
 
 - `start_workflow`

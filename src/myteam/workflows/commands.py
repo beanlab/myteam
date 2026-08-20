@@ -9,7 +9,7 @@ import time
 from typing import Any, TypedDict
 
 from .. import templates
-from ..config import WorkflowDefaults
+from ..config import WorkflowDefaults, normalize_session_name
 from ..templates import get_template_file
 from .agent_session import build_agent_prompt
 from .execution.supervisor import Supervisor
@@ -47,6 +47,7 @@ ENCODING = "utf-8"
 
 class AgentSettings(TypedDict, total=False):
     agent: str | None
+    session_name: str | None
     model: str | None
     reasoning: str | None
     interactive: bool | None
@@ -99,7 +100,7 @@ def resolve_agent_settings(
 
     explicit_settings = explicit_settings or {}
     result: AgentSettings = {}
-    fields = ("agent", "model", "reasoning", "interactive", "extra_args", "session_id", "fork")
+    fields = ("agent", "session_name", "model", "reasoning", "interactive", "extra_args", "session_id", "fork")
     for field in fields:
         value = explicit_settings.get(field)
         if value is None and defaults is not None:
@@ -108,6 +109,8 @@ def resolve_agent_settings(
             else:
                 value = getattr(defaults, field, None)
         if value is not None:
+            if field == "session_name":
+                value = normalize_session_name(value)
             if field == "extra_args" and isinstance(value, list):
                 value = tuple(str(item) for item in value)
             result[field] = value
@@ -341,6 +344,7 @@ def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_inp
             str(get_template_file("workflow_markdown_wrapper.py")),
             absolute,
             workflow_input_json or "{}",
+            target,
             *args,
         ]
     raise RuntimeError(f"Workflow '{target}' has unsupported extension '{path.suffix}'.")

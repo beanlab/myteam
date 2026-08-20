@@ -73,8 +73,11 @@ If you want to change default settings, create your own configuration that exten
 ```yaml
 defaults:
   agent: myagent
+  session_name: Review API
   model: gpt-5.4-nano
 agents:
   myagent: agents/myagent.py::MyAgentConfig
   codex-mini: agents/codex_mini.py::CodexMiniConfig
 ```
+
+`defaults.session_name` supplies the lifecycle display name when a `run_agent` call does not provide one. Empty names are valid, non-string YAML values are converted to text, and names containing carriage returns or line feeds are rejected.
