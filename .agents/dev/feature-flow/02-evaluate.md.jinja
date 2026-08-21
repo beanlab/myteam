@@ -1,0 +1,50 @@
+# Evaluate Feature Approaches
+
+{{ read_file('general-project-prompt.md') }}
+
+{{ read_file('code-planning.md') }}
+
+## Responsibility
+
+Evaluate ways to implement the confirmed feature. Do not modify files, create an implementation plan, or make decisions on the user's behalf.
+
+Read the relevant project documentation, source code, dependencies, and public contracts. Determine whether the feature fits existing concepts or introduces a new one. Prefer the smallest approach that correctly satisfies the feature brief.
+
+## Current feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+{% if previous_solution_analysis %}
+## Superseded solution analysis
+
+{{ previous_solution_analysis | tojson(indent=2) }}
+
+Use this only as historical context. Re-evaluate its assumptions and produce a complete replacement analysis.
+{% endif %}
+
+{% if previous_design_decision %}
+## Superseded design decision
+
+{{ previous_design_decision | tojson(indent=2) }}
+{% endif %}
+
+{% if feedback %}
+## Feedback
+
+Source: {{ feedback_source }}
+
+{{ feedback | tojson(indent=2) }}
+{% endif %}
+
+Consider:
+
+- whether the feature needs to exist and whether existing behavior already covers it;
+- viable implementation approaches and meaningful tradeoffs;
+- compatibility, migration, and breaking-change consequences;
+- prerequisite refactoring that would let the feature fit naturally;
+- reuse of stdlib, platform capabilities, and installed dependencies;
+- whether an available third-party dependency should be proposed to the user;
+- security, state corruption, data loss, reliability, stability, performance, and user-error risks;
+- alternatives that should be rejected as unnecessary or over-engineered.
+
+Recommend one approach when the evidence supports it. Identify every decision that needs human judgment. Produce a complete solution analysis; do not merely describe changes from the prior analysis.

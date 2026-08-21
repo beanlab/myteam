@@ -82,13 +82,22 @@ class Supervisor:
         if self._tmpdir is not None:
             self._tmpdir.cleanup()
 
-    def start_top_level_workflow(self, *, argv: list[str], cwd: str | None, input_json: str | None) -> str:
-        request_id = self.store.create_request().request_id
+    def start_top_level_workflow(
+        self,
+        *,
+        argv: list[str],
+        workflow_path: str,
+        cwd: str | None,
+        input_json: str | None,
+    ) -> str:
+        request_id = self.store.create_request(workflow_path=workflow_path).request_id
         self._commands.put(
             StartWorkflowCommand(
                 request_id=request_id,
                 argv=argv,
+                workflow_path=workflow_path,
                 parent_session_id=None,
+                parent_agent_nonce=None,
                 cwd=cwd,
                 input_json=input_json,
             )
@@ -154,11 +163,12 @@ class Supervisor:
             self._start_workflow(command)
 
     def _start_workflow(self, command: StartWorkflowCommand) -> None:
-        self.store.mark_running(command.request_id)
-        try:
-            self._stack.start(command, socket_path=self.socket_path)
-        except WorkflowStartError as exc:
-            self.store.store_result(command.request_id, status="error", result=exc.result_payload)
+        with self.store.hierarchy_transaction():
+            try:
+                self._stack.start(command, socket_path=self.socket_path)
+                self.store.mark_running(command.request_id)
+            except WorkflowStartError as exc:
+                self.store.store_result(command.request_id, status="error", result=exc.result_payload)
 
     def _handle_workflow_exit(
         self,
@@ -183,11 +193,12 @@ class Supervisor:
             forward_stdout=forward_stdout,
             forward_stderr=forward_stderr,
         )
-        parent_session_id = self.store.complete_exit_request(
-            session.request_id,
-            exit_code=exit_code,
-        )
-        self._stack.remove(session)
+        with self.store.hierarchy_transaction():
+            parent_session_id = self.store.complete_exit_request(
+                session.request_id,
+                exit_code=exit_code,
+            )
+            self._stack.remove(session)
         self._finish_completed_request(parent_session_id)
 
     def _finish_completed_request(self, parent_session_id: str | None) -> None:

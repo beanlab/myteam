@@ -8,6 +8,8 @@ While agents can follow a process defined in Markdown text, they can also deviat
 
 ## `start.md`
 
+## `where.md`
+
 ## `formats.md`
 
 ## New

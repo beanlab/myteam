@@ -30,6 +30,17 @@ def estimate_usage_cost(
     ) / 1_000_000
 
 
+def iter_jsonl(path: Path) -> Iterator[dict[str, Any]]:
+    try:
+        with path.open("rb") as file:
+            for line in file:
+                payload = _decode_json_object(line)
+                if isinstance(payload, dict):
+                    yield payload
+    except OSError:
+        return
+
+
 def iter_jsonl_reverse(path: Path, block_size: int = 1024 * 1024) -> Iterator[dict[str, Any]]:
     try:
         with path.open("rb") as f:

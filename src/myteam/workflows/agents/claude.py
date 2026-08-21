@@ -56,6 +56,7 @@ def build_argv(
     model: str | None = None,
     extra_args: tuple[str, ...] | list[str] | None = None,
     reasoning: str | None = None,
+    session_name: str | None = None,
 ) -> list[str]:
     argv = [EXEC]
     if not interactive:
@@ -68,6 +69,8 @@ def build_argv(
         argv.extend(["--model", model])
     if reasoning is not None:
         argv.extend(["--effort", reasoning])
+    if session_name is not None:
+        argv.extend(["--name", session_name])
     argv.extend(extra_args or [])
     argv.append(prompt_text)
     return argv

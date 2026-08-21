@@ -2,7 +2,7 @@
 
 The file `.myteam.yaml` contains configuration for `myteam` agents. This file (if present) is assumed to be in the working directory.
 
-Configuration for `codex` and `pi` are built-in.
+Configuration for `codex`, `pi`, and `claude` is built in.
 
 ## Agents
 
@@ -28,7 +28,8 @@ class AgentConfig(Protocol):
             interactive: bool,
             session_id: str | None,
             fork: bool,
-            extra_args: tuple[str, ...] | None
+            extra_args: tuple[str, ...] | None,
+            session_name: str | None = None,
     ) -> list[str]:
         """Returns the Popen-style args to launch the agent session"""
 
@@ -54,6 +55,8 @@ class AgentConfig(Protocol):
 
 If the agent config module cannot be loaded, an error is raised.
 
+Adapter parameters are opt-in: `myteam` passes only the supported keyword names declared by `build_argv`, so existing adapters do not need to declare `session_name`. An adapter that declares `session_name: str | None = None` receives the explicit or configured name, or `None` when neither exists.
+
 If a given agent runtime does not support all of the provided arguments (e.g. it cannot fork an agent session), then an error should be raised from `build_argv` when unsupported arguments are supplied. 
 
 ## Session IDs and Data
@@ -73,8 +76,11 @@ If you want to change default settings, create your own configuration that exten
 ```yaml
 defaults:
   agent: myagent
+  session_name: Review API
   model: gpt-5.4-nano
 agents:
   myagent: agents/myagent.py::MyAgentConfig
   codex-mini: agents/codex_mini.py::CodexMiniConfig
 ```
+
+`defaults.session_name` supplies the lifecycle display name when a `run_agent` call does not provide one and is forwarded to adapters that opt into native session naming. Empty names are valid and forwarded, non-string YAML values are converted to text, and names containing carriage returns or line feeds are rejected. When no explicit or configured name exists, the lifecycle display uses `New session`, but adapters receive `None`.

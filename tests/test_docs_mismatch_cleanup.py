@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -51,31 +52,75 @@ def test_listing_folder_header_omits_folder_prefix(tmp_path: Path, monkeypatch: 
     assert "----skill: agents/bar.md----\nbar skill" in rendered
 
 
-def test_listing_missing_prefix_reports_not_a_skill_folder(
+def test_listing_missing_target_reports_filesystem_cause_and_exits_one(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as raised:
         list_resources("nonsense")
 
-    assert "Not a skill folder:" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert raised.value.code == 1
+    assert captured.out == ""
+    assert "nonsense" in captured.err
+    assert "No such file or directory" in captured.err
+    assert "Not a skill folder" not in captured.err
 
 
-def test_listing_file_prefix_reports_not_a_skill_folder(
+def test_listing_symlink_loop_reports_stderr_and_exits_one(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "file.md").write_text("not a folder\n", encoding="utf-8")
+    (tmp_path / "loop").symlink_to("loop")
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(SystemExit):
-        list_resources("file.md")
+    with pytest.raises(SystemExit) as raised:
+        list_resources("loop")
 
-    assert "Not a skill folder:" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert raised.value.code == 1
+    assert captured.out == ""
+    assert "loop" in captured.err
+    assert "Too many levels of symbolic links" in captured.err
+
+
+def test_listing_deleted_cwd_reports_stderr_and_exits_one(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    previous_cwd = Path.cwd()
+    deleted_cwd = tmp_path / "deleted-cwd"
+    deleted_cwd.mkdir()
+    os.chdir(deleted_cwd)
+    deleted_cwd.rmdir()
+    try:
+        with pytest.raises(SystemExit) as raised:
+            list_resources()
+    finally:
+        os.chdir(previous_cwd)
+
+    captured = capsys.readouterr()
+    assert raised.value.code == 1
+    assert captured.out == ""
+    assert "current directory" in captured.err
+    assert "No such file or directory" in captured.err
+
+
+def test_listing_file_target_is_interpreted_as_a_resource(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "file.md").write_text(
+        "---\ntype: skill\ndescription: direct resource\n---\nbody\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert list_resources("file.md") == "----skill: file.md----\ndirect resource"
 
 
 def test_new_python_workflow_template_has_documented_structure(

@@ -39,6 +39,42 @@ def test_list_api_matches_cli_stdout(run_myteam, tmp_path: Path, monkeypatch) ->
     assert result.stdout == list_resources("agents")
 
 
+def test_list_api_supports_multiple_targets_and_directory_selection(
+    run_myteam, tmp_path: Path, monkeypatch
+) -> None:
+    resources = tmp_path / "resources"
+    described = resources / "described"
+    described.mkdir(parents=True)
+    (described / "description.md").write_text("described folder\n", encoding="utf-8")
+    skill = resources / "skill.md"
+    skill.write_text(
+        "---\ntype: skill\ndescription: selected skill\n---\nbody\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    files_cli = run_myteam(tmp_path, "list", "resources/skill.md", "resources/skill.md")
+    directory_cli = run_myteam(tmp_path, "list", "--directory", "resources/described")
+
+    assert files_cli.exit_code == 0
+    assert files_cli.stdout == list_resources("resources/skill.md", "resources/skill.md")
+    assert directory_cli.exit_code == 0
+    assert directory_cli.stdout == list_resources("resources/described", directory=True)
+
+
+def test_list_api_without_targets_uses_cwd(run_myteam, tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "skill.md").write_text(
+        "---\ntype: skill\ndescription: cwd skill\n---\nbody\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result = run_myteam(tmp_path, "list")
+
+    assert result.exit_code == 0
+    assert result.stdout == list_resources()
+
+
 def test_load_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
     skill = tmp_path / "skill.md"
     skill.write_text(

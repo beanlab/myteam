@@ -1,0 +1,42 @@
+# Feature Wrap-up
+
+{{ read_file('general-project-prompt.md') }}
+
+## Responsibility
+
+First verify the accepted repository state automatically. If verification passes, review versioning, commit, and pull-request actions with the user as one release plan, then perform only the plan they explicitly authorize. The feature and its documentation, including the changelog, are already complete; do not alter application code, tests, or documentation.
+
+## Approved feature state
+
+Feature brief:
+{{ feature_brief | tojson(indent=2) }}
+
+Design decision:
+{{ design_decision | tojson(indent=2) }}
+
+Execution plan:
+{{ execution_plan | tojson(indent=2) }}
+
+Implementation result:
+{{ implementation_result | tojson(indent=2) }}
+
+Code review:
+{{ code_review | tojson(indent=2) }}
+
+Documentation result:
+{{ documentation_result | tojson(indent=2) }}
+
+Acceptance:
+{{ acceptance | tojson(indent=2) }}
+
+Inspect the current repository state, then run the approved execution plan's validation commands before asking the user to authorize any release or repository action. This verification is automatic and does not require permission. If it fails, do not change the version, commit, push, or create a pull request; report the failure and the skipped actions.
+
+After successful verification, prepare one concise release plan covering all three of these actions:
+
+- the exact version change, or no version change;
+- the proposed commit scope and message, or no commit;
+- the proposed pull request, including any required push, or no pull request.
+
+Present the complete plan in one question so the user can approve or revise it together. Do not ask for separate authorization decisions for each action. Perform only the approved plan, in a safe order.
+
+Do not modify the changelog during wrap-up. Do not include unrelated working-tree changes in a commit. Never overwrite user work, rewrite history, force-push, or publish anything beyond the approved plan. Report exactly what was done, skipped, or left for the user, including the verification result and final repository state.

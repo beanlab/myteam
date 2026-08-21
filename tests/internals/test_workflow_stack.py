@@ -104,6 +104,25 @@ def test_workflow_stack_suspends_child_parent_and_resumes(monkeypatch: pytest.Mo
     assert stack.stack == []
 
 
+def test_workflow_stack_restores_parent_when_child_launch_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    stack = WorkflowStack(FakeTerminal())  # type: ignore[arg-type]
+    parent = FakeSession("parent-1")
+    stack.active = parent  # type: ignore[assignment]
+
+    def fail_launch(**_kwargs: Any):
+        raise OSError("launch failed")
+
+    monkeypatch.setattr("myteam.workflows.execution.workflow_stack.ManagedPtyProcess.launch", fail_launch)
+
+    with pytest.raises(WorkflowStartError, match="launch failed"):
+        stack.start(_command(parent_session_id="parent-1"), socket_path="/tmp/workflow.sock")
+
+    assert stack.active is parent
+    assert stack.stack == []
+    assert parent.suspended is True
+    assert parent.resumed is True
+
+
 def test_workflow_stack_launches_with_supervisor_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
     stack = WorkflowStack(FakeTerminal())  # type: ignore[arg-type]
@@ -156,7 +175,9 @@ def _command(
     return StartWorkflowCommand(
         request_id=request_id,
         argv=["python", "workflow.py"],
+        workflow_path="/tmp/workflow.py",
         parent_session_id=parent_session_id,
+        parent_agent_nonce=None,
         cwd="/tmp",
         input_json=input_json,
     )
