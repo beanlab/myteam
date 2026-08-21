@@ -4,7 +4,9 @@
 
 The goal is to support nested interactive agent sessions inside of workflows. A child workflow process can ask the supervisor to start another child process. When this happens, the current child process is suspended, the new child becomes active, and the user's terminal is switched to the new child. When the new child exits, the supervisor resumes the previously suspended process.
 
-This behaves like a small purpose-built terminal multiplexer with stack-based process handoff.
+This behaves like a small purpose-built terminal multiplexer with stack-based process handoff. `myteam where` displays the complete current workflow and agent-session hierarchy.
+
+A workflow appears in that hierarchy only after it has started successfully. Failed or completed workflows and completed agent sessions do not appear; when a child workflow completes, its parent again becomes current.
 
 ## Workflow result text
 
@@ -100,6 +102,7 @@ The supervisor is responsible for:
 - suspending and resuming child workflows;
 - switching the visible TTY session when the active child changes;
 - maintaining a stack of suspended workflows;
+- maintaining the validated active workflow and agent-session hierarchy;
 - storing reported workflow result text by request id;
 
 ## Nested mode

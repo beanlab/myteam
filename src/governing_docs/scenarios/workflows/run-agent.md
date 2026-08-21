@@ -75,8 +75,9 @@ The agent result returned by `run_agent` is not automatically returned by `mytea
 Agent sessions are always managed by a `run_agent` invocation.
 
 - In the workflow process, `run_agent` is called
-- `run_agent` generates a session nonce and setups up a communication socket
-- `run_agent` launches the agent session with env vars identifying the socket
+- `run_agent` generates a session nonce and sets up a communication socket
+- when running under `myteam start`, the active session appears in `myteam where` while it runs
+- `run_agent` launches the agent session with env vars identifying the result socket
   - `run_agent` records session transcript while forwarding the active child session to the terminal
 - The agent session either:
   - Reports a result to the workflow via `myteam result`
@@ -84,12 +85,13 @@ Agent sessions are always managed by a `run_agent` invocation.
   - Exits via `/quit` or error
     - `run_agent` uses `None` as the result
 - The `run_agent` uses the agent configuration to determine the session_id and usage for the agent session
+- after the session closes, it no longer appears in `myteam where`
 - `run_agent` returns the associated `SessionResult` in the workflow code
 - Workflow code may turn `SessionResult.output` into caller-facing text by calling `report_workflow_result(...)`
 
 ## Result Socket
 
-`run_agent` exposes a control socket to the agent session through environment variables. This socket is used for result reporting. Note: this socket is different from the socket used by the `myteam` supervisor process. 
+`run_agent` exposes a control socket to the agent session through environment variables. This socket is used only for result reporting; it does not make a standalone `run_agent` session eligible for `myteam where`.
 
 The exact environment variable names are implementation details, but managed child sessions need enough information to identify:
 

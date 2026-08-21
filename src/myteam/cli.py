@@ -10,6 +10,7 @@ from .explain import explain_resources
 from .listing import list_resources
 from .skills import load_skill, new_skill
 from .workflows import new_workflow, report_result, start_workflow_cli
+from .workflows.where import where_cli
 
 
 def _print_result(function: Callable[..., str], *args: Any, **kwargs: Any):
@@ -37,6 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     load_parser.add_argument("skill")
 
     commands.add_parser("onboard")
+    commands.add_parser("where")
 
     start_parser = commands.add_parser("start")
     start_parser.add_argument("--input")
@@ -65,6 +67,8 @@ def _dispatch(args: argparse.Namespace):
         _print_result(onboard)
     elif args.command == "start":
         start_workflow_cli(args.workflow, *args.workflow_args, input=args.input)
+    elif args.command == "where":
+        where_cli()
     elif args.command == "result":
         report_result(args.result_json)
     elif args.command == "version":

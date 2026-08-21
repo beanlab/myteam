@@ -9,7 +9,12 @@ import pytest
 
 from myteam.workflows import run_agent
 from myteam.workflows import agent_session
-from myteam.workflows.execution.protocol import ENV_SOCKET
+from myteam.workflows.execution.protocol import (
+    ENV_AGENT_SESSION_NONCE,
+    ENV_SOCKET,
+    ENV_WORKFLOW_INVOCATION_ID,
+    RpcClient,
+)
 
 
 def write_fake_agent_project(tmp_path: Path, script: str) -> None:
@@ -76,6 +81,10 @@ def test_run_agent_does_not_require_supervisor_and_returns_reported_output(tmp_p
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv(ENV_SOCKET, raising=False)
 
+    def unexpected_supervisor_rpc(*_args, **_kwargs):
+        raise AssertionError("standalone run_agent must not contact a workflow supervisor")
+
+    monkeypatch.setattr(RpcClient, "call", unexpected_supervisor_rpc)
     result = run_agent(prompt="Hello {{ name }}", input={"name": "Ada"}, agent="fake-agent")
 
     assert result.exit_code == 0
@@ -84,6 +93,113 @@ def test_run_agent_does_not_require_supervisor_and_returns_reported_output(tmp_p
     assert result.output["nonce"]
     assert result.output["nonce"] in result.output["prompt"]
     assert "Hello Ada" in result.output["prompt"]
+
+
+@pytest.mark.parametrize(
+    ("source_session_id", "fork", "registered_session_id"),
+    [(None, False, None), ("native-1", False, "native-1"), ("native-1", True, None)],
+)
+def test_managed_run_agent_registers_before_launch_and_unregisters_after_close(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_session_id: str | None,
+    fork: bool,
+    registered_session_id: str | None,
+) -> None:
+    write_fake_agent_project(tmp_path, "")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(ENV_SOCKET, str(tmp_path / "supervisor.sock"))
+    monkeypatch.setenv(ENV_WORKFLOW_INVOCATION_ID, "workflow-1")
+    monkeypatch.setenv(ENV_AGENT_SESSION_NONCE, "parent-agent")
+    events: list[tuple[str, dict]] = []
+    original_launch = agent_session.ManagedPtyProcess.launch
+
+    def rpc_call(_client, kind: str, **payload):
+        events.append((kind, payload))
+        return {"ok": True}
+
+    def record_launch(**kwargs):
+        events.append(("launch", {}))
+        return original_launch(**kwargs)
+
+    monkeypatch.setattr(RpcClient, "call", rpc_call)
+    monkeypatch.setattr(agent_session.ManagedPtyProcess, "launch", record_launch)
+
+    result = run_agent(
+        prompt="Managed",
+        agent="fake-agent",
+        session_name="Planner",
+        model="model-x",
+        session_id=source_session_id,
+        fork=fork,
+    )
+
+    assert result.exit_code == 0
+    assert [kind for kind, _payload in events] == ["register_agent", "launch", "unregister_agent"]
+    registration = events[0][1]
+    assert registration["workflow_invocation_id"] == "workflow-1"
+    assert registration["parent_agent_nonce"] == "parent-agent"
+    assert registration["name"] == "Planner"
+    assert registration["agent"] == "fake-agent"
+    assert registration["model"] == "model-x"
+    assert registration["session_id"] == registered_session_id
+    assert events[-1][1] == {"nonce": registration["nonce"]}
+
+
+def test_managed_run_agent_retries_lost_unregister_response(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_fake_agent_project(tmp_path, "")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(ENV_SOCKET, str(tmp_path / "supervisor.sock"))
+    monkeypatch.setenv(ENV_WORKFLOW_INVOCATION_ID, "workflow-1")
+    unregister_attempts = 0
+
+    def rpc_call(_client, kind: str, **_payload):
+        nonlocal unregister_attempts
+        if kind == "unregister_agent":
+            unregister_attempts += 1
+            if unregister_attempts == 1:
+                raise ConnectionError("response lost")
+        return {"ok": True}
+
+    monkeypatch.setattr(RpcClient, "call", rpc_call)
+
+    result = run_agent(prompt="Managed", agent="fake-agent")
+
+    assert result.exit_code == 0
+    assert unregister_attempts == 2
+
+
+def test_managed_run_agent_launch_failure_unregisters_never_launched_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_fake_agent_project(tmp_path, "")
+    (tmp_path / "fake_config.py").write_text(
+        "class FakeAgentConfig:\n"
+        "    def build_argv(self, *args, **kwargs): return ['definitely-missing-myteam-agent']\n"
+        "    def get_exit_sequence(self): return b'exit\\n'\n"
+        "    def locate_session_data(self, nonce, context): return context.launch_cwd / 'none'\n"
+        "    def get_session_id(self, session_data): return None\n"
+        "    def get_usage_info(self, session_data): return None\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(ENV_SOCKET, str(tmp_path / "supervisor.sock"))
+    monkeypatch.setenv(ENV_WORKFLOW_INVOCATION_ID, "workflow-1")
+    calls: list[tuple[str, dict]] = []
+
+    def rpc_call(_client, kind: str, **payload):
+        calls.append((kind, payload))
+        return {"ok": True}
+
+    monkeypatch.setattr(RpcClient, "call", rpc_call)
+
+    with pytest.raises(FileNotFoundError):
+        run_agent(prompt="Launch", agent="fake-agent")
+
+    assert [kind for kind, _payload in calls] == ["register_agent", "unregister_agent"]
+    assert calls[1][1]["nonce"] == calls[0][1]["nonce"]
 
 
 def test_run_agent_launches_agent_with_tty_stdio(tmp_path: Path, monkeypatch) -> None:

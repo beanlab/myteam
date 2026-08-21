@@ -110,7 +110,17 @@ You can also use `fork=True` to fork a session: a new session is made from a cop
 
 Workflows are also discoverable resources like skills. The description field in workflow frontmatter describes to an agent when and how to invoke a workflow. 
 
-When launched, the current workflow pauses while the inner workflow runs. When the inner workflow completes, all information reported via `report_workflow_result` is displayed to the caller. Thus, workflows can function like tool calls. 
+When launched, the current workflow pauses while the inner workflow runs. When the inner workflow completes, all information reported via `report_workflow_result` is displayed to the caller. Thus, workflows can function like tool calls.
+
+While a workflow is running, use `myteam where` to see your active location:
+
+```text
+/path/to/outer.py
+  Planning (agent=pi, model=gpt-5)
+    /path/to/inner.py
+```
+
+The display includes active and suspended ancestors only; completed sessions are omitted.
 
 ## Guidance
 

@@ -14,6 +14,7 @@ from ..templates import get_template_file
 from .agent_session import build_agent_prompt
 from .execution.supervisor import Supervisor
 from .execution.protocol import (
+    ENV_AGENT_SESSION_NONCE,
     ENV_SOCKET,
     ENV_WORKFLOW_INVOCATION_ID,
     KIND_ACK_RESULT,
@@ -190,7 +191,7 @@ def _start_workflow_result(
     workflow_input_json: str | None,
 ) -> WorkflowProcessResult:
     workflow_input_json = _normalize_workflow_input_json(workflow_input_json)
-    argv = _build_workflow_argv(workflow_name, args, workflow_input_json)
+    argv, workflow_path = _resolve_workflow(workflow_name, args, workflow_input_json)
     socket_path = os.environ.get(ENV_SOCKET)
     parent_session_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
 
@@ -198,13 +199,16 @@ def _start_workflow_result(
         return _start_workflow_via_existing_supervisor(
             socket_path=socket_path,
             parent_session_id=parent_session_id,
+            parent_agent_nonce=os.environ.get(ENV_AGENT_SESSION_NONCE),
             argv=argv,
+            workflow_path=workflow_path,
             workflow_input_json=workflow_input_json,
         )
 
     with Supervisor() as supervisor:
         request_id = supervisor.start_top_level_workflow(
             argv=argv,
+            workflow_path=workflow_path,
             cwd=os.getcwd(),
             input_json=workflow_input_json,
         )
@@ -220,14 +224,18 @@ def _start_workflow_via_existing_supervisor(
     *,
     socket_path: str,
     parent_session_id: str | None,
+    parent_agent_nonce: str | None,
     argv: list[str],
+    workflow_path: str,
     workflow_input_json: str | None,
 ) -> WorkflowProcessResult:
     client = RpcClient(socket_path)
     response = client.call(
         KIND_START_WORKFLOW,
         argv=argv,
+        workflow_path=workflow_path,
         parent_session_id=parent_session_id,
+        parent_agent_nonce=parent_agent_nonce,
         cwd=os.getcwd(),
         input_json=workflow_input_json,
     )
@@ -324,6 +332,16 @@ def _is_session_result_payload(payload: dict[str, Any]) -> bool:
 def _print_session_result(result: SessionResult) -> None:
     print(json.dumps([asdict(item) for item in result.usage], indent=2, sort_keys=True), file=sys.stderr)
     print(json.dumps(result.output), file=sys.stdout)
+
+
+def _resolve_workflow(
+    target: str | None,
+    args: tuple[str, ...],
+    workflow_input_json: str | None,
+) -> tuple[list[str], str]:
+    argv = _build_workflow_argv(target, args, workflow_input_json)
+    assert target is not None
+    return argv, str(Path(target).resolve())
 
 
 def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_input_json: str | None) -> list[str]:

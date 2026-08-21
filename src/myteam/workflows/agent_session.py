@@ -21,7 +21,15 @@ from ..config import WorkflowDefaults, load_myteam_config, normalize_session_nam
 from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
-from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
+from .execution.protocol import (
+    ENV_AGENT_SESSION_NONCE,
+    ENV_AGENT_SESSION_RESULT_SOCKET,
+    ENV_SOCKET,
+    ENV_WORKFLOW_INVOCATION_ID,
+    KIND_REGISTER_AGENT,
+    KIND_UNREGISTER_AGENT,
+    RpcClient,
+)
 from .execution.pty_forwarding import binary_output_stream, drain_pty_output, pump_pty_once, write_bytes
 from .execution.pty_process import ManagedPtyProcess
 from .execution.terminal import RealTerminal
@@ -86,6 +94,52 @@ def run_agent(
         effective_reasoning,
     )
 
+    registration = _ManagedAgentRegistration.create(
+        nonce=session_nonce,
+        name=effective_session_name,
+        agent=agent_name,
+        model=effective_model,
+        session_id=effective_session_id if effective_session_id is not None and not effective_fork else None,
+    )
+    registration.register()
+    try:
+        result = _run_agent_process(
+            argv=argv,
+            cwd=cwd,
+            session_nonce=session_nonce,
+            session_name=effective_session_name,
+            agent_name=agent_name,
+            model=effective_model,
+            reasoning=effective_reasoning,
+            interactive=bool(effective_interactive),
+            source_session_id=effective_session_id,
+            fork=bool(effective_fork),
+            runtime_config=runtime_config,
+        )
+    except BaseException:
+        try:
+            registration.unregister()
+        except BaseException:
+            pass
+        raise
+    registration.unregister()
+    return result
+
+
+def _run_agent_process(
+    *,
+    argv: list[str],
+    cwd: Path,
+    session_nonce: str,
+    session_name: str,
+    agent_name: str,
+    model: str | None,
+    reasoning: str | None,
+    interactive: bool,
+    source_session_id: str | None,
+    fork: bool,
+    runtime_config: AgentRuntimeConfig,
+) -> SessionResult:
     with AgentResultServer() as result_server:
         env = {
             **os.environ,
@@ -107,30 +161,26 @@ def run_agent(
         try:
             _emit_indicator(
                 _format_start_indicator(
-                    name=effective_session_name,
+                    name=session_name,
                     agent=agent_name,
-                    model=effective_model,
-                    reasoning=effective_reasoning,
-                    interactive=bool(effective_interactive),
-                    session_id=effective_session_id,
-                    fork=bool(effective_fork),
+                    model=model,
+                    reasoning=reasoning,
+                    interactive=interactive,
+                    session_id=source_session_id,
+                    fork=fork,
                 )
             )
             reported_result, exit_code = _forward_pty_until_complete(
-                session,
-                result_server,
-                exit_sequence=runtime_config.exit_sequence,
+                session, result_server, exit_sequence=runtime_config.exit_sequence
             )
             try:
                 _close_launched_session(session)
             finally:
                 session_closed = True
             transcript = session.recording.snapshot()
-
             output_value = reported_result.output if reported_result is not None else None
             if reported_result is not None and reported_result.status != "ok":
                 raise RuntimeError(json.dumps({"status": reported_result.status, "output": output_value}))
-
             native_session_id, usage = _resolve_session_metadata(runtime_config, session_nonce)
             result = SessionResult(
                 exit_code=exit_code,
@@ -140,7 +190,7 @@ def run_agent(
                 session_id=native_session_id,
             )
             end_started = True
-            _emit_indicator(_format_end_indicator(effective_session_name, result))
+            _emit_indicator(_format_end_indicator(session_name, result))
             return result
         except BaseException:
             if not session_closed:
@@ -150,10 +200,83 @@ def run_agent(
                     pass
             if not end_started:
                 try:
-                    _emit_indicator(_format_exception_end_indicator(effective_session_name))
+                    _emit_indicator(_format_exception_end_indicator(session_name))
                 except BaseException:
                     pass
             raise
+
+
+class _ManagedAgentRegistration:
+    def __init__(self, client: RpcClient | None, payload: dict[str, Any]) -> None:
+        self.client = client
+        self.payload = payload
+        self.registered = False
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        nonce: str,
+        name: str,
+        agent: str,
+        model: str | None,
+        session_id: str | None,
+    ) -> "_ManagedAgentRegistration":
+        socket_path = os.environ.get(ENV_SOCKET)
+        workflow_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
+        client = RpcClient(socket_path) if socket_path and workflow_id else None
+        return cls(
+            client,
+            {
+                "nonce": nonce,
+                "workflow_invocation_id": workflow_id,
+                "parent_agent_nonce": os.environ.get(ENV_AGENT_SESSION_NONCE),
+                "name": name,
+                "agent": agent,
+                "model": model,
+                "session_id": session_id,
+            },
+        )
+
+    def register(self):
+        if self.client is None:
+            return
+        error: BaseException | None = None
+        for _ in range(2):
+            try:
+                self.client.call(KIND_REGISTER_AGENT, **self.payload)
+                self.registered = True
+                return
+            except BaseException as exc:
+                error = exc
+        try:
+            self._unregister(force=True)
+        except BaseException:
+            pass
+        assert error is not None
+        raise error
+
+    def unregister(self):
+        if self.client is None or not self.registered:
+            return
+        self._unregister(force=False)
+        self.registered = False
+
+    def _unregister(self, *, force: bool):
+        if self.client is None:
+            return
+        error: BaseException | None = None
+        for attempt in range(3):
+            try:
+                self.client.call(KIND_UNREGISTER_AGENT, nonce=self.payload["nonce"])
+                return
+            except BaseException as exc:
+                error = exc
+                if attempt < 2:
+                    time.sleep(0.02)
+        if not force:
+            assert error is not None
+            raise error
 
 
 def _format_start_indicator(

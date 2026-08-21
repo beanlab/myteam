@@ -2,6 +2,7 @@
 
 ## 0.3.8
 
+- Added `myteam where` to display the active managed workflow and agent-session hierarchy.
 - Added optional agent session names to `run_agent`, `.myteam.yaml` defaults, and Markdown workflow frontmatter.
 - Added named agent-session lifecycle indicators. They show resume/fork and returned session IDs, mark known failed sessions in red, and are excluded from that session's transcript.
 - Expanded `myteam list`, `list_resources()`, and Jinja `myteam_list()` to accept multiple file or directory targets, with `-d`/`--directory` selection, deduplication, and root-cause filesystem diagnostics.
