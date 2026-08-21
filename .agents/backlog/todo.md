@@ -18,7 +18,6 @@
 - figure out a way for simple sub-session bulk-prompting - i.e. pass a single string to stdin that is included as `{{ input }}`. Maybe the named values come as `--args`?
 - feature-flow resumability?
 - Stream STDOUT from non-interactive sessions? And always print some kind of notice that a non-interactive session is underway.
-- print session titles on start and resume to orient the user
 - feature_flow.py: each session should introduce itself anew so the user knows what is going on.
 - store full transcript of workflow to text file, along with full usage report.
 - protect the terminal from test-related IO.

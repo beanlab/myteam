@@ -28,8 +28,14 @@ Run tests with `uv run pytest`.
 Pay particular attention to subprocess, PTY, terminal, session, socket, RPC, and serialization behavior. These internals may justify focused lower-level tests when public-boundary tests would be nondeterministic or diagnostically weak.
 {% endif %}
 
+{% if 'documentation' in context_tags %}
+## Documentation conventions
+
+User-facing release notes belong in `src/myteam/CHANGELOG.md` under a `##` version heading. Include meaningful behavior changes and omit implementation details that do not affect users.
+{% endif %}
+
 {% if 'release' in context_tags %}
 ## Release conventions
 
-The project version is stored in `pyproject.toml`. User-facing release notes belong in `src/myteam/CHANGELOG.md` under a `##` version heading. Include meaningful behavior changes and omit implementation details that do not affect users.
+The project version is stored in `pyproject.toml`.
 {% endif %}

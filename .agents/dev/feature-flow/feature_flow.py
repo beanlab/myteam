@@ -156,7 +156,7 @@ DOCUMENTATION_RESULT = {
     "files_changed": "Documentation files changed.",
     "user_facing_updates": "User-facing documentation updates.",
     "agent_facing_updates": "Agent-facing documentation updates.",
-    "validation_performed": "Documentation and final project validation performed.",
+    "validation_performed": "Documentation validation performed.",
     "intentionally_unchanged_docs": "Relevant documentation intentionally left unchanged and why.",
 }
 ACCEPTANCE = {
@@ -167,12 +167,12 @@ ACCEPTANCE = {
     "requested_changes": "Changes requested by the user; empty when approved.",
 }
 WRAP_UP = {
+    "verification": "Automatic pre-release validation performed and its result.",
     "version_change": "Version action performed or skipped.",
-    "changelog_change": "Changelog action performed or skipped.",
     "commit": "Commit action performed or skipped.",
     "pull_request": "Pull-request action performed or skipped.",
-    "actions_skipped": "Actions not authorized by the user.",
-    "final_repository_state": "Final repository and validation state.",
+    "actions_skipped": "Actions not authorized by the user or blocked by verification.",
+    "final_repository_state": "Final repository state.",
 }
 
 
