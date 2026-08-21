@@ -257,7 +257,8 @@ def run_step(
         *,
         output: dict[str, Any],
         input: dict[str, Any] | None = None,
-        interactive: bool = False,
+        # Temporary: keep every workflow session interactive during development.
+        interactive: bool = True,
         session_id: str | None = None,
 ) -> SessionResult:
     prompt_path = PROMPT_DIRECTORY / prompt_name
