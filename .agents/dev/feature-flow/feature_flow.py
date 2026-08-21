@@ -280,6 +280,7 @@ def run_step(
         input=step_input,
         output=output,
         agent=AGENT,
+        session_name=session_name,
         model=settings.model,
         reasoning=settings.reasoning,
         interactive=interactive,
