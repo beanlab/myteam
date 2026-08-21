@@ -33,7 +33,16 @@ class AgentRuntimeConfig:
     exit_sequence: bytes
     get_session_info: Callable[[str], tuple[str, Path]]
     build_argv: Callable[
-        [str, bool, str | None, bool, str | None, tuple[str, ...] | None, str | None],
+        [
+            str,
+            bool,
+            str | None,
+            bool,
+            str | None,
+            tuple[str, ...] | None,
+            str | None,
+            str | None,
+        ],
         list[str],
     ]
     source: Path | str
@@ -280,7 +289,16 @@ def _require_positional_parameter_count(
 
 
 def _build_argv_callable(config_object: Any) -> Callable[
-    [str, bool, str | None, bool, str | None, tuple[str, ...] | None],
+    [
+        str,
+        bool,
+        str | None,
+        bool,
+        str | None,
+        tuple[str, ...] | None,
+        str | None,
+        str | None,
+    ],
     list[str],
 ]:
     if not hasattr(config_object, "build_argv"):
@@ -299,6 +317,7 @@ def _build_argv_callable(config_object: Any) -> Callable[
         model: str | None = None,
         extra_args: tuple[str, ...] | None = None,
         reasoning: str | None = None,
+        session_name: str | None = None,
     ) -> list[str]:
         kwargs = {
             "prompt_text": prompt_text,
@@ -308,6 +327,7 @@ def _build_argv_callable(config_object: Any) -> Callable[
             "fork": fork,
             "extra_args": extra_args,
             "reasoning": reasoning,
+            "session_name": session_name,
         }
         try:
             signature = inspect.signature(build_argv)

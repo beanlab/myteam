@@ -34,6 +34,7 @@ def write_recording_agent_project(tmp_path: Path) -> None:
                     session_id=None,
                     fork=False,
                     extra_args=None,
+                    session_name=None,
                 ):
                     Path('observed-agent-settings.json').write_text(
                         json.dumps(
@@ -44,6 +45,7 @@ def write_recording_agent_project(tmp_path: Path) -> None:
                                 'session_id': session_id,
                                 'fork': fork,
                                 'extra_args': list(extra_args or []),
+                                'session_name': session_name,
                             },
                             sort_keys=True,
                         ),
@@ -107,6 +109,7 @@ def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch, cap
         "session_id": "default-session",
         "fork": True,
         "extra_args": ["--default"],
+        "session_name": "Configured session",
     }
 
 
@@ -137,7 +140,38 @@ def test_run_agent_explicit_arguments_override_myteam_yaml_defaults(tmp_path: Pa
         "session_id": "explicit-session",
         "fork": False,
         "extra_args": ["--explicit", "value"],
+        "session_name": "Explicit session",
     }
+
+
+def test_run_agent_forwards_empty_session_name(tmp_path: Path, monkeypatch, capsys) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    run_agent(prompt="Empty name", session_name="")
+
+    captured = capsys.readouterr()
+    assert 'name=""' in captured.out
+    assert read_observed_settings(tmp_path)["session_name"] == ""
+
+
+def test_run_agent_does_not_forward_implicit_display_name(tmp_path: Path, monkeypatch, capsys) -> None:
+    write_recording_agent_project(tmp_path)
+    config_path = tmp_path / ".myteam.yaml"
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace(
+            "  session_name: Configured session\n",
+            "",
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    run_agent(prompt="Implicit name")
+
+    captured = capsys.readouterr()
+    assert 'name="New session"' in captured.out
+    assert read_observed_settings(tmp_path)["session_name"] is None
 
 
 def test_run_agent_renders_prompt_relative_to_source_path(tmp_path: Path, monkeypatch) -> None:

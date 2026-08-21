@@ -9,7 +9,9 @@ from myteam.workflows.agents.claude import build_argv as build_claude_argv
 from myteam.workflows.agents.claude import get_session_info as get_claude_session_info
 from myteam.workflows.agents.claude import get_usage_info as get_claude_usage_info
 from myteam.workflows.agents.claude import _project_session_dir_name as claude_project_session_dir_name
+from myteam.workflows.agents.codex import build_argv as build_codex_argv
 from myteam.workflows.agents.codex import get_usage_info as get_codex_usage_info
+from myteam.workflows.agents.pi import build_argv as build_pi_argv
 from myteam.workflows.agents.pi import get_usage_info as get_pi_usage_info
 from myteam.workflows.agents.runtime import AgentSessionContext, resolve_agent_runtime_config
 
@@ -131,6 +133,165 @@ def test_claude_build_argv_supports_session_modes_and_settings() -> None:
         "auto",
         "prompt",
     ]
+
+
+def test_pi_build_argv_forwards_session_name_in_every_launch_mode() -> None:
+    assert build_pi_argv("prompt", session_name="new") == ["pi", "--name", "new", "prompt"]
+    assert build_pi_argv("prompt", interactive=False, session_name="headless") == [
+        "pi",
+        "--print",
+        "--name",
+        "headless",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", session_id="resume", session_name="resumed") == [
+        "pi",
+        "--session",
+        "resume",
+        "--name",
+        "resumed",
+        "prompt",
+    ]
+    assert build_pi_argv(
+        "prompt",
+        interactive=False,
+        session_id="resume",
+        session_name="resumed-headless",
+    ) == [
+        "pi",
+        "--print",
+        "--session",
+        "resume",
+        "--name",
+        "resumed-headless",
+        "prompt",
+    ]
+    assert build_pi_argv(
+        "prompt",
+        session_id="fork",
+        fork=True,
+        session_name="forked",
+    ) == ["pi", "--fork", "fork", "--name", "forked", "prompt"]
+    assert build_pi_argv(
+        "prompt",
+        interactive=False,
+        session_id="fork",
+        fork=True,
+        session_name="forked-headless",
+    ) == [
+        "pi",
+        "--print",
+        "--fork",
+        "fork",
+        "--name",
+        "forked-headless",
+        "prompt",
+    ]
+
+
+def test_pi_build_argv_forwards_empty_and_duplicate_names() -> None:
+    assert build_pi_argv(
+        "prompt",
+        extra_args=("--name", "extra"),
+        session_name="",
+    ) == ["pi", "--name", "", "--name", "extra", "prompt"]
+
+
+def test_claude_build_argv_forwards_session_name_in_every_launch_mode() -> None:
+    assert build_claude_argv("prompt", session_name="new") == [
+        "claude",
+        "--name",
+        "new",
+        "prompt",
+    ]
+    assert build_claude_argv("prompt", interactive=False, session_name="headless") == [
+        "claude",
+        "--print",
+        "--name",
+        "headless",
+        "prompt",
+    ]
+    assert build_claude_argv("prompt", session_id="resume", session_name="resumed") == [
+        "claude",
+        "--resume",
+        "resume",
+        "--name",
+        "resumed",
+        "prompt",
+    ]
+    assert build_claude_argv(
+        "prompt",
+        interactive=False,
+        session_id="resume",
+        session_name="resumed-headless",
+    ) == [
+        "claude",
+        "--print",
+        "--resume",
+        "resume",
+        "--name",
+        "resumed-headless",
+        "prompt",
+    ]
+    assert build_claude_argv(
+        "prompt",
+        session_id="fork",
+        fork=True,
+        session_name="forked",
+    ) == [
+        "claude",
+        "--resume",
+        "fork",
+        "--fork-session",
+        "--name",
+        "forked",
+        "prompt",
+    ]
+    assert build_claude_argv(
+        "prompt",
+        interactive=False,
+        session_id="fork",
+        fork=True,
+        session_name="forked-headless",
+    ) == [
+        "claude",
+        "--print",
+        "--resume",
+        "fork",
+        "--fork-session",
+        "--name",
+        "forked-headless",
+        "prompt",
+    ]
+
+
+def test_claude_build_argv_forwards_empty_and_duplicate_names() -> None:
+    assert build_claude_argv(
+        "prompt",
+        extra_args=("--name", "extra"),
+        session_name="",
+    ) == ["claude", "--name", "", "--name", "extra", "prompt"]
+
+
+def test_codex_build_argv_accepts_and_ignores_session_name() -> None:
+    assert build_codex_argv("prompt", session_name="new") == ["codex", "prompt"]
+    assert build_codex_argv("prompt", interactive=False, session_name="headless") == [
+        "codex",
+        "exec",
+        "prompt",
+    ]
+    assert build_codex_argv("prompt", session_id="resume", session_name="resumed") == [
+        "codex",
+        "resume",
+        "resume",
+        "prompt",
+    ]
+    assert build_codex_argv(
+        "prompt",
+        session_id="fork",
+        fork=True,
+        session_name="forked",
+    ) == ["codex", "fork", "fork", "prompt"]
 
 
 def test_claude_get_session_info_finds_newest_matching_project_session(tmp_path: Path) -> None:

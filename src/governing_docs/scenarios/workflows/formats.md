@@ -50,7 +50,7 @@ In Markdown workflows, all `run_agent` arguments except `input` and `prompt` are
 
 Additional `run_agent` parameters specified in the frontmatter (e.g. `agent`, `session_name`, `model`, `reasoning`, or `interactive`) will be passed to the underlying invocation of `run_agent`.
 
-A Markdown session's display name resolves from frontmatter `session_name`, then `.myteam.yaml` `defaults.session_name`, then the workflow path exactly as supplied to `myteam start`. The fallback path is not resolved or normalized for display, so spelling such as `./docs/../docs/review.md` is preserved. An explicitly empty frontmatter name takes precedence.
+A Markdown session's display name resolves from frontmatter `session_name`, then `.myteam.yaml` `defaults.session_name`, then the workflow path exactly as supplied to `myteam start`. The fallback path is passed to `run_agent` as the session name, so adapters that support native naming may use it. It is not resolved or normalized, so spelling such as `./docs/../docs/review.md` is preserved. An explicitly empty frontmatter name takes precedence.
 
 Markdown workflows automatically convert the single `run_agent` result into workflow result text:
 

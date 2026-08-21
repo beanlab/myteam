@@ -37,7 +37,7 @@ def run_agent(
 - `input`: the input to the session
 - `output`: a basic schema describing the required output content and format
 - `agent`: the name of the agent executable to use (e.g. `codex` or `claude`)
-- `session_name`: the display name used by the session lifecycle indicators
+- `session_name`: the name used by session lifecycle indicators and requested from agent CLIs whose adapters support native naming
 - `model`: the model used by the session (e.g. 'gpt-5.4-mini')
 - `reasoning`: reasoning level for the model (e.g. 'medium')
 - `interactive`: controls whether the agent session supports human interaction or runs in headless mode
@@ -45,7 +45,7 @@ def run_agent(
 - `session_id`: indicates the prior agent session to resume; this value is whatever session ID the agent uses and can be obtained from a prior `SessionResult`
 - `fork`: determines whether the specified session is forked or resumed. When `False`, the session is resumed in place; when `True`, it is forked and a new session is created from the history of the specified session. Fork is examined only if `session_id` is provided. 
 
-The session name resolves from the explicit `session_name`, then `.myteam.yaml` defaults, then `New session`. An empty name is valid, non-string values are converted to text, and carriage returns or line feeds are rejected.
+The session name resolves from the explicit `session_name`, then `.myteam.yaml` defaults, then `New session`. Explicit and configured names are also forwarded to adapters that support native session naming. This includes an explicit or configured empty string. The implicit `New session` fallback is display-only and is not forwarded to the agent CLI. Non-string values are converted to text, and carriage returns or line feeds are rejected.
 
 Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. If `prompt_source_path` is provided, relative helper paths are resolved against that document.
 

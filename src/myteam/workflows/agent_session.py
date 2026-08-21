@@ -62,10 +62,12 @@ def run_agent(
     cwd = Path.cwd().resolve()
     defaults = _load_defaults(cwd)
     agent_name = _choose(agent, defaults.agent, DEFAULT_AGENT)
-    effective_session_name = normalize_session_name(
-        _choose(session_name, defaults.session_name, "New session")
+    native_session_name = normalize_session_name(
+        _choose(session_name, defaults.session_name, None)
     )
-    assert effective_session_name is not None
+    effective_session_name = (
+        native_session_name if native_session_name is not None else "New session"
+    )
     runtime_config = _resolve_runtime_config(agent_name, cwd)
 
     effective_model = _choose(model, defaults.model, None)
@@ -92,6 +94,7 @@ def run_agent(
         effective_model,
         effective_extra_args,
         effective_reasoning,
+        native_session_name,
     )
 
     registration = _ManagedAgentRegistration.create(

@@ -22,10 +22,8 @@ def build_argv(
     fork: bool = False,
     model: str | None = None,
     extra_args: tuple[str, ...] | None = None,
+    session_name: str | None = None,
 ) -> list[str]:
-    extras = extra_args or []
-    if model is not None:
-        extras = ["--model", model, *extras]
     argv = [EXEC]
     if not interactive:
         argv.append("--print")
@@ -34,7 +32,11 @@ def build_argv(
             argv.extend(["--fork", session_id])
         else:
             argv.extend(["--session", session_id])
-    argv.extend(extras)
+    if model is not None:
+        argv.extend(["--model", model])
+    if session_name is not None:
+        argv.extend(["--name", session_name])
+    argv.extend(extra_args or [])
     argv.append(prompt_text)
     return argv
 
