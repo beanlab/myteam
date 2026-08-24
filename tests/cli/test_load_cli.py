@@ -17,21 +17,21 @@ def test_load_markdown_skill_prints_body_without_frontmatter(run_myteam, tmp_pat
 def test_load_markdown_skill_renders_document_relative_jinja_helpers(run_myteam, tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
-    (docs / "fragment.txt").write_text("rendered fragment\n", encoding="utf-8")
+    (docs / "fragment.txt").write_text("# Rendered fragment\n", encoding="utf-8")
     skill = docs / "skill.md"
     skill.write_text(
         "---\n"
         "type: skill\n"
         "description: demo\n"
         "---\n"
-        "{{ read_file('fragment.txt') }}",
+        "{{ read_file('fragment.txt') | increase_headers(2) }}",
         encoding="utf-8",
     )
 
     result = run_myteam(tmp_path, "load", "docs/skill.md")
 
     assert result.exit_code == 0
-    assert result.stdout == "rendered fragment\n"
+    assert result.stdout == "### Rendered fragment\n"
     assert result.stderr == ""
 
 

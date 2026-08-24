@@ -17,6 +17,21 @@ The following utility functions are also included:
 
 - `read_file(file)` - injects the file's contents. The included file is Jinja-rendered by default. To include raw contents, use `read_file(file, render=False)`.
 - `shell(command, timeout=None)` - synchronously runs the required string command through the platform-standard shell and injects its combined output. There is no default timeout; provide one to limit how long a command may run.
+- `increase_headers(content, offset=1)` - increases ATX heading levels in Markdown content. It is also available as the `increase_headers` filter.
+
+The same helper is publicly available in Python with `from myteam import increase_headers`. It composes with other helpers in either Jinja form:
+
+```jinja2
+{{ increase_headers(read_file('overview.md'), offset=1) }}
+{{ read_file('overview.md') | increase_headers(1) }}
+{{ shell('generate-markdown') | increase_headers(2) }}
+```
+
+`increase_headers` recognizes an opening run of one or more `#` characters after zero to three spaces when the run is followed by a space, tab, or end of line. It inserts exactly `offset` additional markers while preserving the indentation and all remaining source text. Heading runs and results are not limited to six markers. Four-space-indented lines, forms such as `#text`, and Setext headings are unchanged.
+
+Headings inside standard backtick or tilde fenced code blocks are unchanged, including through end of input when a fence is unclosed. A fence opener uses at least three identical markers after zero to three spaces; a backtick opener's info string cannot contain a backtick. A closer must use the same marker, contain at least as many markers as the opener, and have only spaces or tabs afterward.
+
+The default offset is `1`. An offset of `0` returns the content unchanged, a negative offset raises `ValueError`, and a non-integer offset (including a boolean) raises `TypeError`. Non-string content also raises `TypeError`. At the Python string boundary, the helper preserves LF and CRLF endings and every character other than the inserted `#` markers. Existing file reads, subprocess text capture, and Jinja template parsing may normalize input before it reaches the helper; their newline behavior is unchanged.
 
 A shell command runs in the directory of the file containing its expression. A command in a rendered `read_file` include therefore runs in the included file's directory. A direct prompt with no source path uses the process's current working directory. Commands inherit myteam's environment and permissions, receive non-interactive stdin, and have stderr redirected into stdout. Successful output is returned exactly, including interleaved stderr, trailing newlines, or empty output.
 

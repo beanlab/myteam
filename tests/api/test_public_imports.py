@@ -6,6 +6,7 @@ def test_public_api_imports() -> None:
         SessionResult,
         UsageInfo,
         explain_resources,
+        increase_headers,
         list_resources,
         load_skill,
         onboard,
@@ -20,6 +21,7 @@ def test_public_api_imports() -> None:
     )
 
     assert callable(explain_resources)
+    assert callable(increase_headers)
     assert callable(list_resources)
     assert callable(load_skill)
     assert callable(onboard)

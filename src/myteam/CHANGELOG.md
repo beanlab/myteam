@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.10
+
+- Added `increase_headers(content, offset=1)` to the public Python API and as a Jinja callable and filter for composing Markdown without heading-level conflicts.
+
 ## 0.3.9
 
 - Added a Jinja `shell(command, timeout=None)` helper for injecting combined command output into skills, workflows, direct agent prompts, and rendered includes.

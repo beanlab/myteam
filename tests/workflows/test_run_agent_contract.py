@@ -180,15 +180,15 @@ def test_run_agent_renders_prompt_relative_to_source_path(tmp_path: Path, monkey
 
     docs = tmp_path / "docs"
     docs.mkdir()
-    (docs / "fragment.txt").write_text("relative fragment", encoding="utf-8")
+    (docs / "fragment.txt").write_text("# Relative fragment", encoding="utf-8")
 
     result = run_agent(
-        prompt="Read {{ read_file('fragment.txt') }}",
+        prompt="Read {{ read_file('fragment.txt') | increase_headers }}",
         prompt_source_path=docs / "workflow.md",
     )
 
     assert result.output is not None
-    assert "relative fragment" in result.output["prompt"]
+    assert "## Relative fragment" in result.output["prompt"]
 
 
 def test_run_agent_shell_without_source_path_uses_process_cwd(tmp_path: Path, monkeypatch) -> None:

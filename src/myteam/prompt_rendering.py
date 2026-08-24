@@ -10,6 +10,7 @@ from jinja2 import Environment, StrictUndefined
 from .commands import onboard
 from .explain import explain_resources
 from .listing import list_resources
+from .markdown import increase_headers
 
 
 def render_prompt_text(
@@ -51,9 +52,11 @@ def _build_environment(
         myteam_onboard=onboard,
         myteam_list=_make_list_helper(base_dir),
         myteam_load=_make_load_helper(base_dir),
+        increase_headers=increase_headers,
         read_file=_make_read_file_helper(base_dir, input_values=input_values, include_stack=include_stack),
         shell=_make_shell_helper(base_dir),
     )
+    environment.filters["increase_headers"] = increase_headers
     return environment
 
 

@@ -132,13 +132,13 @@ def test_start_markdown_workflow_renders_document_relative_jinja_helpers(run_myt
         from myteam.workflows.results import report_result
 
         prompt = sys.argv[1]
-        report_result({'prompt_has_fragment': 'workflow fragment' in prompt})
+        report_result({'prompt_has_fragment': '## Workflow fragment' in prompt})
         assert sys.stdin.readline() == 'exit\\n'
         """,
     )
     docs = tmp_path / "docs"
     docs.mkdir()
-    (docs / "fragment.txt").write_text("workflow fragment", encoding="utf-8")
+    (docs / "fragment.txt").write_text("# Workflow fragment", encoding="utf-8")
     workflow = docs / "review.md"
     workflow.write_text(
         "---\n"
@@ -146,7 +146,7 @@ def test_start_markdown_workflow_renders_document_relative_jinja_helpers(run_myt
         "description: review a topic\n"
         "agent: fake-agent\n"
         "---\n"
-        "Read {{ read_file('fragment.txt') }}.\n",
+        "Read {{ increase_headers(read_file('fragment.txt')) }}.\n",
         encoding="utf-8",
     )
 
