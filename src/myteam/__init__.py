@@ -8,12 +8,14 @@ import tomllib
 from .commands import onboard
 from .explain import explain_resources
 from .listing import list_resources
+from .markdown import increase_headers
 from .skills import load_skill
 from .workflows import SessionResult, UsageInfo, report_workflow_result, run_agent
 
 __all__ = [
     "__version__",
     "explain_resources",
+    "increase_headers",
     "list_resources",
     "load_skill",
     "onboard",

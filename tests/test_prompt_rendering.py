@@ -38,6 +38,29 @@ def test_render_markdown_body_raises_on_missing_variable(tmp_path: Path) -> None
         )
 
 
+def test_increase_headers_composes_with_includes_and_shell_output(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "fragment.txt").write_text(
+        "{{ '# Included' | increase_headers }}", encoding="utf-8"
+    )
+    command = python_shell_command("print('# Shell')")
+    template = (
+        "{{ read_file('fragment.txt') | increase_headers(1) }}|"
+        "{{ shell(command) | increase_headers(2) }}|"
+        "{{ increase_headers(content, offset=2) }}|"
+        "{{ content | increase_headers(2) }}"
+    )
+
+    rendered = prompt_rendering.render_markdown_body(
+        template,
+        source_path=docs / "skill.md",
+        input_values={"command": command, "content": "# Direct"},
+    )
+
+    assert rendered == "### Included|### Shell\n|### Direct|### Direct"
+
+
 def test_render_markdown_body_reads_files_relative_to_the_document(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
@@ -356,9 +379,13 @@ def test_render_markdown_body_prefers_input_values_over_helper_names(tmp_path: P
     source = tmp_path / "skill.md"
 
     rendered = prompt_rendering.render_markdown_body(
-        "{{ read_file }}|{{ shell }}",
+        "{{ read_file }}|{{ shell }}|{{ increase_headers }}",
         source_path=source,
-        input_values={"read_file": "shadowed read", "shell": "shadowed shell"},
+        input_values={
+            "read_file": "shadowed read",
+            "shell": "shadowed shell",
+            "increase_headers": "shadowed headings",
+        },
     )
 
-    assert rendered == "shadowed read|shadowed shell"
+    assert rendered == "shadowed read|shadowed shell|shadowed headings"
