@@ -4,7 +4,9 @@
 
 The goal is to support nested interactive agent sessions inside of workflows. A child workflow process can ask the supervisor to start another child process. When this happens, the current child process is suspended, the new child becomes active, and the user's terminal is switched to the new child. When the new child exits, the supervisor resumes the previously suspended process.
 
-This behaves like a small purpose-built terminal multiplexer with stack-based process handoff.
+This behaves like a small purpose-built terminal multiplexer with stack-based process handoff. `myteam where` displays the complete current workflow and agent-session hierarchy.
+
+A workflow appears in that hierarchy only after it has started successfully. Failed or completed workflows and completed agent sessions do not appear; when a child workflow completes, its parent again becomes current.
 
 ## Workflow result text
 
@@ -20,7 +22,7 @@ report_workflow_result("final text returned by myteam start")
 
 `report_workflow_result(...)` may be called multiple times. The supervisor concatenates non-`None` text fragments in call order. Calling `report_workflow_result(None)` appends no text. If a workflow reports no text, `myteam start` prints nothing for that workflow result.
 
-Workflow stdout/stderr are live display/logging streams. They are not the returned result of `myteam start`. The supervisor may record display transcripts for debugging, but PTY transcripts are not replayed as result text.
+Workflow stdout/stderr are live display/logging streams. They are not the explicit result of `myteam start`; that clean boundary is the text sent through `report_workflow_result(...)`. Live display, such as `run_agent` lifecycle indicators, may appear alongside command output. The supervisor may record display transcripts for debugging, but they are not replayed as result text.
 
 ## `myteam start` play-by-play
 
@@ -100,6 +102,7 @@ The supervisor is responsible for:
 - suspending and resuming child workflows;
 - switching the visible TTY session when the active child changes;
 - maintaining a stack of suspended workflows;
+- maintaining the validated active workflow and agent-session hierarchy;
 - storing reported workflow result text by request id;
 
 ## Nested mode

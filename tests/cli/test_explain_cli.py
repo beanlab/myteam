@@ -14,4 +14,5 @@ def test_explain_describes_resource_model_and_commands(run_myteam, tmp_path: Pat
     assert "myteam list" in text
     assert "myteam load" in text
     assert "myteam start" in text
+    assert "myteam where" in text
     assert "preferred" in text

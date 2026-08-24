@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .agent_utils import resolve_session_path, iter_jsonl_reverse, estimate_usage_cost
+from .agent_utils import resolve_session_path, iter_jsonl, estimate_usage_cost
 from .runtime import AgentSessionContext
 from ..results import UsageInfo
 
@@ -39,6 +39,7 @@ def build_argv(
     fork: bool = False,
     model: str | None = None,
     extra_args: tuple[str, ...] | None = None,
+    session_name: str | None = None,
 ) -> list[str]:
     extras = extra_args or []
     if model is not None:
@@ -70,58 +71,84 @@ def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Pat
     return match.group(1), path
 
 
-def get_usage_info(session_path: Path) -> UsageInfo | None:
-    model = None
-    usage: dict[str, object] | None = None
-    for event in iter_jsonl_reverse(session_path):
-        # capture model (first valid from bottom = last in file)
-        if model is None:
-            payload = event.get("payload")
-            if isinstance(payload, dict):
-                m = payload.get("model")
-                if isinstance(m, str):
-                    model = m
-            elif isinstance(event.get("model"), str):
-                model = event["model"]
+def get_usage_info(session_path: Path) -> list[UsageInfo] | None:
+    current_model: str | None = None
+    previous_usage: dict[str, object] = {}
+    usage_by_model: dict[str, UsageInfo] = {}
 
-        if usage is None:
-            usage = _extract_usage_payload(event)
+    for event in iter_jsonl(session_path):
+        model = _extract_model(event)
+        if model is not None:
+            current_model = model
 
-        if model is not None and usage is not None:
-            # found final usage → stop immediately
-            break
+        cumulative_usage = _extract_usage_payload(event)
+        if cumulative_usage is None:
+            continue
 
-    else:
-        return None
+        usage_delta = _usage_delta(cumulative_usage, previous_usage)
+        previous_usage = cumulative_usage
+        if current_model is None:
+            continue
 
-    if not model:
-        return None
+        input_tokens = usage_delta["input_tokens"]
+        cached_input_tokens = usage_delta["cached_input_tokens"]
+        output_tokens = usage_delta["output_tokens"]
+        model_usage = usage_by_model.setdefault(
+            current_model,
+            UsageInfo(model=current_model),
+        )
+        model_usage.add(
+            UsageInfo(
+                model=current_model,
+                input_tokens=input_tokens,
+                cached_input_tokens=cached_input_tokens,
+                output_tokens=output_tokens,
+                reasoning_output_tokens=usage_delta["reasoning_output_tokens"],
+                total_tokens=usage_delta["total_tokens"],
+                estimated_cost=estimate_usage_cost(
+                    PRICING_INFO,
+                    current_model,
+                    input_tokens,
+                    cached_input_tokens,
+                    output_tokens,
+                ),
+            )
+        )
 
-    def get_token_count(k: str) -> int:
-        v = usage.get(k)
-        return v if isinstance(v, int) else 0
+    return list(usage_by_model.values()) or None
 
-    input_tokens = get_token_count("input_tokens")
-    cached_input_tokens = get_token_count("cached_input_tokens")
-    output_tokens = get_token_count("output_tokens")
-    reasoning_tokens = get_token_count("reasoning_output_tokens")
-    total_tokens = get_token_count("total_tokens")
 
-    return UsageInfo(
-        model=model,
-        input_tokens=input_tokens,
-        cached_input_tokens=cached_input_tokens,
-        output_tokens=output_tokens,
-        reasoning_output_tokens=reasoning_tokens,
-        total_tokens=total_tokens,
-        estimated_cost=estimate_usage_cost(
-            PRICING_INFO,
-            model,
-            input_tokens,
-            cached_input_tokens,
-            output_tokens,
-        ),
+def _extract_model(event: dict[str, object]) -> str | None:
+    payload = event.get("payload")
+    if isinstance(payload, dict) and isinstance(payload.get("model"), str):
+        return payload["model"]
+    model = event.get("model")
+    return model if isinstance(model, str) else None
+
+
+def _usage_delta(
+    current: dict[str, object],
+    previous: dict[str, object],
+) -> dict[str, int]:
+    fields = (
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_output_tokens",
+        "total_tokens",
     )
+    delta: dict[str, int] = {}
+    for field in fields:
+        current_value = current.get(field)
+        previous_value = previous.get(field)
+        current_count = current_value if isinstance(current_value, int) else 0
+        previous_count = previous_value if isinstance(previous_value, int) else 0
+        delta[field] = (
+            current_count - previous_count
+            if current_count >= previous_count
+            else current_count
+        )
+    return delta
 
 
 def _extract_usage_payload(event: dict[str, object]) -> dict[str, object] | None:

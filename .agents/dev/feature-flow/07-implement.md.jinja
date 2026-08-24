@@ -1,0 +1,53 @@
+# Implement the Approved Feature Plan
+
+{{ read_file('general-project-prompt.md') }}
+
+{{ read_file('code-planning.md') }}
+
+{{ read_file('code-style.md') }}
+
+## Testing approach
+
+Preserve tests that protect externally observable contracts. Avoid coupling new tests to private implementation details unless a risky internal cannot be covered meaningfully through a public boundary.
+
+## Responsibility
+
+Implement the complete approved plan. Stay within the confirmed feature scope and do not perform unrelated cleanup.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Approved execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+## Current test state
+
+{{ test_state | tojson(indent=2) }}
+
+{% if previous_implementation_result %}
+## Superseded implementation result
+
+{{ previous_implementation_result | tojson(indent=2) }}
+
+Inspect the repository rather than assuming this report is still exact. Produce a complete replacement implementation result.
+{% endif %}
+
+{% if feedback %}
+## Feedback behind this iteration
+
+Source: {{ feedback_source }}
+
+{{ feedback | tojson(indent=2) }}
+{% endif %}
+
+Follow the approved sequence, preserving public contracts except where the design explicitly changes them. Keep the implementation minimal, self-documenting, secure, and easy to change. Reuse existing code and dependencies where appropriate.
+
+Run the planned focused tests and the appropriate broader test suite. Resolve unexpected failures. If the plan cannot be followed safely or a new consequential decision is required, do not silently invent a new design; report the concern clearly.
+
+Return a complete canonical implementation result covering all current changes, deviations, refactoring, validation, and remaining concerns.

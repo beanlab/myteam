@@ -26,6 +26,7 @@ def test_supervisor_runs_workflow_process(tmp_path: Path) -> None:
     with Supervisor() as supervisor:
         request_id = supervisor.start_top_level_workflow(
             argv=[sys.executable, str(workflow)],
+            workflow_path=str(workflow.resolve()),
             cwd=str(tmp_path),
             input_json=None,
         )

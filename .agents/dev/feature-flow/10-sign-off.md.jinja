@@ -1,0 +1,49 @@
+# Feature Sign-off
+
+{{ read_file('general-project-prompt.md') }}
+
+## Responsibility
+
+Determine whether the completed and documented feature satisfies the user's confirmed intent. Do not modify files, redesign the feature, or perform release actions.
+
+## Confirmed feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Approved execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+## Implementation result
+
+{{ implementation_result | tojson(indent=2) }}
+
+## Approved code review
+
+{{ code_review | tojson(indent=2) }}
+
+## Documentation result
+
+{{ documentation_result | tojson(indent=2) }}
+
+{% if previous_acceptance %}
+## Previous sign-off result
+
+{{ previous_acceptance | tojson(indent=2) }}
+{% endif %}
+
+Inspect the actual repository diff, affected documentation, and relevant validation state rather than relying only on the reports above. Briefly explain what changed, why, how non-trivial decisions were implemented, what was refactored, and what was tested. Compare the delivered behavior explicitly against every acceptance criterion and disclose deviations or remaining concerns. Confirm that user-facing documentation accurately describes the delivered behavior and that examples and generated artifacts are consistent.
+
+Discuss concerns with the user one question at a time. Set `decision` to `approved` only after explicit user approval.
+
+If changes are requested, classify the return point carefully:
+
+- `discovery` when the desired scope, behavior, acceptance criteria, or design intent has changed;
+- `planning` when the confirmed feature remains correct but its implementation or tests must be corrected;
+- `documentation` when the implementation is acceptable and only documentation must be corrected.
+
+Choose the latest phase capable of making the correction. Record the requested changes precisely enough for the receiving phase to act on them.

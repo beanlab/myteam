@@ -32,7 +32,7 @@ class FakeSession:
 
 def test_workflow_result_is_stored_as_soon_as_rpc_is_accepted() -> None:
     store = WorkflowStore()
-    record = store.create_request()
+    record = store.create_request(workflow_path="/tmp/workflow.py")
     store.mark_running(record.request_id)
 
     response = store.report_workflow_result(
@@ -50,7 +50,7 @@ def test_workflow_result_is_stored_as_soon_as_rpc_is_accepted() -> None:
 
 def test_workflow_store_poll_and_ack_lifecycle() -> None:
     store = WorkflowStore()
-    record = store.create_request()
+    record = store.create_request(workflow_path="/tmp/workflow.py")
 
     assert store.poll_result({"request_id": record.request_id}) == {"ok": True, "ready": False}
 
@@ -71,7 +71,7 @@ def test_workflow_store_poll_and_ack_lifecycle() -> None:
 
 def test_workflow_store_complete_request_returns_parent_session_id() -> None:
     store = WorkflowStore()
-    record = store.create_request(parent_session_id="parent-1")
+    record = store.create_request(workflow_path="/tmp/workflow.py", parent_session_id="parent-1")
 
     parent_session_id = store.complete_request(record.request_id, status="ok", result={"exit_code": 0})
 
@@ -80,7 +80,7 @@ def test_workflow_store_complete_request_returns_parent_session_id() -> None:
 
 def test_workflow_store_complete_exit_request_captures_text_and_finalizes() -> None:
     store = WorkflowStore()
-    record = store.create_request(parent_session_id="parent-1")
+    record = store.create_request(workflow_path="/tmp/workflow.py", parent_session_id="parent-1")
     store.mark_running(record.request_id)
     store.report_workflow_result({"request_id": record.request_id, "text": "first\n"})
     store.report_workflow_result({"request_id": record.request_id, "text": "second\n"})
@@ -101,7 +101,7 @@ def test_workflow_store_complete_exit_request_captures_text_and_finalizes() -> N
 
 def test_workflow_store_rejects_reports_after_final_result() -> None:
     store = WorkflowStore()
-    record = store.create_request()
+    record = store.create_request(workflow_path="/tmp/workflow.py")
     store.mark_running(record.request_id)
     store.complete_request(record.request_id, status="ok", result={"exit_code": 0})
 
@@ -111,7 +111,7 @@ def test_workflow_store_rejects_reports_after_final_result() -> None:
 
 def test_workflow_store_accepts_concurrent_result_reports() -> None:
     store = WorkflowStore()
-    record = store.create_request()
+    record = store.create_request(workflow_path="/tmp/workflow.py")
     store.mark_running(record.request_id)
     expected = {f"part-{index}\n" for index in range(20)}
 
@@ -133,7 +133,7 @@ def test_workflow_store_accepts_concurrent_result_reports() -> None:
 def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("myteam.workflows.execution.supervisor.drain_pty_output", lambda *_args, **_kwargs: None)
     supervisor = Supervisor()
-    record = supervisor.store.create_request()
+    record = supervisor.store.create_request(workflow_path="/tmp/workflow.py")
     supervisor.store.mark_running(record.request_id)
     session = FakeSession(record.request_id)
     supervisor._stack.active = session  # type: ignore[assignment]
@@ -153,7 +153,7 @@ def test_reported_workflow_result_is_used_when_session_exits(monkeypatch: pytest
 def test_nonzero_exit_keeps_reported_workflow_result_text(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("myteam.workflows.execution.supervisor.drain_pty_output", lambda *_args, **_kwargs: None)
     supervisor = Supervisor()
-    record = supervisor.store.create_request()
+    record = supervisor.store.create_request(workflow_path="/tmp/workflow.py")
     supervisor.store.mark_running(record.request_id)
     session = FakeSession(record.request_id, exit_code=7)
     supervisor._stack.active = session  # type: ignore[assignment]

@@ -1,0 +1,27 @@
+# Select the Feature Approach
+
+{{ read_file('general-project-prompt.md') }}
+
+## Responsibility
+
+Help the user select and approve an implementation approach. Do not modify files or create the detailed implementation plan.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Solution analysis
+
+{{ solution_analysis | tojson(indent=2) }}
+
+{% if previous_design_decision %}
+## Superseded design decision
+
+{{ previous_design_decision | tojson(indent=2) }}
+
+A changed decision must be explicitly confirmed. Produce a complete replacement decision.
+{% endif %}
+
+Discuss only decisions that materially affect behavior, compatibility, complexity, risk, or maintenance. Present reasonable options and your recommendation. Ask the user one question at a time, updating later questions when earlier answers make them irrelevant.
+
+Resolve blocking design questions before finishing. Clearly record the selected approach, rationale, accepted tradeoffs, prerequisite refactoring, and compatibility policy. Set `approved_by_user` to true only after the user explicitly approves the complete decision.

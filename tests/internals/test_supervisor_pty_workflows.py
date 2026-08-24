@@ -16,6 +16,7 @@ def run_workflow(workflow: Path, cwd: Path) -> dict:
     with Supervisor() as supervisor:
         request_id = supervisor.start_top_level_workflow(
             argv=[sys.executable, str(workflow)],
+            workflow_path=str(workflow.resolve()),
             cwd=str(cwd),
             input_json=None,
         )

@@ -1,0 +1,74 @@
+# Review the Feature Implementation
+
+{{ read_file('general-project-prompt.md') }}
+
+{{ read_file('code-planning.md') }}
+
+{{ read_file('code-style.md') }}
+
+## Testing approach
+
+Prefer tests at the outermost meaningful boundary. Protect externally observable contracts without coupling tests to private implementation details. Accept lower-level coverage when it is justified by unusually risky internals.
+
+## Responsibility
+
+Independently review the actual repository implementation. Do not modify files.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Approved execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+## Implementation result
+
+{{ implementation_result | tojson(indent=2) }}
+
+{% if remediation_result %}
+## Latest remediation report
+
+{{ remediation_result | tojson(indent=2) }}
+{% endif %}
+
+{% if previous_code_review %}
+## Previous code review
+
+{{ previous_code_review | tojson(indent=2) }}
+
+Verify its findings, but perform a fresh review of the complete current implementation.
+{% endif %}
+
+{% if review_resolution %}
+## Binding user resolution
+
+{{ review_resolution | tojson(indent=2) }}
+
+Honor this direction. Do not reopen a finding the user resolved unless subsequent changes create new evidence that materially changes it.
+{% endif %}
+
+Inspect the diff and relevant surrounding code. Run appropriate validation when useful. Review for:
+
+- correctness against every acceptance criterion;
+- security, data integrity, error handling, and failure behavior;
+- public contract and compatibility consequences;
+- test quality and missing contract coverage;
+- unnecessary complexity, bloat, duplication, and speculative abstractions;
+- maintainability, naming, organization, and ease of future change;
+- deviations from the approved plan or design.
+
+A blocking finding must be tied directly to the feature brief, approved design, a public contract, security, or correctness. Do not require optional improvements, unrelated cleanup, or personal style preferences. On re-review, do not introduce new findings unless they result from remediation or could not reasonably have been identified before remediation.
+
+Use `approved` only when no changes are required. Otherwise use `changes_required`, provide specific actionable findings, and select exactly one return point:
+
+- `implementation` when the approved plan and design remain sound and a local code, test, or security correction is sufficient;
+- `planning` when the implementation exposes missing work, sequencing, validation, or safeguards in the plan;
+- `design` when the approved approach, tradeoffs, or compatibility policy must be reconsidered;
+- `discovery` when the requested behavior, scope, acceptance criteria, or public contract is unclear or incorrect.
+
+Choose the latest phase capable of correcting the problem. Do not ask implementation remediation to revise an upstream decision.

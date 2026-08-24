@@ -4,7 +4,13 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .protocol import ENV_SOCKET, ENV_WORKFLOW_INPUT_JSON, ENV_WORKFLOW_INVOCATION_ID
+from .protocol import (
+    ENV_AGENT_SESSION_NONCE,
+    ENV_AGENT_SESSION_RESULT_SOCKET,
+    ENV_SOCKET,
+    ENV_WORKFLOW_INPUT_JSON,
+    ENV_WORKFLOW_INVOCATION_ID,
+)
 from .pty_process import ManagedPtyProcess
 from .terminal import RealTerminal, Winsize
 from .workflow_commands import StartWorkflowCommand
@@ -29,7 +35,18 @@ class WorkflowStack:
 
     def start(self, command: StartWorkflowCommand, *, socket_path: str) -> ManagedPtyProcess:
         self._prepare_for_start(command)
-        session = self._launch(command, socket_path=socket_path)
+        try:
+            session = self._launch(command, socket_path=socket_path)
+        except BaseException as exc:
+            if command.parent_session_id is not None:
+                self.resume_previous()
+            raise WorkflowStartError(
+                {
+                    "exit_code": 1,
+                    "result_text": "",
+                    "error_text": f"Workflow launch failed: {exc}\n",
+                }
+            ) from exc
         self.sessions[session.session_id] = session
         self.active = session
         self.terminal.flush_input()
@@ -101,8 +118,12 @@ class WorkflowStack:
             ENV_SOCKET: socket_path,
             ENV_WORKFLOW_INVOCATION_ID: command.request_id,
         }
+        env.pop(ENV_AGENT_SESSION_NONCE, None)
+        env.pop(ENV_AGENT_SESSION_RESULT_SOCKET, None)
         if command.input_json is not None:
             env[ENV_WORKFLOW_INPUT_JSON] = command.input_json
+        else:
+            env.pop(ENV_WORKFLOW_INPUT_JSON, None)
 
         return ManagedPtyProcess.launch(
             session_id=command.request_id,

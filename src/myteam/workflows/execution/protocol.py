@@ -19,6 +19,9 @@ KIND_START_WORKFLOW = "start_workflow"
 KIND_POLL_RESULT = "poll_result"
 KIND_ACK_RESULT = "ack_result"
 KIND_WORKFLOW_RESULT = "workflow_result"
+KIND_REGISTER_AGENT = "register_agent"
+KIND_UNREGISTER_AGENT = "unregister_agent"
+KIND_GET_STACK = "get_stack"
 
 
 @dataclass(frozen=True)

@@ -17,11 +17,19 @@ from typing import Any
 
 from .. import templates
 from ..prompt_rendering import render_prompt_text
-from ..config import WorkflowDefaults, load_myteam_config
+from ..config import WorkflowDefaults, load_myteam_config, normalize_session_name
 from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
 from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
-from .execution.protocol import ENV_AGENT_SESSION_NONCE, ENV_AGENT_SESSION_RESULT_SOCKET
+from .execution.protocol import (
+    ENV_AGENT_SESSION_NONCE,
+    ENV_AGENT_SESSION_RESULT_SOCKET,
+    ENV_SOCKET,
+    ENV_WORKFLOW_INVOCATION_ID,
+    KIND_REGISTER_AGENT,
+    KIND_UNREGISTER_AGENT,
+    RpcClient,
+)
 from .execution.pty_forwarding import binary_output_stream, drain_pty_output, pump_pty_once, write_bytes
 from .execution.pty_process import ManagedPtyProcess
 from .execution.terminal import RealTerminal
@@ -30,6 +38,10 @@ from .results import SessionResult, UsageInfo
 
 _AGENT_RESULT_POLL_SECONDS = 0.05
 _AGENT_EXIT_TIMEOUT_SECONDS = 2.0
+_INDICATOR_WIDTH = 44
+_BLUE_BOLD = "\x1b[1;34m"
+_RED_BOLD = "\x1b[1;31m"
+_RESET = "\x1b[0m"
 
 
 def run_agent(
@@ -38,6 +50,7 @@ def run_agent(
     input: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
     agent: str | None = None,
+    session_name: str | None = None,
     model: str | None = None,
     reasoning: str | None = None,
     extra_args: tuple[str, ...] | list[str] | None = None,
@@ -45,11 +58,16 @@ def run_agent(
     session_id: str | None = None,
     fork: bool | None = None,
     prompt_source_path: Path | str | None = None,
-
 ) -> SessionResult:
     cwd = Path.cwd().resolve()
     defaults = _load_defaults(cwd)
     agent_name = _choose(agent, defaults.agent, DEFAULT_AGENT)
+    native_session_name = normalize_session_name(
+        _choose(session_name, defaults.session_name, None)
+    )
+    effective_session_name = (
+        native_session_name if native_session_name is not None else "New session"
+    )
     runtime_config = _resolve_runtime_config(agent_name, cwd)
 
     effective_model = _choose(model, defaults.model, None)
@@ -76,8 +94,55 @@ def run_agent(
         effective_model,
         effective_extra_args,
         effective_reasoning,
+        native_session_name,
     )
 
+    registration = _ManagedAgentRegistration.create(
+        nonce=session_nonce,
+        name=effective_session_name,
+        agent=agent_name,
+        model=effective_model,
+        session_id=effective_session_id if effective_session_id is not None and not effective_fork else None,
+    )
+    registration.register()
+    try:
+        result = _run_agent_process(
+            argv=argv,
+            cwd=cwd,
+            session_nonce=session_nonce,
+            session_name=effective_session_name,
+            agent_name=agent_name,
+            model=effective_model,
+            reasoning=effective_reasoning,
+            interactive=bool(effective_interactive),
+            source_session_id=effective_session_id,
+            fork=bool(effective_fork),
+            runtime_config=runtime_config,
+        )
+    except BaseException:
+        try:
+            registration.unregister()
+        except BaseException:
+            pass
+        raise
+    registration.unregister()
+    return result
+
+
+def _run_agent_process(
+    *,
+    argv: list[str],
+    cwd: Path,
+    session_nonce: str,
+    session_name: str,
+    agent_name: str,
+    model: str | None,
+    reasoning: str | None,
+    interactive: bool,
+    source_session_id: str | None,
+    fork: bool,
+    runtime_config: AgentRuntimeConfig,
+) -> SessionResult:
     with AgentResultServer() as result_server:
         env = {
             **os.environ,
@@ -94,28 +159,222 @@ def run_agent(
             nonce=session_nonce,
             agent_name=agent_name,
         )
+        session_closed = False
+        end_started = False
         try:
-            reported_result, exit_code = _forward_pty_until_complete(
-                session,
-                result_server,
-                exit_sequence=runtime_config.exit_sequence,
+            _emit_indicator(
+                _format_start_indicator(
+                    name=session_name,
+                    agent=agent_name,
+                    model=model,
+                    reasoning=reasoning,
+                    interactive=interactive,
+                    session_id=source_session_id,
+                    fork=fork,
+                )
             )
+            reported_result, exit_code = _forward_pty_until_complete(
+                session, result_server, exit_sequence=runtime_config.exit_sequence
+            )
+            try:
+                _close_launched_session(session)
+            finally:
+                session_closed = True
             transcript = session.recording.snapshot()
-        finally:
-            session.close()
+            output_value = reported_result.output if reported_result is not None else None
+            if reported_result is not None and reported_result.status != "ok":
+                raise RuntimeError(json.dumps({"status": reported_result.status, "output": output_value}))
+            native_session_id, usage = _resolve_session_metadata(runtime_config, session_nonce)
+            result = SessionResult(
+                exit_code=exit_code,
+                output=output_value,
+                usage=usage,
+                transcript=transcript,
+                session_id=native_session_id,
+            )
+            end_started = True
+            _emit_indicator(_format_end_indicator(session_name, result))
+            return result
+        except BaseException:
+            if not session_closed:
+                try:
+                    _close_launched_session(session)
+                except BaseException:
+                    pass
+            if not end_started:
+                try:
+                    _emit_indicator(_format_exception_end_indicator(session_name))
+                except BaseException:
+                    pass
+            raise
 
-    output_value = reported_result.output if reported_result is not None else None
-    if reported_result is not None and reported_result.status != "ok":
-        raise RuntimeError(json.dumps({"status": reported_result.status, "output": output_value}))
 
-    native_session_id, usage = _resolve_session_metadata(runtime_config, session_nonce)
-    return SessionResult(
-        exit_code=exit_code,
-        output=output_value,
-        usage=usage,
-        transcript=transcript,
-        session_id=native_session_id,
+class _ManagedAgentRegistration:
+    def __init__(self, client: RpcClient | None, payload: dict[str, Any]) -> None:
+        self.client = client
+        self.payload = payload
+        self.registered = False
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        nonce: str,
+        name: str,
+        agent: str,
+        model: str | None,
+        session_id: str | None,
+    ) -> "_ManagedAgentRegistration":
+        socket_path = os.environ.get(ENV_SOCKET)
+        workflow_id = os.environ.get(ENV_WORKFLOW_INVOCATION_ID)
+        client = RpcClient(socket_path) if socket_path and workflow_id else None
+        return cls(
+            client,
+            {
+                "nonce": nonce,
+                "workflow_invocation_id": workflow_id,
+                "parent_agent_nonce": os.environ.get(ENV_AGENT_SESSION_NONCE),
+                "name": name,
+                "agent": agent,
+                "model": model,
+                "session_id": session_id,
+            },
+        )
+
+    def register(self):
+        if self.client is None:
+            return
+        error: BaseException | None = None
+        for _ in range(2):
+            try:
+                self.client.call(KIND_REGISTER_AGENT, **self.payload)
+                self.registered = True
+                return
+            except BaseException as exc:
+                error = exc
+        try:
+            self._unregister(force=True)
+        except BaseException:
+            pass
+        assert error is not None
+        raise error
+
+    def unregister(self):
+        if self.client is None or not self.registered:
+            return
+        self._unregister(force=False)
+        self.registered = False
+
+    def _unregister(self, *, force: bool):
+        if self.client is None:
+            return
+        error: BaseException | None = None
+        for attempt in range(3):
+            try:
+                self.client.call(KIND_UNREGISTER_AGENT, nonce=self.payload["nonce"])
+                return
+            except BaseException as exc:
+                error = exc
+                if attempt < 2:
+                    time.sleep(0.02)
+        if not force:
+            assert error is not None
+            raise error
+
+
+def _format_start_indicator(
+    *,
+    name: str,
+    agent: str,
+    model: str | None,
+    reasoning: str | None,
+    interactive: bool,
+    session_id: str | None,
+    fork: bool,
+) -> bytes:
+    title = "Session resumed" if session_id is not None and not fork else "Session started"
+    first_fields = [f"name={_quote(name)}", f"agent={_quote(agent)}"]
+    if session_id is not None:
+        source_name = "forked_from" if fork else "session_id"
+        first_fields.append(f"{source_name}={_quote(session_id)}")
+
+    second_fields = []
+    if model is not None:
+        second_fields.append(f"model={_quote(model)}")
+    if reasoning is not None:
+        second_fields.append(f"reasoning={_quote(reasoning)}")
+    second_fields.append(f"interactive={json.dumps(interactive)}")
+    return _format_indicator(
+        title,
+        [" ".join(first_fields), " ".join(second_fields)],
+        color=_BLUE_BOLD,
+        leading_newline=False,
     )
+
+
+def _format_end_indicator(name: str, result: SessionResult) -> bytes:
+    metadata = [f"name={_quote(name)}"]
+    if result.session_id is not None:
+        metadata.append(f"session_id={_quote(result.session_id)}")
+    color = _RED_BOLD if result.exit_code != 0 else _BLUE_BOLD
+    return _format_indicator(
+        "Session ended",
+        [" ".join(metadata)],
+        color=color,
+        leading_newline=True,
+    )
+
+
+def _format_exception_end_indicator(name: str) -> bytes:
+    return _format_indicator(
+        "Session ended",
+        [f"name={_quote(name)}"],
+        color=_BLUE_BOLD,
+        leading_newline=True,
+    )
+
+
+def _format_indicator(
+    title: str,
+    metadata: list[str],
+    *,
+    color: str,
+    leading_newline: bool,
+) -> bytes:
+    top = f"┌─ {title} "
+    top += "─" * max(1, _INDICATOR_WIDTH - len(top))
+    bottom = "└" + "─" * (_INDICATOR_WIDTH - 1)
+    plain = "NO_COLOR" in os.environ
+
+    if plain:
+        lines = [top, *(f"│ {line}" for line in metadata), bottom]
+    else:
+        lines = [
+            f"{color}{top}{_RESET}",
+            *(f"{color}│{_RESET} {line}" for line in metadata),
+            f"{color}{bottom}{_RESET}",
+        ]
+
+    prefix = "\n" if leading_newline else ""
+    return (prefix + "\n".join(lines) + "\n").encode("utf-8")
+
+
+def _quote(value: Any) -> str:
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def _emit_indicator(indicator: bytes) -> None:
+    write_bytes(binary_output_stream(sys.stdout), indicator)
+
+
+def _close_launched_session(session: ManagedPtyProcess) -> None:
+    output = binary_output_stream(sys.stdout)
+    try:
+        if session.poll() is None:
+            session.terminate()
+        drain_pty_output(session, stdout_writer=lambda chunk: write_bytes(output, chunk))
+    finally:
+        session.close()
 
 
 def build_agent_prompt(

@@ -13,10 +13,20 @@ MYTEAM_CONFIG_FILENAME = ".myteam.yaml"
 CONFIG_FILENAME = ".config.yaml"
 
 
+def normalize_session_name(value: Any) -> str | None:
+    if value is None:
+        return None
+    name = str(value)
+    if "\n" in name or "\r" in name:
+        raise ValueError("Session name must not contain newline characters.")
+    return name
+
+
 class WorkflowDefaults(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     agent: Optional[str] = Field(default=None, min_length=1)
+    session_name: Optional[str] = None
     model: Optional[str] = Field(default=None, min_length=1)
     reasoning: Optional[str] = Field(default=None, min_length=1)
     interactive: Optional[bool] = None
@@ -25,6 +35,11 @@ class WorkflowDefaults(BaseModel):
     extra_args: Optional[tuple[str, ...]] = Field(default=None)
     usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
     timeout: Optional[PositiveInt] = Field(default=None)
+
+    @field_validator("session_name", mode="before")
+    @classmethod
+    def _normalize_session_name(cls, value: Any) -> str | None:
+        return normalize_session_name(value)
 
     @field_validator("extra_args", mode="before")
     @classmethod

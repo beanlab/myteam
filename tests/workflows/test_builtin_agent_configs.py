@@ -9,6 +9,10 @@ from myteam.workflows.agents.claude import build_argv as build_claude_argv
 from myteam.workflows.agents.claude import get_session_info as get_claude_session_info
 from myteam.workflows.agents.claude import get_usage_info as get_claude_usage_info
 from myteam.workflows.agents.claude import _project_session_dir_name as claude_project_session_dir_name
+from myteam.workflows.agents.codex import build_argv as build_codex_argv
+from myteam.workflows.agents.codex import get_usage_info as get_codex_usage_info
+from myteam.workflows.agents.pi import build_argv as build_pi_argv
+from myteam.workflows.agents.pi import get_usage_info as get_pi_usage_info
 from myteam.workflows.agents.runtime import AgentSessionContext, resolve_agent_runtime_config
 
 
@@ -18,6 +22,58 @@ def agent_session_context(home: Path, launch_cwd: Path | None = None) -> AgentSe
         project_root=(launch_cwd or home).resolve(),
         launch_cwd=(launch_cwd or home).resolve(),
     )
+
+
+def test_codex_get_usage_info_attributes_cumulative_deltas_by_model(tmp_path: Path) -> None:
+    session_path = tmp_path / "rollout-session.jsonl"
+    session_path.write_text(
+        '{"type":"turn_context","payload":{"model":"gpt-5.4"}}\n'
+        '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":10,"reasoning_output_tokens":2,"total_tokens":110}}}}\n'
+        '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":250,"cached_input_tokens":70,"output_tokens":30,"reasoning_output_tokens":5,"total_tokens":280}}}}\n'
+        '{"type":"turn_context","payload":{"model":"gpt-5-mini"}}\n'
+        '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":300,"cached_input_tokens":80,"output_tokens":50,"reasoning_output_tokens":9,"total_tokens":350}}}}\n',
+        encoding="utf-8",
+    )
+
+    usage = get_codex_usage_info(session_path)
+
+    assert usage is not None
+    usage_by_model = {item.model: item for item in usage}
+    assert set(usage_by_model) == {"gpt-5.4", "gpt-5-mini"}
+    assert usage_by_model["gpt-5.4"].input_tokens == 250
+    assert usage_by_model["gpt-5.4"].cached_input_tokens == 70
+    assert usage_by_model["gpt-5.4"].output_tokens == 30
+    assert usage_by_model["gpt-5.4"].reasoning_output_tokens == 5
+    assert usage_by_model["gpt-5.4"].total_tokens == 280
+    assert usage_by_model["gpt-5-mini"].input_tokens == 50
+    assert usage_by_model["gpt-5-mini"].cached_input_tokens == 10
+    assert usage_by_model["gpt-5-mini"].output_tokens == 20
+    assert usage_by_model["gpt-5-mini"].reasoning_output_tokens == 4
+    assert usage_by_model["gpt-5-mini"].total_tokens == 70
+
+
+def test_pi_get_usage_info_aggregates_every_response_by_model(tmp_path: Path) -> None:
+    session_path = tmp_path / "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl"
+    session_path.write_text(
+        '{"type":"assistant","message":{"model":"gpt-5.6-sol","usage":{"input":10,"cacheRead":20,"cacheWrite":30,"output":4,"reasoning":2,"totalTokens":64,"cost":{"total":0.1}}}}\n'
+        '{"type":"assistant","message":{"model":"gpt-5.6-sol","usage":{"input":5,"cacheRead":40,"cacheWrite":6,"output":7,"reasoning":3,"totalTokens":58,"cost":{"total":0.2}}}}\n'
+        '{"type":"assistant","message":{"model":"other-model","usage":{"input":1,"cacheRead":2,"cacheWrite":3,"output":4,"reasoning":1,"totalTokens":10,"cost":{"total":0.05}}}}\n',
+        encoding="utf-8",
+    )
+
+    usage = get_pi_usage_info(session_path)
+
+    assert usage is not None
+    usage_by_model = {item.model: item for item in usage}
+    assert set(usage_by_model) == {"gpt-5.6-sol", "other-model"}
+    assert usage_by_model["gpt-5.6-sol"].input_tokens == 111
+    assert usage_by_model["gpt-5.6-sol"].cached_input_tokens == 60
+    assert usage_by_model["gpt-5.6-sol"].output_tokens == 11
+    assert usage_by_model["gpt-5.6-sol"].reasoning_output_tokens == 5
+    assert usage_by_model["gpt-5.6-sol"].total_tokens == 122
+    assert usage_by_model["gpt-5.6-sol"].estimated_cost == pytest.approx(0.3)
+    assert usage_by_model["other-model"].total_tokens == 10
+    assert usage_by_model["other-model"].estimated_cost == pytest.approx(0.05)
 
 
 def test_packaged_claude_config_resolves(tmp_path: Path) -> None:
@@ -77,6 +133,165 @@ def test_claude_build_argv_supports_session_modes_and_settings() -> None:
         "auto",
         "prompt",
     ]
+
+
+def test_pi_build_argv_forwards_session_name_in_every_launch_mode() -> None:
+    assert build_pi_argv("prompt", session_name="new") == ["pi", "--name", "new", "prompt"]
+    assert build_pi_argv("prompt", interactive=False, session_name="headless") == [
+        "pi",
+        "--print",
+        "--name",
+        "headless",
+        "prompt",
+    ]
+    assert build_pi_argv("prompt", session_id="resume", session_name="resumed") == [
+        "pi",
+        "--session",
+        "resume",
+        "--name",
+        "resumed",
+        "prompt",
+    ]
+    assert build_pi_argv(
+        "prompt",
+        interactive=False,
+        session_id="resume",
+        session_name="resumed-headless",
+    ) == [
+        "pi",
+        "--print",
+        "--session",
+        "resume",
+        "--name",
+        "resumed-headless",
+        "prompt",
+    ]
+    assert build_pi_argv(
+        "prompt",
+        session_id="fork",
+        fork=True,
+        session_name="forked",
+    ) == ["pi", "--fork", "fork", "--name", "forked", "prompt"]
+    assert build_pi_argv(
+        "prompt",
+        interactive=False,
+        session_id="fork",
+        fork=True,
+        session_name="forked-headless",
+    ) == [
+        "pi",
+        "--print",
+        "--fork",
+        "fork",
+        "--name",
+        "forked-headless",
+        "prompt",
+    ]
+
+
+def test_pi_build_argv_forwards_empty_and_duplicate_names() -> None:
+    assert build_pi_argv(
+        "prompt",
+        extra_args=("--name", "extra"),
+        session_name="",
+    ) == ["pi", "--name", "", "--name", "extra", "prompt"]
+
+
+def test_claude_build_argv_forwards_session_name_in_every_launch_mode() -> None:
+    assert build_claude_argv("prompt", session_name="new") == [
+        "claude",
+        "--name",
+        "new",
+        "prompt",
+    ]
+    assert build_claude_argv("prompt", interactive=False, session_name="headless") == [
+        "claude",
+        "--print",
+        "--name",
+        "headless",
+        "prompt",
+    ]
+    assert build_claude_argv("prompt", session_id="resume", session_name="resumed") == [
+        "claude",
+        "--resume",
+        "resume",
+        "--name",
+        "resumed",
+        "prompt",
+    ]
+    assert build_claude_argv(
+        "prompt",
+        interactive=False,
+        session_id="resume",
+        session_name="resumed-headless",
+    ) == [
+        "claude",
+        "--print",
+        "--resume",
+        "resume",
+        "--name",
+        "resumed-headless",
+        "prompt",
+    ]
+    assert build_claude_argv(
+        "prompt",
+        session_id="fork",
+        fork=True,
+        session_name="forked",
+    ) == [
+        "claude",
+        "--resume",
+        "fork",
+        "--fork-session",
+        "--name",
+        "forked",
+        "prompt",
+    ]
+    assert build_claude_argv(
+        "prompt",
+        interactive=False,
+        session_id="fork",
+        fork=True,
+        session_name="forked-headless",
+    ) == [
+        "claude",
+        "--print",
+        "--resume",
+        "fork",
+        "--fork-session",
+        "--name",
+        "forked-headless",
+        "prompt",
+    ]
+
+
+def test_claude_build_argv_forwards_empty_and_duplicate_names() -> None:
+    assert build_claude_argv(
+        "prompt",
+        extra_args=("--name", "extra"),
+        session_name="",
+    ) == ["claude", "--name", "", "--name", "extra", "prompt"]
+
+
+def test_codex_build_argv_accepts_and_ignores_session_name() -> None:
+    assert build_codex_argv("prompt", session_name="new") == ["codex", "prompt"]
+    assert build_codex_argv("prompt", interactive=False, session_name="headless") == [
+        "codex",
+        "exec",
+        "prompt",
+    ]
+    assert build_codex_argv("prompt", session_id="resume", session_name="resumed") == [
+        "codex",
+        "resume",
+        "resume",
+        "prompt",
+    ]
+    assert build_codex_argv(
+        "prompt",
+        session_id="fork",
+        fork=True,
+        session_name="forked",
+    ) == ["codex", "fork", "fork", "prompt"]
 
 
 def test_claude_get_session_info_finds_newest_matching_project_session(tmp_path: Path) -> None:

@@ -18,5 +18,5 @@ The `name` of a skill or workflow is not defined in the YAML frontmatter. Resour
 
 Skill and workflow names always include their extensions. References without extensions are assumed to directories. 
 
-Only `.md` and `.py` resource files are supported. Other extensions will result in errors. 
+Only `.md` and `.py` files can be resources. Listing ignores other file extensions; loading a skill or starting a workflow from one reports an error.
 

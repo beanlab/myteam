@@ -84,14 +84,130 @@ def test_list_default_prefix_uses_current_working_directory(run_myteam, tmp_path
     assert "----skill: alpha.md----\nalpha skill" in result.stdout
 
 
-def test_list_missing_or_file_prefix_reports_not_a_skill_folder(run_myteam, tmp_path: Path) -> None:
-    file_prefix = tmp_path / "file.md"
-    file_prefix.write_text("not a folder\n", encoding="utf-8")
+def test_list_accepts_a_resource_file_target(run_myteam, tmp_path: Path) -> None:
+    write_listing_fixture(tmp_path)
 
-    missing = run_myteam(tmp_path, "list", "missing")
-    file_result = run_myteam(tmp_path, "list", "file.md")
+    result = run_myteam(tmp_path, "list", "agents/foo/bar.md")
 
-    assert missing.exit_code == 1
-    assert "Not a skill folder:" in missing.stderr
-    assert file_result.exit_code == 1
-    assert "Not a skill folder:" in file_result.stderr
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert result.stdout == "----skill: agents/foo/bar.md----\nbar skill"
+
+
+def test_list_aggregates_multiple_targets_and_sorts_glob_style_argv_globally(run_myteam, tmp_path: Path) -> None:
+    write_listing_fixture(tmp_path)
+
+    result = run_myteam(
+        tmp_path,
+        "list",
+        "agents/foo/yep.py",
+        "agents/quux.md",
+        "agents/foo/bar.md",
+    )
+
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert result.stdout == (
+        "----skill: agents/foo/bar.md----\n"
+        "bar skill\n\n"
+        "----workflow: agents/foo/yep.py----\n"
+        "yep workflow\n\n"
+        "----skill: agents/quux.md----\n"
+        "quux skill"
+    )
+
+
+def test_list_directory_flag_selects_the_described_directory(run_myteam, tmp_path: Path) -> None:
+    write_listing_fixture(tmp_path)
+
+    short = run_myteam(tmp_path, "list", "-d", "agents/foo")
+    long = run_myteam(tmp_path, "list", "--directory", "agents/foo")
+
+    expected = "----agents/foo/----\nList foo when foo resources are relevant."
+    for result in (short, long):
+        assert result.exit_code == 0
+        assert result.stderr == ""
+        assert result.stdout == expected
+
+
+def test_list_directory_flag_without_targets_selects_cwd(run_myteam, tmp_path: Path) -> None:
+    (tmp_path / "description.md").write_text("Project resources.\n", encoding="utf-8")
+    (tmp_path / "child.md").write_text(
+        "---\ntype: skill\ndescription: must not be listed\n---\nbody\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "list", "-d")
+
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert result.stdout == "----./----\nProject resources."
+
+
+def test_list_deduplicates_repeated_overlapping_and_symlink_aliased_targets(
+    run_myteam, tmp_path: Path
+) -> None:
+    write_listing_fixture(tmp_path)
+    (tmp_path / "bar-alias.md").symlink_to(tmp_path / "agents" / "foo" / "bar.md")
+
+    result = run_myteam(
+        tmp_path,
+        "list",
+        "agents/foo",
+        "agents/foo/bar.md",
+        "bar-alias.md",
+        "agents/foo",
+    )
+
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert result.stdout.count("bar skill") == 1
+    assert result.stdout.count("baz skill") == 1
+    assert result.stdout.count("yep workflow") == 1
+    assert "----skill: agents/foo/bar.md----" in result.stdout
+    assert "bar-alias.md" not in result.stdout
+
+
+def test_list_ignores_non_resources_for_an_empty_success(run_myteam, tmp_path: Path) -> None:
+    undescribed = tmp_path / "undescribed"
+    undescribed.mkdir()
+    (tmp_path / "notes.txt").write_text("unsupported\n", encoding="utf-8")
+    (tmp_path / "malformed.md").write_text("not a resource\n", encoding="utf-8")
+
+    result = run_myteam(
+        tmp_path,
+        "list",
+        "notes.txt",
+        "malformed.md",
+        "-d",
+        "undescribed",
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+def test_list_symlink_loop_reports_filesystem_error_without_output(run_myteam, tmp_path: Path) -> None:
+    (tmp_path / "loop").symlink_to("loop")
+
+    result = run_myteam(tmp_path, "list", "loop")
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "loop" in result.stderr
+    assert "Too many levels of symbolic links" in result.stderr
+
+
+def test_list_filesystem_error_suppresses_partial_output_and_reports_cause_and_path(
+    run_myteam, tmp_path: Path
+) -> None:
+    valid = tmp_path / "valid.md"
+    valid.write_text("---\ntype: skill\ndescription: valid skill\n---\nbody\n", encoding="utf-8")
+
+    result = run_myteam(tmp_path, "list", "valid.md", "missing.md")
+
+    assert result.exit_code != 0
+    assert result.stdout == ""
+    assert "missing.md" in result.stderr
+    assert "No such file or directory" in result.stderr

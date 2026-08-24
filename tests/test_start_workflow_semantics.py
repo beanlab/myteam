@@ -33,17 +33,23 @@ def test_python_workflow_does_not_receive_injected_input(tmp_path: Path) -> None
     assert argv == [sys.executable, str(workflow.resolve()), "--custom", "value"]
 
 
-def test_markdown_workflow_receives_input_json(tmp_path: Path) -> None:
-    workflow = tmp_path / "workflow.md"
+def test_markdown_workflow_receives_input_json_and_original_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "docs" / "workflow.md"
+    workflow.parent.mkdir()
     workflow.write_text("---\ntype: workflow\n---\nPrompt\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    target = "./docs/../docs/workflow.md"
 
-    argv = _build_workflow_argv(str(workflow), ("extra",), '{"topic": "release"}')
+    argv = _build_workflow_argv(target, ("extra",), '{"topic": "release"}')
 
     assert argv == [
         sys.executable,
         str(get_template_file("workflow_markdown_wrapper.py")),
         str(workflow.resolve()),
         '{"topic": "release"}',
+        target,
         "extra",
     ]
 

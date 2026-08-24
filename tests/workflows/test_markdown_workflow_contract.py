@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import textwrap
 
+from myteam.workflows.execution.protocol import ENV_SOCKET
+
 
 def write_markdown_fake_agent_project(tmp_path: Path) -> None:
     (tmp_path / "fake_agent.py").write_text(
@@ -70,7 +72,10 @@ def write_markdown_fake_agent_project(tmp_path: Path) -> None:
     )
 
 
-def test_markdown_workflow_frontmatter_controls_run_agent_settings(run_myteam, tmp_path: Path) -> None:
+def test_markdown_workflow_frontmatter_controls_run_agent_settings(
+    run_myteam, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv(ENV_SOCKET, raising=False)
     write_markdown_fake_agent_project(tmp_path)
     workflow = tmp_path / "workflow.md"
     workflow.write_text(
@@ -78,6 +83,7 @@ def test_markdown_workflow_frontmatter_controls_run_agent_settings(run_myteam, t
         "type: workflow\n"
         "description: exercise frontmatter settings\n"
         "agent: fake-agent\n"
+        "session_name: Markdown contract\n"
         "model: frontmatter-model\n"
         "reasoning: medium\n"
         "interactive: false\n"
@@ -98,7 +104,9 @@ def test_markdown_workflow_frontmatter_controls_run_agent_settings(run_myteam, t
     result = run_myteam(tmp_path, "start", "workflow.md", "--input", '{"topic": "release"}')
 
     assert result.exit_code == 0
-    assert result.stdout == '{"ok": true}\n'
+    assert result.stdout.endswith('{"ok": true}\n')
+    assert "Session started" not in result.stderr
+    assert "Session ended" not in result.stderr
     assert json.loads((tmp_path / "observed-markdown-agent-settings.json").read_text(encoding="utf-8")) == {
         "model": "frontmatter-model",
         "reasoning": "medium",

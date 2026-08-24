@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import dataclasses
+import errno
+import stat
 import sys
 from pathlib import Path
 from typing import Literal
@@ -18,38 +20,76 @@ class ResourceInfo:
     description: str
 
 
-def list_resources(prefix: str | None = None) -> str:
-    root = Path.cwd().resolve()
-    prefix_path = _resolve_prefix_path(root, prefix)
-    return _format_resource_infos(list_resource_entries(root, prefix_path))
+def list_resources(*targets: str | Path, directory: bool = False) -> str:
+    try:
+        root = _current_root()
+        requested = targets or (root,)
+        selected = _select_targets(root, requested, directory=directory)
+        infos = list_resource_entries(root, selected)
+    except OSError as exc:
+        print(_filesystem_error(exc), file=sys.stderr)
+        raise SystemExit(1) from None
+    return _format_resource_infos(infos)
 
 
-def list_resource_entries(root: Path, prefix: Path) -> list[ResourceInfo]:
-    if not prefix.exists() or not prefix.is_dir():
-        print(f"Not a skill folder: {prefix}", file=sys.stderr)
-        raise SystemExit(1)
+def _current_root() -> Path:
+    try:
+        cwd = Path.cwd()
+    except OSError as exc:
+        raise OSError(exc.errno, exc.strerror or str(exc), "current directory") from None
+    return _resolve_path(cwd)
 
+
+def _select_targets(root: Path, targets: tuple[str | Path, ...], *, directory: bool) -> list[Path]:
+    selected: list[Path] = []
+    identities: set[tuple[int, int]] = set()
+
+    for target in targets:
+        path = _resolve_target(root, target)
+        target_stat = path.stat()
+        if stat.S_ISDIR(target_stat.st_mode) and not directory:
+            candidates = sorted(path.iterdir(), key=lambda item: (item.name.lower(), item.name))
+        else:
+            candidates = [path]
+
+        for candidate in candidates:
+            canonical = _resolve_path(candidate)
+            candidate_stat = canonical.stat()
+            identity = (candidate_stat.st_dev, candidate_stat.st_ino)
+            if identity not in identities:
+                identities.add(identity)
+                selected.append(candidate)
+
+    return selected
+
+
+def list_resource_entries(root: Path, paths: list[Path]) -> list[ResourceInfo]:
     entries: list[ResourceInfo] = []
-    for item in sorted(prefix.iterdir(), key=lambda path: (path.name.lower(), path.name)):
-        if item.is_dir():
-            description = read_folder_description(item)
+    for path in paths:
+        path_stat = path.stat()
+        if stat.S_ISDIR(path_stat.st_mode):
+            description = read_folder_description(path)
             if description is not None:
-                entries.append(ResourceInfo("folder", f"{_display_name(root, item)}/", description))
+                entries.append(ResourceInfo("folder", f"{_display_name(root, path)}/", description))
+            continue
+        if not stat.S_ISREG(path_stat.st_mode):
             continue
 
-        metadata = _read_type_description(item)
+        metadata = _read_type_description(path)
         if metadata is None:
             continue
-
-        rtype, description = metadata
-        entries.append(ResourceInfo(rtype, _display_name(root, item), description))
+        resource_type, description = metadata
+        entries.append(ResourceInfo(resource_type, _display_name(root, path), description))
 
     return sorted(entries, key=_sort_key)
 
 
 def read_folder_description(folder: Path) -> str | None:
     description_file = folder / "description.md"
-    if not description_file.exists():
+    try:
+        description_file.stat()
+    except FileNotFoundError:
+        folder.stat()
         return None
 
     text = description_file.read_text(encoding="utf-8")
@@ -95,21 +135,31 @@ def _extract_type_description(frontmatter: dict) -> tuple[Literal["skill", "work
     return normalized_type, rendered_description
 
 
-def _resolve_prefix_path(root: Path, prefix: str | None) -> Path:
-    if prefix in (None, ""):
-        return root
+def _resolve_target(root: Path, target: str | Path) -> Path:
+    path = Path(target)
+    if not path.is_absolute():
+        path = root / path
+    return _resolve_path(path)
 
-    prefix_path = Path(prefix)
-    if not prefix_path.is_absolute():
-        prefix_path = root / prefix_path
-    return prefix_path.resolve()
+
+def _resolve_path(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except RuntimeError:
+        raise OSError(errno.ELOOP, "Too many levels of symbolic links", str(path)) from None
+
+
+def _filesystem_error(exc: OSError) -> str:
+    affected = exc.filename or "unknown path"
+    cause = exc.strerror or str(exc)
+    return f"Unable to list {affected}: {cause}"
 
 
 def _display_name(root: Path, path: Path) -> str:
     try:
         return path.relative_to(root).as_posix()
     except ValueError:
-        return path.resolve().as_posix()
+        return _resolve_path(path).as_posix()
 
 
 def _sort_key(info: ResourceInfo) -> tuple[str, str]:

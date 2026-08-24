@@ -1,0 +1,46 @@
+# Remediate Code Review Findings
+
+{{ read_file('general-project-prompt.md') }}
+
+{{ read_file('code-planning.md') }}
+
+{{ read_file('code-style.md') }}
+
+## Testing approach
+
+Preserve tests that protect externally observable contracts. Avoid coupling new tests to private implementation details unless a risky internal cannot be covered meaningfully through a public boundary.
+
+## Responsibility
+
+Address the code review findings without reopening the approved feature scope or performing unrelated cleanup.
+
+## Feature context
+
+Feature brief:
+{{ feature_brief | tojson(indent=2) }}
+
+Approved design:
+{{ design_decision | tojson(indent=2) }}
+
+Approved execution plan:
+{{ execution_plan | tojson(indent=2) }}
+
+## Current implementation result
+
+{{ implementation_result | tojson(indent=2) }}
+
+## Review findings
+
+{{ code_review | tojson(indent=2) }}
+
+{% if review_resolution %}
+## Binding user resolution
+
+{{ review_resolution | tojson(indent=2) }}
+
+Follow this direction. Do not reopen a finding the user resolved.
+{% endif %}
+
+Verify each finding against the actual code before changing it. Address valid findings with the smallest correct change. If a required finding is incorrect or conflicts with the approved design, do not apply it blindly; record a precise justification and set `review_disputed` to true. A concern that does not reject a required finding is not a dispute.
+
+Add or adjust tests when a finding exposes a coverage gap. Run focused and appropriate broader validation. Do not stop after reporting a patch: return a complete canonical `implementation_result` describing the entire current implementation, the disposition of every review finding, whether any finding is disputed, and readiness for re-review.

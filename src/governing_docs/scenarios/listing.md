@@ -1,35 +1,43 @@
 # Listing Skills and Workflows
 
-`myteam list [prefix]` displays a list of the skills and workflows available under the specified prefix.
+`myteam list [TARGET ...]` displays skill and workflow resources selected by zero or more file or directory targets.
 
-A user or agent references a `myteam` resource by the path displayed when listed. 
+A user or agent references a `myteam` resource by the path displayed when listed. Results from all targets are deduplicated and sorted globally by name, with folders, skills, and workflows sorted together.
 
-Entries are listed in alphabetical order by name with folders, files, and workflows sorted together.
+Each folder entry contains its path and the content of its `description.md`. Each skill or workflow entry contains its path and the `description` from its frontmatter. Python resource files are parsed, not executed.
 
-Each folder entry should contain:
+## Selecting resources
 
-- folder name: the identifier used to list nested content
-- description: instructions that inform the agent about when to list this additional content
+- A file target selects that file.
+- A directory target selects its immediate children; listing is not recursive.
+- `-d` or `--directory` selects each target itself instead. A selected directory is listed only when it contains `description.md`.
+- With no targets, the current working directory is used. Therefore, plain `myteam list` lists its immediate children, while `myteam list -d` evaluates the current directory itself.
 
-Each skill entry should contain:
+One resource may be reached through repeated, overlapping, or symlink-aliased targets. It is emitted only once. Symlinks are followed and displayed using the same canonical path behavior as other listings.
 
-- skill name: the identifier used to load the skill
-- description: instructions that inform the agent about when to load the skill
+Existing unsupported files, files without valid resource frontmatter, and directories without `description.md` are ignored. A valid selection containing no resources succeeds with empty output.
 
-Each workflow entry should contain:
+Targets are literal paths. The shell is responsible for glob expansion, unmatched patterns, and whether hidden files are included. For example, after shell expansion, `myteam list agents/*` passes each match as a separate target.
 
-- workflow name: the identifier used to start the workflow
-- description: instructions that inform the agent about when and how to use the workflow
+If any target or selected resource is missing, unreadable, or otherwise inaccessible, listing fails without printing a partial resource list. The diagnostic identifies the affected path and underlying filesystem cause.
 
-Because skills and workflows are organized hierarchically, `prefix` controls the scope for which the items are listed.
+## Python API
 
-If `prefix` is not specified, it defaults to empty, meaning the current working directory.
+```python
+from myteam import list_resources
 
-Note that the `description` field is only used for listing resources; it is not used in loading skills or invoking workflows. 
+text = list_resources(*targets, directory=False)
+```
 
-### Examples
+Each target may be a string or path. The API follows the same file and directory selection rules as `myteam list`; passing `directory=True` selects targets themselves. It aggregates, deduplicates, globally sorts, and formats results like the CLI.
 
-Directory setup:
+Calling `list_resources()` without a target uses the current working directory. Existing positional single-target calls such as `list_resources("agents")` remain supported.
+
+A missing, unreadable, or otherwise inaccessible path writes a filesystem diagnostic to stderr and raises `SystemExit(1)`. No partial listing is returned.
+
+## Output format
+
+Given:
 
 ```
 agents/
@@ -39,13 +47,12 @@ agents/
     baz.py  # skill
     yep.py  # workflow
   quux.md  # skill
-  nope.md
   go.py    # workflow
 ```
 
-`myteam list agents` should print something to the effect of:
+`myteam list agents` prints the immediate resources:
 
-```
+```text
 ----agents/foo/----
 <content from description.md>
 
@@ -56,7 +63,7 @@ agents/
 <description field from quux.md frontmatter>
 ```
 
-`myteam list agents/foo` or `myteam list agents/foo/` should print:
+`myteam list agents/foo` prints its immediate resources:
 
 ```text
 ----skill: agents/foo/bar.md----
@@ -69,14 +76,4 @@ agents/
 <description from yep.py>
 ```
 
-`myteam list nonsense` should report an error like "Not a skill folder: nonsense".
-
-Any folder can be the prefix in `myteam list`. However, only folders containing `description.md` will be printed as skill folders in the output.
-
-### Listing Python files
-
-When listing Python files, these files are not executed. Rather, only the YAML frontmatter is parsed. 
-
-
-
-
+`myteam list agents/foo/bar.md` prints only the `bar.md` block. `myteam list -d agents/foo` prints only the folder block for `agents/foo`.

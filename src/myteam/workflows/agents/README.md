@@ -42,6 +42,7 @@ def build_argv(
         session_id: str | None = None,
         fork: bool = False,
         extra_args: tuple[str, ...] | None = None,
+        session_name: str | None = None,
 ) -> list[str]:
     ...
 ```
@@ -58,14 +59,20 @@ may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
 
 `EXEC` is the command name used to launch the agent CLI. It must be a string.
 
-### `build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None)`
+### `build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None, session_name=None)`
 
-`build_argv` returns the argv list used to start the agent process.
+`build_argv` returns the argv list used to start the agent process. Parameters
+are opt-in: the runtime passes only keyword names declared by the adapter, so
+existing adapters may omit `session_name`. Adapters that declare it receive the
+explicit or configured name, including an empty string, or `None` when no name
+was supplied.
 
 Use `session_id` to resume an existing session. Set `fork=True` to fork that
 session into a new one. `extra_args` contains optional workflow-authored argv
 items that the agent config places wherever that CLI expects additional flags.
-Different CLIs use different syntax:
+The built-in Pi and Claude adapters pass non-`None` names to their CLIs with
+`--name`; Codex accepts but ignores the value. Different CLIs use different
+syntax:
 
 ```python
 def build_argv(
@@ -74,6 +81,7 @@ def build_argv(
     session_id: str | None = None,
     fork: bool = False,
     extra_args: tuple[str, ...] | None = None,
+    session_name: str | None = None,
 ) -> list[str]:
     extras = extra_args or []
     if session_id is not None and fork:
@@ -153,6 +161,7 @@ def build_argv(
     session_id: str | None = None,
     fork: bool = False,
     extra_args: tuple[str, ...] | None = None,
+    session_name: str | None = None,
 ) -> list[str]:
     argv = build_codex_argv(
         prompt_text,
@@ -160,6 +169,7 @@ def build_argv(
         session_id,
         fork,
         extra_args=extra_args,
+        session_name=session_name,
     )
     argv[1:1] = ["--model", "gpt-5.4-mini"]
     return argv

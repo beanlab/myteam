@@ -38,6 +38,7 @@ See `workflows/workflows.md`
 In support of these primary concerns, `myteam` also supports:
 
 - `myteam explain` - provide instructions to an agent about how to use `myteam` commands
+- `myteam where` - display the active managed workflow and agent-session hierarchy
 - `myteam version` - display version
 - `myteam changelog` - display packaged release notes
 

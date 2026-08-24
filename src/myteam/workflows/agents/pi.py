@@ -22,10 +22,8 @@ def build_argv(
     fork: bool = False,
     model: str | None = None,
     extra_args: tuple[str, ...] | None = None,
+    session_name: str | None = None,
 ) -> list[str]:
-    extras = extra_args or []
-    if model is not None:
-        extras = ["--model", model, *extras]
     argv = [EXEC]
     if not interactive:
         argv.append("--print")
@@ -34,7 +32,11 @@ def build_argv(
             argv.extend(["--fork", session_id])
         else:
             argv.extend(["--session", session_id])
-    argv.extend(extras)
+    if model is not None:
+        argv.extend(["--model", model])
+    if session_name is not None:
+        argv.extend(["--name", session_name])
+    argv.extend(extra_args or [])
     argv.append(prompt_text)
     return argv
 
@@ -47,9 +49,9 @@ def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Pat
     return match.group(1), session_path
 
 
-def get_usage_info(session_path: Path) -> UsageInfo | None:
+def get_usage_info(session_path: Path) -> list[UsageInfo] | None:
     try:
-        return _usage_info_from_session_path(session_path)
+        return _usage_by_model_from_session_path(session_path)
     except (LookupError, ValueError, json.JSONDecodeError):
         return None
 
@@ -68,9 +70,8 @@ def _resolve_pi_session_path(
     )
 
 
-def _usage_info_from_session_path(path: Path) -> UsageInfo | None:
-    latest_model: str | None = None
-    latest_usage: dict[str, Any] | None = None
+def _usage_by_model_from_session_path(path: Path) -> list[UsageInfo] | None:
+    usage_by_model: dict[str, UsageInfo] = {}
 
     for payload in iter_jsonl_reverse(path):
         message = payload.get("message")
@@ -79,38 +80,39 @@ def _usage_info_from_session_path(path: Path) -> UsageInfo | None:
 
         model = message.get("model")
         usage = message.get("usage")
+        if not isinstance(model, str) or not isinstance(usage, dict):
+            continue
 
-        if latest_model is None and isinstance(model, str):
-            latest_model = model
+        cache_read_tokens = int(usage.get("cacheRead", 0))
+        input_tokens = (
+            int(usage.get("input", 0))
+            + cache_read_tokens
+            + int(usage.get("cacheWrite", 0))
+        )
+        estimated_cost = _get_explicit_total_cost(usage)
+        if estimated_cost is None:
+            estimated_cost = estimate_usage_cost(
+                PRICING_INFO,
+                model,
+                input_tokens,
+                cache_read_tokens,
+                int(usage.get("output", 0)),
+            )
 
-        if isinstance(usage, dict):
-            latest_usage = usage
-
-        if latest_model and latest_usage:
-            break
-
-    if not latest_model or not latest_usage:
-        return None
-
-    estimated_cost = _get_explicit_total_cost(latest_usage)
-    if estimated_cost is None:
-        estimated_cost = estimate_usage_cost(
-            PRICING_INFO,
-            latest_model,
-            int(latest_usage.get("input", 0)),
-            int(latest_usage.get("cacheRead", 0)),
-            int(latest_usage.get("output", 0)),
+        model_usage = usage_by_model.setdefault(model, UsageInfo(model=model))
+        model_usage.add(
+            UsageInfo(
+                model=model,
+                input_tokens=input_tokens,
+                cached_input_tokens=cache_read_tokens,
+                output_tokens=int(usage.get("output", 0)),
+                reasoning_output_tokens=int(usage.get("reasoning", 0)),
+                total_tokens=int(usage.get("totalTokens", 0)),
+                estimated_cost=estimated_cost,
+            )
         )
 
-    return UsageInfo(
-        model=latest_model,
-        input_tokens=int(latest_usage.get("input", 0)),
-        cached_input_tokens=int(latest_usage.get("cacheRead", 0)),
-        output_tokens=int(latest_usage.get("output", 0)),
-        reasoning_output_tokens=0,
-        total_tokens=int(latest_usage.get("totalTokens", 0)),
-        estimated_cost=estimated_cost,
-    )
+    return list(usage_by_model.values()) or None
 
 
 def _project_session_dir_name(path: Path) -> str:
