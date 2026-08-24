@@ -35,6 +35,42 @@ def test_load_markdown_skill_renders_document_relative_jinja_helpers(run_myteam,
     assert result.stderr == ""
 
 
+def test_load_markdown_skill_runs_shell_in_skill_directory(run_myteam, tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "shell-marker.txt").write_text("from skill shell\n", encoding="utf-8")
+    skill = docs / "skill.md"
+    skill.write_text(
+        "---\ntype: skill\ndescription: demo\n---\n{{ shell('cat shell-marker.txt') }}",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "load", "docs/skill.md")
+
+    assert result.exit_code == 0
+    assert result.stdout == "from skill shell\n"
+    assert result.stderr == ""
+
+
+def test_load_markdown_skill_shell_failure_has_no_partial_rendered_output(
+    run_myteam, tmp_path: Path
+) -> None:
+    command = "echo 'command stdout'; echo 'command stderr' >&2; exit 9"
+    skill = tmp_path / "skill.md"
+    skill.write_text(
+        '---\ntype: skill\ndescription: demo\n---\nprefix {{ shell("' + command + '") }} suffix',
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "load", "skill.md")
+
+    assert result.exit_code != 0
+    assert result.stdout == ""
+    assert command in result.stderr
+    assert "9" in result.stderr
+    assert "command stdout\ncommand stderr\n" in result.stderr
+
+
 def test_load_markdown_skill_does_not_require_valid_frontmatter(run_myteam, tmp_path: Path) -> None:
     skill = tmp_path / "loose.md"
     skill.write_text("Just content.\n", encoding="utf-8")

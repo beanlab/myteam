@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import locale
 from pathlib import Path
+import subprocess
 from typing import Any
 
 from jinja2 import Environment, StrictUndefined
@@ -50,6 +52,7 @@ def _build_environment(
         myteam_list=_make_list_helper(base_dir),
         myteam_load=_make_load_helper(base_dir),
         read_file=_make_read_file_helper(base_dir, input_values=input_values, include_stack=include_stack),
+        shell=_make_shell_helper(base_dir),
     )
     return environment
 
@@ -58,6 +61,45 @@ def _resolve_base_dir(source_path: Path | str | None) -> Path:
     if source_path is None:
         return Path.cwd().resolve()
     return Path(source_path).resolve().parent
+
+
+def _make_shell_helper(base_dir: Path):
+    def shell(command: str, timeout: float | None = None) -> str:
+        try:
+            completed = subprocess.run(
+                command,
+                shell=True,
+                cwd=base_dir,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            output = _normalize_timeout_output(error.stdout)
+            raise RuntimeError(
+                f"Shell command:\n{command}\nTimed out after {timeout!r} seconds. "
+                f"Partial combined output:\n{output}"
+            ) from error
+
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"Shell command:\n{command}\nExited with code {completed.returncode}. "
+                f"Combined output:\n{completed.stdout}"
+            )
+        return completed.stdout
+
+    return shell
+
+
+def _normalize_timeout_output(output: str | bytes | None) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode(locale.getpreferredencoding(False), errors="replace")
+    return output
 
 
 def _make_read_file_helper(base_dir: Path, *, input_values: dict[str, Any], include_stack: list[Path]):

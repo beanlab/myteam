@@ -47,7 +47,7 @@ def run_agent(
 
 The session name resolves from the explicit `session_name`, then `.myteam.yaml` defaults, then `New session`. Explicit and configured names are also forwarded to adapters that support native session naming. This includes an explicit or configured empty string. The implicit `New session` fallback is display-only and is not forwarded to the agent CLI. Non-string values are converted to text, and carriage returns or line feeds are rejected.
 
-Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. If `prompt_source_path` is provided, relative helper paths are resolved against that document.
+Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. If `prompt_source_path` is provided, source-relative helpers use that document; otherwise they use the process's current working directory. See [Jinja2 Template Rendering](../jinja-support.md) for the available helpers and their execution and precedence rules.
 
 In effect (pseudocode):
 

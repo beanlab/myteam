@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shlex
+import sys
 
 import pytest
 from jinja2 import UndefinedError
 
 import myteam.prompt_rendering as prompt_rendering
+
+
+def python_shell_command(script: str) -> str:
+    return shlex.join([sys.executable, "-u", "-c", script])
 
 
 def test_render_markdown_body_renders_inputs_and_control_flow(tmp_path: Path) -> None:
@@ -245,13 +251,114 @@ def test_render_markdown_body_can_opt_out_of_rendering_included_files(tmp_path: 
     assert rendered == "Start Hello {{ name }} End"
 
 
+def test_shell_returns_exact_combined_output_and_uses_source_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "cwd-marker.txt").write_text("from source", encoding="utf-8")
+    monkeypatch.setenv("MYTEAM_SHELL_TEST", "from env")
+    command = python_shell_command(
+        "import os, pathlib, sys; "
+        "sys.stdout.write('out\\n'); sys.stdout.flush(); "
+        "sys.stderr.write('err\\n'); sys.stderr.flush(); "
+        "print(os.environ['MYTEAM_SHELL_TEST']); "
+        "print(pathlib.Path('cwd-marker.txt').read_text(), end='\\n'); "
+        "print(sys.stdin.read() == '')"
+    )
+
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ shell(command) }}",
+        source_path=docs / "skill.md",
+        input_values={"command": command},
+    )
+
+    assert rendered == "out\nerr\nfrom env\nfrom source\nTrue\n"
+
+
+def test_shell_preserves_empty_output(tmp_path: Path) -> None:
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ shell(command) }}",
+        source_path=tmp_path / "skill.md",
+        input_values={"command": python_shell_command("pass")},
+    )
+
+    assert rendered == ""
+
+
+def test_shell_without_source_path_uses_process_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "cwd-marker.txt").write_text("process cwd\n", encoding="utf-8")
+    command = python_shell_command("from pathlib import Path; print(Path('cwd-marker.txt').read_text(), end='')")
+
+    rendered = prompt_rendering.render_prompt_text("{{ shell(command) }}", {"command": command})
+
+    assert rendered == "process cwd\n"
+
+
+def test_shell_in_rendered_include_uses_included_file_directory(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    included = docs / "included"
+    included.mkdir(parents=True)
+    (included / "cwd-marker.txt").write_text("included cwd\n", encoding="utf-8")
+    command = python_shell_command("from pathlib import Path; print(Path('cwd-marker.txt').read_text(), end='')")
+    (included / "fragment.txt").write_text("{{ shell(command) }}", encoding="utf-8")
+
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ read_file('included/fragment.txt') }}",
+        source_path=docs / "skill.md",
+        input_values={"command": command},
+    )
+
+    assert rendered == "included cwd\n"
+
+
+def test_shell_nonzero_failure_reports_command_exit_code_and_combined_output(tmp_path: Path) -> None:
+    command = python_shell_command(
+        "import sys; print('failure stdout'); print('failure stderr', file=sys.stderr); sys.exit(7)"
+    )
+
+    with pytest.raises(Exception) as raised:
+        prompt_rendering.render_markdown_body(
+            "before {{ shell(command) }} after",
+            source_path=tmp_path / "skill.md",
+            input_values={"command": command},
+        )
+
+    diagnostic = str(raised.value)
+    assert command in diagnostic
+    assert "7" in diagnostic
+    assert "failure stdout\nfailure stderr\n" in diagnostic
+
+
+def test_shell_timeout_reports_command_timeout_and_partial_combined_output(tmp_path: Path) -> None:
+    command = python_shell_command(
+        "import sys, time; print('partial stdout', flush=True); "
+        "print('partial stderr', file=sys.stderr, flush=True); time.sleep(0.5)"
+    )
+
+    with pytest.raises(Exception) as raised:
+        prompt_rendering.render_markdown_body(
+            "before {{ shell(command, timeout=0.05) }} after",
+            source_path=tmp_path / "skill.md",
+            input_values={"command": command},
+        )
+
+    diagnostic = str(raised.value)
+    assert command in diagnostic
+    assert "0.05" in diagnostic
+    assert "partial stdout\npartial stderr\n" in diagnostic
+
+
 def test_render_markdown_body_prefers_input_values_over_helper_names(tmp_path: Path) -> None:
     source = tmp_path / "skill.md"
 
     rendered = prompt_rendering.render_markdown_body(
-        "{{ read_file }}",
+        "{{ read_file }}|{{ shell }}",
         source_path=source,
-        input_values={"read_file": "shadowed"},
+        input_values={"read_file": "shadowed read", "shell": "shadowed shell"},
     )
 
-    assert rendered == "shadowed"
+    assert rendered == "shadowed read|shadowed shell"

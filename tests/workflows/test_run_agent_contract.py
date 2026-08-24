@@ -191,6 +191,20 @@ def test_run_agent_renders_prompt_relative_to_source_path(tmp_path: Path, monkey
     assert "relative fragment" in result.output["prompt"]
 
 
+def test_run_agent_shell_without_source_path_uses_process_cwd(tmp_path: Path, monkeypatch) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "shell-marker.txt").write_text("direct shell output", encoding="utf-8")
+    command = "cat shell-marker.txt"
+
+    result = run_agent(prompt="Rendered: {{ shell(command) }}", input={"command": command})
+
+    assert result.output is not None
+    prompt = result.output["prompt"]
+    assert "direct shell output" in prompt
+    assert command not in prompt
+
+
 def test_run_agent_supplies_output_schema_content_to_agent_prompt_without_locking_wording(
     tmp_path: Path,
     monkeypatch,
