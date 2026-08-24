@@ -4,7 +4,7 @@
 - fix usage in markdown workflow wrapper (print usage results when complete)
 - print usage only on master `myteam start` invocation
 - reserve banner in terminal view for workflow messages
-- command-line args to override md workflow settings (agent, model, reasoning, interactive)
+- command-line args to override md workflow settings (agent, model, reasoning, interactive, session name)
 - new_workflow.py template
 - strip transcript from error messages (it floods the terminal)
 - make sure workflow outputs don't print transcript either in template

@@ -155,3 +155,36 @@ def test_start_markdown_workflow_renders_document_relative_jinja_helpers(run_myt
     assert result.exit_code == 0
     assert result.stdout == '{"prompt_has_fragment": true}\n'
     assert result.stderr == ""
+
+
+def test_start_markdown_workflow_runs_shell_in_workflow_directory(run_myteam, tmp_path: Path) -> None:
+    write_fake_agent_project(
+        tmp_path,
+        """
+        import sys
+        from myteam.workflows.results import report_result
+
+        prompt = sys.argv[1]
+        report_result({'prompt_has_shell_output': 'workflow shell output' in prompt})
+        assert sys.stdin.readline() == 'exit\\n'
+        """,
+    )
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "shell-marker.txt").write_text("workflow shell output", encoding="utf-8")
+    workflow = docs / "review.md"
+    workflow.write_text(
+        "---\n"
+        "type: workflow\n"
+        "description: review a topic\n"
+        "agent: fake-agent\n"
+        "---\n"
+        "Read {{ shell('cat shell-marker.txt') }}.\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "start", "docs/review.md")
+
+    assert result.exit_code == 0
+    assert result.stdout == '{"prompt_has_shell_output": true}\n'
+    assert result.stderr == ""

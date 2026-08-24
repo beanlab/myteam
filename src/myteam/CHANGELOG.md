@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.9
+
+- Added a Jinja `shell(command, timeout=None)` helper for injecting combined command output into skills, workflows, direct agent prompts, and rendered includes.
+
 ## 0.3.8
 
 - Added `myteam where` to display the active managed workflow and agent-session hierarchy.
