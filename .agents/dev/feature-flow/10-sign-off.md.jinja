@@ -30,13 +30,17 @@ Determine whether the completed and documented feature satisfies the user's conf
 
 {{ documentation_result | tojson(indent=2) }}
 
+## Final verification
+
+{{ final_verification | tojson(indent=2) }}
+
 {% if previous_acceptance %}
 ## Previous sign-off result
 
 {{ previous_acceptance | tojson(indent=2) }}
 {% endif %}
 
-Inspect the actual repository diff, affected documentation, and relevant validation state rather than relying only on the reports above. Briefly explain what changed, why, how non-trivial decisions were implemented, what was refactored, and what was tested. Compare the delivered behavior explicitly against every acceptance criterion and disclose deviations or remaining concerns. Confirm that user-facing documentation accurately describes the delivered behavior and that examples and generated artifacts are consistent.
+Inspect the actual repository diff and affected documentation. Do not rerun tests or validation; use the final-verification result above. Briefly explain what changed, why, how non-trivial decisions were implemented, what was refactored, and what was tested. Compare the delivered behavior explicitly against every acceptance criterion and disclose deviations or remaining concerns. Confirm that user-facing documentation accurately describes the delivered behavior and that examples and generated artifacts are consistent.
 
 Discuss concerns with the user one question at a time. Set `decision` to `approved` only after explicit user approval.
 

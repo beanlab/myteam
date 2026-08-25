@@ -4,7 +4,7 @@
 
 ## Responsibility
 
-First verify the accepted repository state automatically. If verification passes, review versioning, commit, and pull-request actions with the user as one release plan, then perform only the plan they explicitly authorize. The feature and its documentation, including the changelog, are already complete; do not alter application code, tests, or documentation.
+Select the release target with the user, write the versioned changelog entry, and perform only explicitly authorized repository and pull-request actions. Do not alter application or test code. If the user requests another feature or documentation change, report it for routing to the owning step instead of making it here.
 
 ## Approved feature state
 
@@ -26,17 +26,28 @@ Code review:
 Documentation result:
 {{ documentation_result | tojson(indent=2) }}
 
+Final verification:
+{{ final_verification | tojson(indent=2) }}
+
 Acceptance:
 {{ acceptance | tojson(indent=2) }}
 
-Inspect the current repository state, then run the approved execution plan's validation commands before asking the user to authorize any release or repository action. This verification is automatic and does not require permission. If it fails, do not change the version, commit, push, or create a pull request; report the failure and the skipped actions.
+## Target version and changelog
 
-After successful verification, prepare one concise release plan covering all three of these actions:
+Inspect the current branch name and version in `pyproject.toml`. Inspect the version from the `main` ref without checking out or modifying `main`. Compare them before asking the user which version these changes should target:
 
-- the exact version change, or no version change;
-- the proposed commit scope and message, or no commit;
-- the proposed pull request, including any required push, or no pull request.
+- If the current version differs from `main`, explain that it appears to be an unmerged version and recommend including this work in the current version.
+- If the current version is the same as `main`, recommend an appropriate next version based on the accepted user-visible changes.
+- If `main` cannot be inspected or the comparison is ambiguous, explain that briefly rather than guessing.
 
-Present the complete plan in one question so the user can approve or revise it together. Do not ask for separate authorization decisions for each action. Perform only the approved plan, in a safe order.
+Ask only one question at a time. First ask which target version the user wants. Do not modify the version or changelog until the user answers. If the user requests any other feature or documentation change at any point in wrap-up, stop release work, set `decision` to `changes_requested`, choose the latest appropriate return step, and report the request precisely.
 
-Do not modify the changelog during wrap-up. Do not include unrelated working-tree changes in a commit. Never overwrite user work, rewrite history, force-push, or publish anything beyond the approved plan. Report exactly what was done, skipped, or left for the user, including the verification result and final repository state.
+After the user confirms the target version, update `pyproject.toml` when needed and add concise, user-centered release notes under that version's `##` heading in `src/myteam/CHANGELOG.md`. Describe capabilities and visible compatibility changes, not implementation details. Preserve existing notes under an already-unmerged target heading.
+
+## Commit and pull request
+
+Inspect the current repository state and determine whether a pull request for the current branch already exists, including non-open states when the available tooling supports that lookup. Check existing pull requests before proposing or attempting PR creation. If one exists, retrieve and report its URL and do not create a duplicate. Otherwise, propose creating a PR.
+
+Prepare one concise release plan covering the exact commit scope and message, any required push, and whether an existing PR will be used or a new PR created. Ask the user one question to approve or revise that complete plan. Perform only the approved plan, in a safe order. When authorized to create a PR, check once more whether one now exists; use its URL if it does, otherwise create the PR and report the resulting URL.
+
+Do not include unrelated working-tree changes in a commit. Never overwrite user work, rewrite history, force-push, or publish anything beyond the approved plan. Set `decision` to `complete` only after reporting exactly what was done, skipped, or left for the user, the PR URL when one exists, and the final repository state.

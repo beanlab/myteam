@@ -52,7 +52,7 @@ Verify its findings, but perform a fresh review of the complete current implemen
 Honor this direction. Do not reopen a finding the user resolved unless subsequent changes create new evidence that materially changes it.
 {% endif %}
 
-Inspect the diff and relevant surrounding code. Run appropriate validation when useful. Review for:
+Inspect the diff, relevant surrounding code, and reported focused-test results. Do not rerun tests or validation; the complete validation suite runs once after code and documentation review. Review for:
 
 - correctness against every acceptance criterion;
 - security, data integrity, error handling, and failure behavior;

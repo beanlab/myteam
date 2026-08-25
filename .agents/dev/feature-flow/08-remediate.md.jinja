@@ -29,9 +29,11 @@ Approved execution plan:
 
 {{ implementation_result | tojson(indent=2) }}
 
-## Review findings
+## Correction feedback
 
-{{ code_review | tojson(indent=2) }}
+Source: {{ feedback_source }}
+
+{{ correction_feedback | tojson(indent=2) }}
 
 {% if review_resolution %}
 ## Binding user resolution
@@ -41,6 +43,6 @@ Approved execution plan:
 Follow this direction. Do not reopen a finding the user resolved.
 {% endif %}
 
-Verify each finding against the actual code before changing it. Address valid findings with the smallest correct change. If a required finding is incorrect or conflicts with the approved design, do not apply it blindly; record a precise justification and set `review_disputed` to true. A concern that does not reject a required finding is not a dispute.
+Verify the feedback against the actual code before changing it. Address valid findings or final-verification failures with the smallest correct change. If required review feedback is incorrect or conflicts with the approved design, do not apply it blindly; record a precise justification and set `review_disputed` to true. A concern that does not reject required review feedback is not a dispute; final-verification failures are not disputes.
 
-Add or adjust tests when a finding exposes a coverage gap. Run focused and appropriate broader validation. Do not stop after reporting a patch: return a complete canonical `implementation_result` describing the entire current implementation, the disposition of every review finding, whether any finding is disputed, and readiness for re-review.
+Add or adjust tests when the feedback exposes a coverage gap. Run only the focused tests needed to confirm the correction; the complete validation suite runs in final verification. Do not stop after reporting a patch: return a complete canonical `implementation_result` describing the entire current implementation, the disposition of all correction feedback, whether any review finding is disputed, and readiness for re-review.

@@ -1,0 +1,33 @@
+# Verify the Reviewed Feature
+
+{{ read_file('general-project-prompt.md') }}
+
+## Responsibility
+
+Perform the single complete validation pass for the current reviewed implementation and documentation. Do not modify any files.
+
+## Feature brief
+
+{{ feature_brief | tojson(indent=2) }}
+
+## Approved design
+
+{{ design_decision | tojson(indent=2) }}
+
+## Approved execution plan
+
+{{ execution_plan | tojson(indent=2) }}
+
+## Implementation result
+
+{{ implementation_result | tojson(indent=2) }}
+
+## Approved code review
+
+{{ code_review | tojson(indent=2) }}
+
+## Documentation result
+
+{{ documentation_result | tojson(indent=2) }}
+
+Inspect the current repository state. Run every validation command in the approved execution plan exactly once against this candidate state. Do not rerun successful commands. Report `passed` as true only if every command succeeds. If anything fails, preserve the complete failure details so implementation can correct the problem; do not attempt corrections in this step.

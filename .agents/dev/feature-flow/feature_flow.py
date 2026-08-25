@@ -6,14 +6,19 @@ usage: no arguments; the interactive discovery session will ask for the feature 
 from __future__ import annotations
 
 import json
+import re
+import subprocess
 import time
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
 from myteam import SessionResult, report_workflow_result, run_agent
 
 PROMPT_DIRECTORY = Path(__file__).parent
+RUN_ARTIFACT_DIRECTORY = Path(".agents/scratch/runs")
+WORKFLOW_NAME = "feature-flow"
 AGENT = "pi"
 STRONG_MODEL = "openai/gpt-5.6-sol"
 MID_MODEL = "openai/gpt-5.6-terra"
@@ -33,6 +38,7 @@ SESSION_SETTINGS = {
     "plan_review": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
     "delivery": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
     "code_review": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
+    "verification": SessionSettings(model=STRONG_MODEL, reasoning="medium"),
     "documentation": SessionSettings(model=MID_MODEL, reasoning="medium"),
     "release": SessionSettings(model=ECONOMICAL_MODEL, reasoning="low"),
 }
@@ -48,6 +54,7 @@ STEP_SESSIONS = {
     "08-review-code.md.jinja": "code_review",
     "08-resolve-review.md.jinja": "code_review",
     "09-document.md.jinja": "documentation",
+    "10-verify.md.jinja": "verification",
     "10-sign-off.md.jinja": "product",
     "11-wrap-up.md.jinja": "release",
 }
@@ -63,8 +70,9 @@ STEP_CONTEXTS = {
     "08-remediate.md.jinja": ("implementation", "testing"),
     "08-resolve-review.md.jinja": ("implementation", "testing", "security"),
     "09-document.md.jinja": ("documentation",),
+    "10-verify.md.jinja": ("testing",),
     "10-sign-off.md.jinja": ("product",),
-    "11-wrap-up.md.jinja": ("release",),
+    "11-wrap-up.md.jinja": ("release", "documentation"),
 }
 
 FEATURE_BRIEF = {
@@ -140,8 +148,8 @@ CODE_REVIEW = {
 }
 REMEDIATION_RESULT = {
     "implementation_result": IMPLEMENTATION_RESULT,
-    "findings_addressed": "Review findings addressed and how.",
-    "findings_not_addressed": "Findings not applied and the justification for each.",
+    "feedback_addressed": "Correction feedback addressed and how.",
+    "feedback_not_addressed": "Feedback not applied and the justification for each item.",
     "review_disputed": "Boolean indicating whether any required review finding is disputed.",
     "tests_changed": "Tests added or adjusted while addressing the findings.",
     "ready_for_re_review": "Boolean indicating whether re-review may begin.",
@@ -159,6 +167,11 @@ DOCUMENTATION_RESULT = {
     "validation_performed": "Documentation validation performed.",
     "intentionally_unchanged_docs": "Relevant documentation intentionally left unchanged and why.",
 }
+FINAL_VERIFICATION = {
+    "passed": "Boolean indicating whether every planned validation command passed.",
+    "commands_run": "Validation commands run.",
+    "results": "Results and any failures.",
+}
 ACCEPTANCE = {
     "criteria_status": "Status of every acceptance criterion.",
     "deviations": "Any deviation from the agreed feature.",
@@ -167,11 +180,16 @@ ACCEPTANCE = {
     "requested_changes": "Changes requested by the user; empty when approved.",
 }
 WRAP_UP = {
-    "verification": "Automatic pre-release validation performed and its result.",
+    "decision": "One of: complete, changes_requested.",
+    "return_to": "For requested feature changes, one of: discovery, design, planning, implementation, documentation; empty when complete.",
+    "requested_changes": "Requested feature changes; empty when complete.",
+    "target_version": "Version selected by the user, or empty when changes are requested.",
     "version_change": "Version action performed or skipped.",
+    "changelog": "Changelog action performed or skipped.",
     "commit": "Commit action performed or skipped.",
     "pull_request": "Pull-request action performed or skipped.",
-    "actions_skipped": "Actions not authorized by the user or blocked by verification.",
+    "pull_request_url": "Existing or newly created pull-request URL; null when none exists.",
+    "actions_skipped": "Actions not authorized by the user.",
     "final_repository_state": "Final repository state.",
 }
 
@@ -206,7 +224,7 @@ class ReturnToImplementation(ReturnToStep):
 
 
 class ReturnToDocumentation(ReturnToStep):
-    """Requests another documentation pass followed by sign-off."""
+    """Requests another documentation pass followed by verification and sign-off."""
 
 
 @dataclass(frozen=True)
@@ -238,6 +256,7 @@ class FlowState:
     code_review: dict[str, Any] | None = None
     review_resolution: dict[str, Any] | None = None
     documentation_result: dict[str, Any] | None = None
+    final_verification: dict[str, Any] | None = None
     acceptance: dict[str, Any] | None = None
     feedback: dict[str, Any] | None = None
     feedback_source: str | None = None
@@ -425,6 +444,27 @@ def build_usage_report(state: FlowState) -> dict[str, Any]:
         "models": list(totals_by_model.values()),
         "totals": totals,
     }
+
+
+def current_branch_name() -> str:
+    result = subprocess.run(
+        ["git", "branch", "--show-current"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    return result.stdout.strip() or "detached-head"
+
+
+def write_run_artifact(result: dict[str, Any]) -> Path:
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    safe_branch = re.sub(r"[^A-Za-z0-9._-]+", "-", current_branch_name()).strip(".-")
+    artifact_path = RUN_ARTIFACT_DIRECTORY / (
+        f"{timestamp}-{WORKFLOW_NAME}-{safe_branch or 'unknown-branch'}.json"
+    )
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(json.dumps(result, indent=2) + "\n")
+    return artifact_path
 
 
 def set_feedback(state: FlowState, signal: ReturnToStep):
@@ -617,14 +657,15 @@ def run_initial_implementation(state: FlowState):
     state.review_resolution = None
 
 
-def run_remediation(state: FlowState, review_feedback: dict[str, Any]):
+def run_remediation(state: FlowState, correction_feedback: dict[str, Any]):
     state.delivery_session = run_step(
         state,
         "08-remediate.md.jinja",
         input={
             **delivery_context(state),
             "implementation_result": state.implementation_result,
-            "code_review": review_feedback,
+            "correction_feedback": correction_feedback,
+            "feedback_source": state.feedback_source,
             "review_resolution": state.review_resolution,
         },
         output=REMEDIATION_RESULT,
@@ -676,21 +717,21 @@ def run_review_resolution(state: FlowState, reason: str) -> str:
 
 def run_implementation(state: FlowState) -> dict[str, Any]:
     run_initial_implementation(state)
-    review_feedback: dict[str, Any] | None = None
+    correction_feedback: dict[str, Any] | None = None
     remediation_cycles = 0
     authorized_remediation = False
 
     while True:
-        if review_feedback is not None:
+        if correction_feedback is not None:
             if remediation_cycles >= 2 and not authorized_remediation:
                 decision = run_review_resolution(state, "remediation_limit")
                 if decision == "re_review":
-                    review_feedback = None
+                    correction_feedback = None
                 else:
                     authorized_remediation = True
 
-            if review_feedback is not None:
-                run_remediation(state, review_feedback)
+            if correction_feedback is not None:
+                run_remediation(state, correction_feedback)
                 remediation_cycles += 1
                 authorized_remediation = False
                 if state.remediation_result.get("review_disputed") is True:
@@ -698,12 +739,14 @@ def run_implementation(state: FlowState) -> dict[str, Any]:
                     if decision == "remediate":
                         authorized_remediation = True
                         continue
-                review_feedback = None
+                clear_feedback(state)
+                correction_feedback = None
 
         try:
             return run_code_review(state)
         except ReturnToImplementation as signal:
-            review_feedback = signal.feedback
+            set_feedback(state, signal)
+            correction_feedback = signal.feedback
 
 
 def run_code_review(state: FlowState) -> dict[str, Any]:
@@ -757,9 +800,34 @@ def run_documentation(state: FlowState) -> dict[str, Any]:
         state.documentation_result = state.documentation_session.output
 
         try:
-            return run_sign_off(state)
+            return run_final_verification(state)
         except ReturnToDocumentation as signal:
             set_feedback(state, signal)
+
+
+def run_final_verification(state: FlowState) -> dict[str, Any]:
+    verification = run_step(
+        state,
+        "10-verify.md.jinja",
+        input={
+            **delivery_context(state),
+            "implementation_result": state.implementation_result,
+            "code_review": state.code_review,
+            "documentation_result": state.documentation_result,
+        },
+        output=FINAL_VERIFICATION,
+    )
+    state.final_verification = verification.output
+    if not isinstance(state.final_verification.get("passed"), bool):
+        raise WorkflowStopped("Final verification did not report a boolean passed value")
+    if state.final_verification["passed"] is not True:
+        return_to_step(
+            "implementation",
+            state.final_verification,
+            "final_verification",
+        )
+    clear_feedback(state)
+    return run_sign_off(state)
 
 
 def run_sign_off(state: FlowState) -> dict[str, Any]:
@@ -771,6 +839,7 @@ def run_sign_off(state: FlowState) -> dict[str, Any]:
             "implementation_result": state.implementation_result,
             "code_review": state.code_review,
             "documentation_result": state.documentation_result,
+            "final_verification": state.final_verification,
             "previous_acceptance": state.acceptance,
         },
         output=ACCEPTANCE,
@@ -805,11 +874,25 @@ def run_wrap_up(state: FlowState) -> dict[str, Any]:
             "implementation_result": state.implementation_result,
             "code_review": state.code_review,
             "documentation_result": state.documentation_result,
+            "final_verification": state.final_verification,
             "acceptance": state.acceptance,
         },
         output=WRAP_UP,
         interactive=True,
     )
+    decision = require_value(wrap_up, "decision", {"complete", "changes_requested"})
+    if decision == "changes_requested":
+        return_to = require_value(
+            wrap_up,
+            "return_to",
+            {"discovery", "design", "planning", "implementation", "documentation"},
+        )
+        return_to_step(return_to, wrap_up.output, "wrap_up")
+
+    pull_request_url = wrap_up.output.get("pull_request_url")
+    if pull_request_url is not None and not isinstance(pull_request_url, str):
+        raise WorkflowStopped("Wrap-up reported an invalid pull_request_url")
+
     return {
         "status": "complete",
         "feature_brief": state.feature_brief,
@@ -823,6 +906,7 @@ def run_wrap_up(state: FlowState) -> dict[str, Any]:
         "code_review": state.code_review,
         "review_resolution": state.review_resolution,
         "documentation_result": state.documentation_result,
+        "final_verification": state.final_verification,
         "acceptance": state.acceptance,
         "wrap_up": wrap_up.output,
     }
@@ -835,7 +919,17 @@ def main():
     except WorkflowStopped as error:
         result = {"status": "stopped", "reason": str(error)}
     result["usage"] = build_usage_report(state)
-    report_workflow_result(json.dumps(result, indent=2))
+    artifact_path = write_run_artifact(result)
+    pull_request_url = None
+    wrap_up = result.get("wrap_up")
+    if isinstance(wrap_up, dict):
+        pull_request_url = wrap_up.get("pull_request_url")
+    summary = {
+        "total_cost": result["usage"]["totals"]["estimated_cost"],
+        "pull_request_url": pull_request_url,
+        "report_path": str(artifact_path),
+    }
+    report_workflow_result(json.dumps(summary))
 
 
 if __name__ == "__main__":

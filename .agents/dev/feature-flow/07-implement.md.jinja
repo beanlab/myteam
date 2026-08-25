@@ -48,6 +48,6 @@ Source: {{ feedback_source }}
 
 Follow the approved sequence, preserving public contracts except where the design explicitly changes them. Keep the implementation minimal, self-documenting, secure, and easy to change. Reuse existing code and dependencies where appropriate.
 
-Run the planned focused tests and the appropriate broader test suite. Resolve unexpected failures. If the plan cannot be followed safely or a new consequential decision is required, do not silently invent a new design; report the concern clearly.
+Run only the focused tests needed for fast implementation feedback. The complete validation suite runs once in final verification. Resolve unexpected focused-test failures. If the plan cannot be followed safely or a new consequential decision is required, do not silently invent a new design; report the concern clearly.
 
 Return a complete canonical implementation result covering all current changes, deviations, refactoring, validation, and remaining concerns.
