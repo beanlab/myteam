@@ -24,7 +24,7 @@ Source: {{ feedback_source }}
 {{ feedback | tojson(indent=2) }}
 {% endif %}
 
-Interview the user interactively. Ask one question at a time. Clarify:
+Interview the user interactively. Ask one question at a time. With each question, provide your recommended answer and concise reasons for that recommendation before asking the user to decide. Clarify:
 
 - the motivation and desired observable behavior;
 - acceptance criteria;
