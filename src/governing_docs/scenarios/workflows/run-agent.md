@@ -18,7 +18,7 @@ def run_agent(
         *,
         prompt: str,
         input: dict[str, Any] = None,
-        output: dict[str, Any] | None = None,
+        output: dict[Any, Any] | None = None,
         agent: str | None = None,
         session_name: str | None = None,
         model: str | None = None,
@@ -35,7 +35,7 @@ def run_agent(
 
 - `prompt`: the instructions passed to the agent session
 - `input`: the input to the session
-- `output`: a basic schema describing the required output content and format
+- `output`: a YAML-presented mapping describing the required output content and format; YAML-native key and value types are preserved in the schema shown to the agent
 - `agent`: the name of the agent executable to use (e.g. `codex` or `claude`)
 - `session_name`: the name used by session lifecycle indicators and requested from agent CLIs whose adapters support native naming
 - `model`: the model used by the session (e.g. 'gpt-5.4-mini')
@@ -131,8 +131,10 @@ The nonce plumbing is required for resumed/forked sessions, usage lookup, and re
 
 When an agent session starts, `myteam` augments the provided prompt with brief instructions detailing:
 
-- the expected output format, using the provided output schema;
+- the expected output format, presenting the provided mapping as an advisory YAML schema without coercing YAML-native keys or values;
 - how to report the result using `myteam result`.
+
+The schema presentation format does not change result encoding: the value reported by the agent must be valid JSON.
 
 When the agent calls `myteam result`, that command parses the reported value as JSON, connects to the `run_agent` result socket, and sends a JSONL-RPC-style message containing the output JSON.
 

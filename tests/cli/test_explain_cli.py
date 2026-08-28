@@ -16,3 +16,10 @@ def test_explain_describes_resource_model_and_commands(run_myteam, tmp_path: Pat
     assert "myteam start" in text
     assert "myteam where" in text
     assert "preferred" in text
+    assert "markdown" in text
+    assert "single json object" in text
+    assert "listed input" in text
+    assert "listed" in text and "output" in text
+    assert "python" in text
+    assert "arbitrary" in text
+    assert "usage" in text

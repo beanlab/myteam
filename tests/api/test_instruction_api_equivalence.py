@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from myteam import explain_resources, list_resources, load_skill, onboard
 
 
@@ -27,6 +29,7 @@ def test_list_api_matches_cli_stdout(run_myteam, tmp_path: Path, monkeypatch) ->
         '"""\n'
         'type: workflow\n'
         'description: use this workflow for API equivalence\n'
+        'usage: workflow.py --topic TOPIC\n'
         '"""\n'
         "raise RuntimeError('must not execute while listing')\n",
         encoding="utf-8",
@@ -37,6 +40,7 @@ def test_list_api_matches_cli_stdout(run_myteam, tmp_path: Path, monkeypatch) ->
 
     assert result.exit_code == 0
     assert result.stdout == list_resources("agents")
+    assert "Usage:\nworkflow.py --topic TOPIC" in result.stdout
 
 
 def test_list_api_supports_multiple_targets_and_directory_selection(
@@ -73,6 +77,30 @@ def test_list_api_without_targets_uses_cwd(run_myteam, tmp_path: Path, monkeypat
 
     assert result.exit_code == 0
     assert result.stdout == list_resources()
+
+
+def test_list_api_metadata_failure_matches_cli_error_contract(
+    run_myteam, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    workflow = tmp_path / "invalid.py"
+    workflow.write_text(
+        '\"\"\"\ntype: workflow\ndescription: invalid\nusage: [not, a, string]\n\"\"\"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    cli = run_myteam(tmp_path, "list", "invalid.py")
+    with pytest.raises(SystemExit) as raised:
+        list_resources("invalid.py")
+
+    captured = capsys.readouterr()
+    assert cli.exit_code == raised.value.code == 1
+    assert cli.stdout == captured.out == ""
+    assert cli.stderr == captured.err
+    assert "invalid.py" in captured.err
+    assert "usage" in captured.err
+    assert "list" in captured.err.lower()
+    assert "string" in captured.err.lower()
 
 
 def test_load_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:

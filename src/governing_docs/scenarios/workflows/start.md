@@ -8,6 +8,8 @@ This behaves like a small purpose-built terminal multiplexer with stack-based pr
 
 A workflow appears in that hierarchy only after it has started successfully. Failed or completed workflows and completed agent sessions do not appear; when a child workflow completes, its parent again becomes current.
 
+Before a recognized workflow starts, its format-specific frontmatter metadata is validated. Invalid metadata exits nonzero with a diagnostic and does not launch the workflow. Input schemas remain advisory at runtime; validation does not compare caller JSON with schema contents.
+
 ## Workflow result text
 
 `myteam start` returns text for a human or AI agent caller. Workflows return this text explicitly by calling `report_workflow_result(...)`. Ordinary `print(...)` output is live display/logging; it is not the returned `myteam start` result.

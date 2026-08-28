@@ -9,6 +9,13 @@ The `description` field is encouraged but optional. It provides instructions abo
 
 `myteam` resources missing the `description` field will have an empty description when listed.
 
+Recognized workflows have format-specific optional metadata:
+
+- Python `usage`, when non-null, must be a string. Python `input` and `output` have no schema meaning and are not validated as schemas.
+- Markdown `input` and `output`, when non-null, must be mappings. Their keys and values may use YAML-native types. Markdown `usage` is ignored because invocation usage is generated from `input`.
+
+Missing and null fields are unspecified. Empty mappings are specified schemas. Invalid recognized workflow fields prevent both listing and starting that workflow.
+
 In Markdown files, the frontmatter is in the standard `---` block at the beginning of the file.
 
 ```markdown

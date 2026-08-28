@@ -24,6 +24,7 @@ Workflows are chained, managed agent sessions.
 `myteam` supports:
 
 - discoverable, hierarchical workflows (similar to skills)
+- format-specific workflow metadata: Python Usage and Markdown Input/Output YAML mappings
 - input/output schemas for agent sessions
 - explicit text workflow results
 - session reuse and forking

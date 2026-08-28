@@ -11,6 +11,7 @@ from typing import Any, TypedDict
 from .. import templates
 from ..config import WorkflowDefaults, normalize_session_name
 from ..templates import get_template_file
+from ..workflow_metadata import WorkflowMetadataError, read_workflow_metadata
 from .agent_session import build_agent_prompt
 from .execution.supervisor import Supervisor
 from .execution.protocol import (
@@ -150,11 +151,15 @@ def start_workflow_cli(
         args,
         workflow_input_json if workflow_input_json is not None else input,
     )
-    result = _start_workflow_result(
-        workflow_name=workflow_name,
-        args=args,
-        workflow_input_json=effective_input,
-    )
+    try:
+        result = _start_workflow_result(
+            workflow_name=workflow_name,
+            args=args,
+            workflow_input_json=effective_input,
+        )
+    except WorkflowMetadataError as exc:
+        print(exc, file=sys.stderr)
+        raise SystemExit(1) from None
     _print_workflow_process_result(result)
     if result.exit_code != 0:
         raise SystemExit(result.exit_code)
@@ -354,6 +359,8 @@ def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_inp
 
     suffix = path.suffix.lower()
     absolute = str(path.resolve())
+    if suffix in {".py", ".md"}:
+        read_workflow_metadata(path)
     if suffix == ".py":
         return [sys.executable, absolute, *args]
     if suffix == ".md":
@@ -372,7 +379,7 @@ def _build_agent_prompt(
     prompt: str,
     *,
     session_nonce: str,
-    output_schema: dict[str, Any] | None,
+    output_schema: dict[Any, Any] | None,
 ) -> str:
     return build_agent_prompt(prompt, session_nonce=session_nonce, output_schema=output_schema)
 

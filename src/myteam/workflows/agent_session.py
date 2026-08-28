@@ -15,6 +15,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from .. import templates
 from ..config import (
     MyteamConfig,
@@ -61,7 +63,7 @@ def run_agent(
     *,
     prompt: str,
     input: dict[str, Any] | None = None,
-    output: dict[str, Any] | None = None,
+    output: dict[Any, Any] | None = None,
     agent: str | None = None,
     session_name: str | None = None,
     model: str | None = None,
@@ -395,7 +397,7 @@ def build_agent_prompt(
     prompt: str,
     *,
     session_nonce: str,
-    output_schema: dict[str, Any] | None,
+    output_schema: dict[Any, Any] | None,
 ) -> str:
     sections = [
         f"*Session ID: {session_nonce}*",
@@ -406,8 +408,11 @@ def build_agent_prompt(
         result_instructions = render_prompt_text(
             templates.get_template("agent_result_instructions.md"),
             {
-                # Don't sort the keys so the order the user provided is preserved
-                "OUTPUT_SCHEMA_JSON": json.dumps(output_schema, indent=2),
+                "OUTPUT_SCHEMA_YAML": yaml.safe_dump(
+                    output_schema,
+                    sort_keys=False,
+                    default_flow_style=False,
+                ),
             },
         ).strip()
         sections.append(result_instructions)
