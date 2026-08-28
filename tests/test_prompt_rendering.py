@@ -7,6 +7,7 @@ import sys
 import pytest
 from jinja2 import UndefinedError
 
+from myteam import list_resources
 import myteam.prompt_rendering as prompt_rendering
 
 
@@ -219,6 +220,71 @@ def test_myteam_list_without_paths_uses_the_document_directory(
     assert rendered == "LIST"
     assert tuple(Path(path).resolve() for path in seen["targets"]) == (docs.resolve(),)
     assert seen["directory"] is False
+
+
+def test_myteam_list_matches_enriched_python_api_and_cli(
+    run_myteam, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "workflow.md").write_text(
+        "---\n"
+        "type: workflow\n"
+        "description: Rendered listing\n"
+        "input:\n"
+        "  topic: subject\n"
+        "output:\n"
+        "  answer: response\n"
+        "---\nbody\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    rendered = prompt_rendering.render_markdown_body(
+        "{{ myteam_list('workflow.md') }}",
+        source_path=docs / "template.md",
+        input_values={},
+    )
+    api = list_resources("docs/workflow.md")
+    cli = run_myteam(tmp_path, "list", "docs/workflow.md")
+
+    assert cli.exit_code == 0
+    assert cli.stderr == ""
+    assert rendered == api == cli.stdout
+    assert "Usage:" in rendered
+    assert "Input:" in rendered
+    assert "Output:" in rendered
+
+
+def test_myteam_list_metadata_failure_aborts_rendering_with_shared_error(
+    run_myteam,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "invalid.md").write_text(
+        "---\ntype: workflow\ndescription: invalid\ninput: scalar\n---\nbody\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    cli = run_myteam(tmp_path, "list", "docs/invalid.md")
+
+    with pytest.raises(SystemExit) as raised:
+        prompt_rendering.render_markdown_body(
+            "literal prefix {{ myteam_list('invalid.md') }} literal suffix",
+            source_path=docs / "template.md",
+            input_values={},
+        )
+
+    captured = capsys.readouterr()
+    assert raised.value.code == cli.exit_code == 1
+    assert captured.out == cli.stdout == ""
+    assert captured.err == cli.stderr
+    assert "invalid.md" in captured.err
+    assert "input" in captured.err
+    assert "mapping" in captured.err.lower()
 
 
 def test_myteam_list_symlink_loop_uses_listing_error_boundary(

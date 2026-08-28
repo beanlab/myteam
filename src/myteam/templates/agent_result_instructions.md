@@ -26,8 +26,8 @@ EOF
 
 Pay attention and be sure to do a shell command tool call and not just output the payload.
 
-The result JSON for this session **must** follow this schema:
+The required result shape is described by this schema. The value passed to `myteam result` must still be valid JSON.
 
-```json
-{{ OUTPUT_SCHEMA_JSON }}
+```yaml
+{{ OUTPUT_SCHEMA_YAML }}
 ```

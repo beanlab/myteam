@@ -19,7 +19,7 @@ Existing unsupported files, files without valid resource frontmatter, and direct
 
 Targets are literal paths. The shell is responsible for glob expansion, unmatched patterns, and whether hidden files are included. For example, after shell expansion, `myteam list agents/*` passes each match as a separate target.
 
-If any target or selected resource is missing, unreadable, or otherwise inaccessible, listing fails without printing a partial resource list. The diagnostic identifies the affected path and underlying filesystem cause.
+If any target or selected resource is missing, unreadable, otherwise inaccessible, or has invalid recognized workflow metadata, listing fails without printing a partial resource list. A metadata diagnostic identifies the file, field, actual type, and expected type.
 
 ## Python API
 
@@ -33,7 +33,7 @@ Each target may be a string or path. The API follows the same file and directory
 
 Calling `list_resources()` without a target uses the current working directory. Existing positional single-target calls such as `list_resources("agents")` remain supported.
 
-A missing, unreadable, or otherwise inaccessible path writes a filesystem diagnostic to stderr and raises `SystemExit(1)`. No partial listing is returned.
+A missing, unreadable, or otherwise inaccessible path, or invalid selected workflow metadata, writes a diagnostic to stderr and raises `SystemExit(1)`. No partial listing is returned.
 
 ## Output format
 
@@ -77,3 +77,39 @@ agents/
 ```
 
 `myteam list agents/foo/bar.md` prints only the `bar.md` block. `myteam list -d agents/foo` prints only the folder block for `agents/foo`.
+
+### Workflow details
+
+Workflow details follow the description, with a blank line between the description and each section. Sections are ordered `Usage`, `Input`, then `Output`.
+
+For a Python workflow, non-empty `usage` is stripped of surrounding whitespace and displayed without changing its internal or multiline content:
+
+```text
+----workflow: agents/review.py----
+Review changes.
+
+Usage:
+review.py --scope PATH
+```
+
+Missing, null, empty, or whitespace-only Python usage is omitted.
+
+For a Markdown workflow, specified input and output mappings are displayed as normalized block YAML, preserving parsed key order and nesting. An input mapping also generates a POSIX-shell-actionable command using the actual displayed workflow path and a fixed placeholder for caller-supplied JSON:
+
+```text
+----workflow: agents/review.md----
+Review changes.
+
+Usage:
+myteam start agents/review.md --input '<JSON matching Input>'
+
+Input:
+scope: path to review
+
+Output:
+summary: review summary
+```
+
+An empty mapping is specified and is displayed as `{}`; an empty input mapping also generates Usage. Missing or null fields are unspecified and omitted. An output-only Markdown workflow has an Output section but no generated Usage. Authored Markdown `usage` is ignored. Input is the sole schema description; generated Usage does not derive argument contents from schema values. Generated commands independently POSIX-quote the displayed path and the literal `<JSON matching Input>` placeholder, which the caller replaces with a JSON object. They are not promised to be portable to non-POSIX shells.
+
+The CLI, `list_resources()`, and Jinja `myteam_list()` produce exactly equivalent enriched text for the same selected resources.

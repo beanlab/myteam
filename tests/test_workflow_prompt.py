@@ -30,11 +30,11 @@ def test_agent_prompt_includes_output_schema_source_when_output_schema_is_presen
     assert "short summary" in rendered
 
 
-def test_agent_prompt_renders_instruction_template_with_schema_json_source(monkeypatch) -> None:
+def test_agent_prompt_renders_instruction_template_with_schema_yaml_source(monkeypatch) -> None:
     monkeypatch.setattr(
         agent_session.templates,
         "get_template",
-        lambda name: "schema={{ OUTPUT_SCHEMA_JSON }}",
+        lambda name: "schema={{ OUTPUT_SCHEMA_YAML }}",
     )
 
     rendered = _build_agent_prompt(
@@ -48,4 +48,18 @@ def test_agent_prompt_renders_instruction_template_with_schema_json_source(monke
     assert "schema=" in rendered
     assert "summary" in rendered
     assert "short summary" in rendered
-    assert "{{ OUTPUT_SCHEMA_JSON }}" not in rendered
+    assert "{{ OUTPUT_SCHEMA_YAML }}" not in rendered
+    assert "OUTPUT_SCHEMA_JSON" not in rendered
+
+
+def test_agent_prompt_distinguishes_yaml_schema_from_json_result_reporting() -> None:
+    rendered = _build_agent_prompt(
+        "Do the work.",
+        session_nonce="nonce-123",
+        output_schema={1: "numeric key", "completed_at": "date"},
+    )
+
+    assert "```yaml" in rendered
+    assert "\n1: numeric key" in rendered
+    assert "valid JSON" in rendered
+    assert "OUTPUT_SCHEMA_JSON" not in rendered

@@ -46,22 +46,22 @@ A workflow is a managed agent session or chain of sessions. Workflows are predef
 
 If a workflow can be used to accomplish your task, please invoke it. As with all `myteam` resources, **never** assume a task is so trivial that you will do it yourself if there is a workflow that can be used instead.
 
-To invoke a workflow, call:
+The `workflow-name` is the name of the workflow exactly as listed.
+
+Markdown workflows accept a single JSON object through `--input`. Use their listed Input and Output schemas to understand what to provide and what result to expect:
 ```
-myteam start <workflow-name> --input <json-input>
+myteam start <workflow-name> --input '{"field": "value"}'
 ```
 
-The `workflow-name` is the name of the workflow exactly as given below.
-
-Example:
+Python workflows may accept arbitrary arguments and options. Follow the listed Usage for each workflow:
 ```
-myteam start dev/review --input '{"files-changed": ["src/foo.py", "src/bar.py"]}'
+myteam start <workflow-name> <arguments-or-options>
 ```
 
-When a workflow finishes, it will return output that matches the schema described in the workflow description.
+When a workflow finishes, it returns its explicit workflow result text.
 
 Inside a workflow managed by `myteam start`, run `myteam where` to display the active workflow and agent-session hierarchy.
 
-A workflow might not have an input or an output defined. If `input` or `output` are not shown with the description, assume these are `null`. You do not need to provide `null` input, and you should ignore `null` output.
+Markdown workflows list Input and Output only when those schemas are specified. If either is absent, do not infer an input requirement or result structure.
 
 When invoking a workflow, do so with an indefinite timeout. Imposing a timelimit will likely result in errors.

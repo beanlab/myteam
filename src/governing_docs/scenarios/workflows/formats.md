@@ -6,7 +6,7 @@ A workflow can be a Python or Markdown file with `type: workflow` in the frontma
 
 Python workflows are invoked as executable scripts. These may use `run_agent` to run agent sessions and `report_workflow_result` to report caller-facing text.
 
-The workflow can have any arguments it wants, but these should be described in the module frontmatter `usage` field with sufficient clarity that the caller knows what information to supply.
+The workflow can have any arguments it wants, but these should be described in the module frontmatter `usage` field with sufficient clarity that the caller knows what information to supply. Non-null `usage` must be a string; surrounding whitespace is normalized when it is listed. Missing, null, empty, and whitespace-only usage is not displayed. Python `input` and `output` fields are not schema metadata.
 
 The workflow can also print anything it wants as live display/logging. Live display, including `run_agent` lifecycle indicators, is separate from the workflow result. Only text reported with `report_workflow_result(...)` is returned to the caller; consumers needing clean result data should use that text or `SessionResult.output`.
 
@@ -59,9 +59,11 @@ Markdown workflows automatically convert the single `run_agent` result into work
 
 #### Schemas
 
-The input and output schemas in Markdown workflows are not formal jsonschema. Rather, they are human/agent-readable YAML describing what fields are expected and what content should be supplied. They are prompts, not enforcement.
+The input and output schemas in Markdown workflows are not formal jsonschema. Rather, they are human/agent-readable YAML mappings describing what fields are expected and what content should be supplied. They are prompts, not runtime enforcement. Missing and null schemas are unspecified, while an empty mapping is specified and displayed.
 
-The input schema guides the caller in what data should be passed via the `--input` argument, but it is up to the caller to follow the schema; deviation may result in an error.
+Non-null input and output must be mappings. Their contents may use YAML-native keys and values because the schemas are advisory descriptions, not generated JSON arguments. The output mapping is presented faithfully to the agent as YAML, preserving parsed order and key types. The agent still reports its actual result through `myteam result` as valid JSON. Authored Markdown `usage` is ignored; listings generate a command with a placeholder directing the caller to supply JSON matching Input.
+
+The input schema guides the caller in what single JSON object should be passed via the `--input` argument, but it is up to the caller to follow the schema; deviation may result in an error.
 
 Even when an output schema is present, a cleanly quit managed session can return `None`; in that case the Markdown workflow reports no result text.
 

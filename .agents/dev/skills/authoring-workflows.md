@@ -79,7 +79,7 @@ Report concise totals by step, session family, and model when useful, while reta
 
 Every step should return a complete artifact, not a patch to a previous artifact. Pass prior artifacts under names such as `previous_execution_plan` and tell the prompt they are superseded context.
 
-Use the `run_agent(output=...)` schema to describe the information required for completion. Schemas guide agents but are not runtime validation. Validate fields that control orchestration, such as verdicts, routes, booleans, and nested canonical artifacts.
+Use the `run_agent(output=...)` schema to describe the information required for completion. The mapping is presented to the agent as YAML, preserving YAML-native key and value types; the agent must still report a valid JSON value through `myteam result`. Schemas guide agents but are not runtime validation. Validate fields that control orchestration, such as verdicts, routes, booleans, and nested canonical artifacts.
 
 When a specialized step has a different report shape, preserve the downstream canonical artifact explicitly. For example, remediation can return both finding dispositions and a complete nested `implementation_result`; extract and validate the canonical result before continuing.
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import json
 import textwrap
 from pathlib import Path
@@ -270,6 +271,26 @@ def test_run_agent_shell_without_source_path_uses_process_cwd(tmp_path: Path, mo
     prompt = result.output["prompt"]
     assert "direct shell output" in prompt
     assert command not in prompt
+
+
+def test_run_agent_preserves_yaml_native_output_schema_content(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = run_agent(
+        prompt="Produce the answer.",
+        output={1: "numeric result field", "completed_at": date(2025, 1, 2)},
+    )
+
+    assert result.output is not None
+    prompt = result.output["prompt"]
+    assert "\n1: numeric result field" in prompt
+    assert "completed_at: 2025-01-02" in prompt
+    assert "```yaml" in prompt
+    assert "valid JSON" in prompt
 
 
 def test_run_agent_supplies_output_schema_content_to_agent_prompt_without_locking_wording(

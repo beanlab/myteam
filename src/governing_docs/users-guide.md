@@ -68,6 +68,8 @@ All Markdown bodies are rendered with Jinja2. The environment includes `read_fil
 
 You can also use `myteam_explain()` to include instructions about skills and workflows and `myteam_list()` to control which resources are visible to an agent. See [Jinja template rendering](scenarios/jinja-support.md) for helper documentation, including `shell` execution and security considerations.
 
+`myteam list` exposes workflow invocation metadata for discovery. Python workflows use an optional frontmatter `usage` string and may accept arbitrary arguments; Markdown workflows use optional `input` and `output` YAML mappings and accept one JSON object through `--input`. Markdown listings generate the `myteam start ... --input '<JSON matching Input>'` command rather than using authored `usage`. See [Listing Skills and Workflows](scenarios/listing.md) and [Workflow Formats](scenarios/workflows/formats.md) for omission, validation, and schema-presentation rules.
+
 ### Defining Outputs
 
 When you give an agent a defined output schema, it's prompt automatically includes the output schema along with instructions for how to use `myteam result` to report that output.

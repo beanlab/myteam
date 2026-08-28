@@ -1,5 +1,10 @@
 # Change Log
 
+## 0.3.12
+
+- Enriched workflow listings across the CLI, Python API, and Jinja helper with Usage and Markdown Input/Output sections.
+- Workflow metadata is validated before listing or starting. Python workflows with non-string `usage` and Markdown workflows with non-mapping `input` or `output` are invalid.
+
 ## 0.3.11
 
 - Added reusable global configuration from `~/.myteam.yaml`, with project configuration taking precedence for defaults and custom agents.

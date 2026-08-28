@@ -3,12 +3,20 @@ from __future__ import annotations
 
 import dataclasses
 import errno
+import shlex
 import stat
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from .frontmatter import parse_python_frontmatter, split_markdown_frontmatter
+import yaml
+
+from .frontmatter import split_markdown_frontmatter
+from .workflow_metadata import (
+    WorkflowMetadataError,
+    read_resource_frontmatter,
+    read_workflow_metadata,
+)
 
 ResourceType = Literal["folder", "skill", "workflow"]
 
@@ -18,6 +26,9 @@ class ResourceInfo:
     type: ResourceType
     name: str
     description: str
+    usage: str | None = None
+    input_schema: dict[Any, Any] | None = None
+    output_schema: dict[Any, Any] | None = None
 
 
 def list_resources(*targets: str | Path, directory: bool = False) -> str:
@@ -28,6 +39,9 @@ def list_resources(*targets: str | Path, directory: bool = False) -> str:
         infos = list_resource_entries(root, selected)
     except OSError as exc:
         print(_filesystem_error(exc), file=sys.stderr)
+        raise SystemExit(1) from None
+    except WorkflowMetadataError as exc:
+        print(exc, file=sys.stderr)
         raise SystemExit(1) from None
     return _format_resource_infos(infos)
 
@@ -75,11 +89,22 @@ def list_resource_entries(root: Path, paths: list[Path]) -> list[ResourceInfo]:
         if not stat.S_ISREG(path_stat.st_mode):
             continue
 
-        metadata = _read_type_description(path)
-        if metadata is None:
+        frontmatter = read_resource_frontmatter(path)
+        resource = _extract_type_description(frontmatter)
+        if resource is None:
             continue
-        resource_type, description = metadata
-        entries.append(ResourceInfo(resource_type, _display_name(root, path), description))
+        resource_type, description = resource
+        workflow = read_workflow_metadata(path, frontmatter)
+        entries.append(
+            ResourceInfo(
+                resource_type,
+                _display_name(root, path),
+                description,
+                usage=workflow.usage if workflow is not None else None,
+                input_schema=workflow.input_schema if workflow is not None else None,
+                output_schema=workflow.output_schema if workflow is not None else None,
+            )
+        )
 
     return sorted(entries, key=_sort_key)
 
@@ -95,24 +120,6 @@ def read_folder_description(folder: Path) -> str | None:
     text = description_file.read_text(encoding="utf-8")
     _, body = split_markdown_frontmatter(text)
     return body.rstrip("\n")
-
-
-def _read_type_description(file: Path) -> tuple[Literal["skill", "workflow"], str] | None:
-    if file.suffix == ".py":
-        return _read_python_type_description(file)
-    if file.suffix == ".md":
-        return _read_markdown_type_description(file)
-    return None
-
-
-def _read_markdown_type_description(file: Path) -> tuple[Literal["skill", "workflow"], str] | None:
-    frontmatter, _ = split_markdown_frontmatter(file.read_text(encoding="utf-8"))
-    return _extract_type_description(frontmatter)
-
-
-def _read_python_type_description(file: Path) -> tuple[Literal["skill", "workflow"], str] | None:
-    frontmatter = parse_python_frontmatter(file.read_text(encoding="utf-8"))
-    return _extract_type_description(frontmatter)
 
 
 def _extract_type_description(frontmatter: dict) -> tuple[Literal["skill", "workflow"], str] | None:
@@ -178,10 +185,31 @@ def _format_info(info: ResourceInfo) -> str:
     else:
         header = f"----{info.type}: {info.name}----"
 
-    if not info.description:
-        return header
+    body = [info.description] if info.description else []
+    usage = info.usage.strip() if info.usage is not None else ""
+    if info.input_schema is not None:
+        input_placeholder = "<JSON matching Input>"
+        usage = (
+            f"myteam start {shlex.quote(info.name)} --input "
+            f"{shlex.quote(input_placeholder)}"
+        )
+    if usage:
+        body.append(f"Usage:\n{usage}")
+    if info.input_schema is not None:
+        body.append(f"Input:\n{_format_yaml(info.input_schema)}")
+    if info.output_schema is not None:
+        body.append(f"Output:\n{_format_yaml(info.output_schema)}")
 
-    return f"{header}\n{info.description}"
+    if not body:
+        return header
+    content = "\n\n".join(body)
+    return f"{header}\n{content}"
+
+
+def _format_yaml(value: dict[Any, Any]) -> str:
+    return yaml.safe_dump(
+        value, sort_keys=False, default_flow_style=False
+    ).removesuffix("\n")
 
 
 __all__ = [

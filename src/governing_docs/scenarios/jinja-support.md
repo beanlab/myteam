@@ -11,7 +11,7 @@ The following `myteam` functions are included in the Jinja environment:
 - `myteam_list(*paths, directory=False)` - injects the equivalent resource listing for one or more paths. Every path is relative to the Markdown document. With no paths, it lists the document's directory. `directory=True` selects the paths themselves, equivalent to `myteam list -d`.
 - `myteam_load(skill)` - loads the specified skill content. The skill path is relative to the document.
 
-See [Listing Skills and Workflows](listing.md) for the shared `myteam list` selection, sorting, ignored-resource, and filesystem-failure semantics.
+See [Listing Skills and Workflows](listing.md) for the shared `myteam list` selection, sorting, ignored-resource, and failure semantics.
 
 The following utility functions are also included:
 
@@ -43,4 +43,4 @@ Document-relative path helpers support `~` home-directory expansion. Absolute pa
 
 Input field names take precedence over Jinja environment functions. An input named `shell`, for example, shadows the helper. Previously, an unshadowed `shell` name was undefined.
 
-Errors in rendering propagate to the calling process. In particular, a filesystem error from `myteam_list` writes its diagnostic to stderr, raises `SystemExit(1)`, and aborts rendering.
+Errors in rendering propagate to the calling process. In particular, a filesystem or workflow-metadata error from `myteam_list` writes the same diagnostic as the CLI to stderr, raises `SystemExit(1)`, and aborts rendering without returning partial rendered output.
