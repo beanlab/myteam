@@ -17,13 +17,18 @@ and argv shaping in the adapter module itself.
 Agent configs are resolved by
 [`runtime.py`](runtime.py):
 
-1. Project-local override is prioritized:
+1. An agent registered in the effective `~/.myteam.yaml` and project
+   `.myteam.yaml` configuration is used. Project registrations override global
+   registrations with the same name; a relative target is resolved relative to
+   the file that registered it.
+2. Otherwise, the legacy project-local override is used:
    `.myteam/.config/<agent>.py`
-2. Otherwise it falls back on packaged default:
+3. Otherwise it falls back on the packaged default:
    `myteam.workflows.agents.<agent>`
 
-Local configs are intentionally supported so a project can use an agent CLI that
-is not shipped with `myteam`, or override the default behavior of a packaged one.
+Configured agents let users reuse an agent CLI that is not shipped with
+`myteam`, or override a packaged agent. The legacy project-local location
+remains supported for existing projects.
 
 ## Required Module Contract
 
@@ -143,10 +148,18 @@ See [codex.py](codex.py) or [pi.py](pi.py) for examples
 ## Recipe: making an agent alias for a specific configuration
 
 Let's say you want to create an agent alias that launches codex with specific
-command-line flags included. For example, let's create an agent named
-`codex_mini` that uses `--model gpt-5.4-mini`. Create a file in
-`.myteam/.config/`. If you named it `codex_mini.py`, you would run it by
-passing `agent="codex_mini"` into `run_agent`.
+command-line flags included. For example, create an agent named `codex_mini`
+that uses `--model gpt-5.4-mini`. Put this module at
+`agents/codex_mini.py`, then register it in the project `.myteam.yaml`:
+
+```yaml
+agents:
+  codex_mini: agents/codex_mini.py
+```
+
+You can instead put the registration and module under your home directory to
+make the alias available to every project. A project registration with the
+same name overrides it.
 
 ```python
 from __future__ import annotations

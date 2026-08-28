@@ -5,8 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from myteam.config import load_myteam_config
-from myteam.workflows.agents.runtime import AgentSessionContext, resolve_agent_runtime_config
+from myteam.config import load_myteam_config, load_workflow_defaults
+from myteam.workflows.agents.runtime import (
+    AgentSessionContext,
+    resolve_agent_runtime_config,
+)
 
 
 def test_load_myteam_config_parses_defaults_and_agents(tmp_path: Path) -> None:
@@ -31,7 +34,7 @@ def test_load_myteam_config_parses_defaults_and_agents(tmp_path: Path) -> None:
     config = load_myteam_config(tmp_path)
 
     assert config is not None
-    assert config.path == config_path
+    assert not hasattr(config, "path")
     assert config.defaults.agent == "myagent"
     assert config.defaults.session_name == "1234"
     assert config.defaults.model == "gpt-5.4-nano"
@@ -55,6 +58,85 @@ def test_load_myteam_config_rejects_session_name_newlines(tmp_path: Path, sessio
 
     with pytest.raises(ValueError, match="newline"):
         load_myteam_config(tmp_path)
+
+
+def write_agent_config(path: Path, class_name: str, executable: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"class {class_name}:\n"
+        f"    EXEC = {executable!r}\n"
+        "    def build_argv(self, prompt_text, **kwargs):\n"
+        "        return [self.EXEC, prompt_text]\n"
+        "    def get_exit_sequence(self):\n"
+        "        return b'exit\\n'\n"
+        "    def locate_session_data(self, nonce, context):\n"
+        "        return context.launch_cwd / 'session.jsonl'\n"
+        "    def get_session_id(self, session_data):\n"
+        "        return 'session-id'\n"
+        "    def get_usage_info(self, session_data):\n"
+        "        return None\n",
+        encoding="utf-8",
+    )
+
+
+def test_merged_agents_resolve_relative_to_the_file_that_defined_each_agent(
+    tmp_path: Path,
+    isolated_home: Path,
+) -> None:
+    write_agent_config(isolated_home / "agents" / "global.py", "GlobalConfig", "from-global")
+    write_agent_config(tmp_path / "agents" / "project.py", "ProjectConfig", "from-project")
+    (isolated_home / ".myteam.yaml").write_text(
+        "agents:\n"
+        "  global-agent: agents/global.py::GlobalConfig\n"
+        "  shared: agents/global.py::GlobalConfig\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".myteam.yaml").write_text(
+        "agents:\n"
+        "  project-agent: agents/project.py::ProjectConfig\n"
+        "  shared: agents/project.py::ProjectConfig\n",
+        encoding="utf-8",
+    )
+    context = AgentSessionContext(
+        home=isolated_home,
+        project_root=tmp_path,
+        launch_cwd=tmp_path,
+    )
+
+    global_config = resolve_agent_runtime_config(
+        "global-agent", project_root=tmp_path, session_context=context
+    )
+    project_config = resolve_agent_runtime_config(
+        "project-agent", project_root=tmp_path, session_context=context
+    )
+    overridden_config = resolve_agent_runtime_config(
+        "shared", project_root=tmp_path, session_context=context
+    )
+
+    assert global_config.exec == "from-global"
+    assert project_config.exec == "from-project"
+    assert overridden_config.exec == "from-project"
+
+
+def test_global_config_does_not_bypass_legacy_project_defaults(
+    tmp_path: Path,
+    isolated_home: Path,
+) -> None:
+    (isolated_home / ".myteam.yaml").write_text(
+        "defaults:\n  model: global-model\n",
+        encoding="utf-8",
+    )
+    myteam_folder = tmp_path / ".myteam"
+    myteam_folder.mkdir()
+    (myteam_folder / ".config.yaml").write_text(
+        "model: legacy-project-model\n",
+        encoding="utf-8",
+    )
+
+    defaults = load_workflow_defaults(myteam_folder)
+
+    assert defaults is not None
+    assert defaults.model == "legacy-project-model"
 
 
 def test_hyphenated_agent_name_can_resolve_from_myteam_yaml(tmp_path: Path) -> None:

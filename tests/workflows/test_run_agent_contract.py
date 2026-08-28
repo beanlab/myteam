@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import textwrap
+from pathlib import Path
 
+import myteam.workflows.agent_session as agent_session
 from myteam import run_agent
 
 
@@ -85,6 +86,14 @@ def write_recording_agent_project(tmp_path: Path) -> None:
     )
 
 
+def move_recording_agent_config_to_home(tmp_path: Path, isolated_home: Path) -> str:
+    project_config = tmp_path / ".myteam.yaml"
+    config_text = project_config.read_text(encoding="utf-8")
+    project_config.unlink()
+    (tmp_path / "fake_config.py").replace(isolated_home / "fake_config.py")
+    return config_text
+
+
 def read_observed_settings(tmp_path: Path) -> dict[str, object]:
     return json.loads((tmp_path / "observed-agent-settings.json").read_text(encoding="utf-8"))
 
@@ -109,6 +118,64 @@ def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch, cap
         "session_id": "default-session",
         "fork": True,
         "extra_args": ["--default"],
+        "session_name": "Configured session",
+    }
+
+
+def test_run_agent_uses_global_only_defaults_and_agent(
+    tmp_path: Path,
+    isolated_home: Path,
+    monkeypatch,
+) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.setattr(agent_session, "DEFAULT_AGENT", "fake-agent")
+    config_text = move_recording_agent_config_to_home(tmp_path, isolated_home)
+    (isolated_home / ".myteam.yaml").write_text(config_text, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = run_agent(prompt="Global configuration")
+
+    assert result.exit_code == 0
+    assert read_observed_settings(tmp_path) == {
+        "model": "default-model",
+        "reasoning": "low",
+        "interactive": False,
+        "session_id": "default-session",
+        "fork": True,
+        "extra_args": ["--default"],
+        "session_name": "Configured session",
+    }
+
+
+def test_run_agent_uses_effective_merged_defaults_and_global_agent(
+    tmp_path: Path,
+    isolated_home: Path,
+    monkeypatch,
+) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.setattr(agent_session, "DEFAULT_AGENT", "fake-agent")
+    config_text = move_recording_agent_config_to_home(tmp_path, isolated_home)
+    (isolated_home / ".myteam.yaml").write_text(config_text, encoding="utf-8")
+    (tmp_path / ".myteam.yaml").write_text(
+        "defaults:\n"
+        "  model: null\n"
+        "  reasoning: high\n"
+        "  interactive: true\n"
+        "  extra_args: [--project]\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result = run_agent(prompt="Merged configuration")
+
+    assert result.exit_code == 0
+    assert read_observed_settings(tmp_path) == {
+        "model": None,
+        "reasoning": "high",
+        "interactive": True,
+        "session_id": "default-session",
+        "fork": True,
+        "extra_args": ["--project"],
         "session_name": "Configured session",
     }
 

@@ -1,6 +1,6 @@
 # Workflow Configuration
 
-The file `.myteam.yaml` contains configuration for `myteam` agents. This file (if present) is assumed to be in the working directory.
+The files `~/.myteam.yaml` and `.myteam.yaml` contain configuration for `myteam` agents. The home file applies globally, and the project file (if present) is read from the working directory. There is no opt-out for the home file.
 
 Configuration for `codex`, `pi`, and `claude` is built in.
 
@@ -65,11 +65,15 @@ If a given agent runtime does not support all of the provided arguments (e.g. it
 
 ## `.myteam.yaml`
 
-`.myteam.yaml` contains workflow argument defaults and custom agent information.
+A `.myteam.yaml` file contains workflow argument defaults and custom agent information. `~/.myteam.yaml` provides reusable defaults and agents for every project; the working directory's `.myteam.yaml` customizes them for that project.
 
-This file lists the agent names and associated Python config file and class name delimited with `::`. The Python config path is relative to the `.myteam.yaml` file.
+Defaults merge by field, with the project file taking precedence. A project field that is omitted inherits the global value. A project field explicitly set to `null` clears the global value. Every provided field replaces the global field as a whole; collection-valued fields such as `extra_args` are not appended.
+
+Agent maps merge by name. Project agents override global agents with the same name, while other global agents remain available. In either file, `agents` maps an agent name to its Python config file, optionally followed by a class name delimited with `::`. A relative Python config path is resolved from the directory containing the `.myteam.yaml` file that defined that agent.
 
 If you reuse a built-in name, your custom configuration will take precedence over the built-in configuration.
+
+Every participating file is parsed and validated. An invalid home or project file is fatal, even when the other file is valid, and the error identifies the invalid file. If the home and project paths refer to the same physical file, it is treated as one source.
 
 If you want to change default settings, create your own configuration that extends the built-in and adapts the desired behavior.
 

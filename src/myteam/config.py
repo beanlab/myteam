@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    ValidationError,
+    field_validator,
+)
 
 MYTEAM_CONFIG_FILENAME = ".myteam.yaml"
 # Legacy filename retained for compatibility with code/tests that still call
@@ -57,17 +64,33 @@ class WorkflowDefaults(BaseModel):
 class MyteamConfig:
     defaults: WorkflowDefaults = field(default_factory=WorkflowDefaults)
     agents: dict[str, str] = field(default_factory=dict)
-    path: Path | None = None
+    _agent_origins: dict[str, Path] = field(default_factory=dict, repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class _ConfigSource:
+    path: Path
+    defaults: WorkflowDefaults
+    agents: dict[str, str]
 
 
 def load_myteam_config(cwd: Path | None = None) -> MyteamConfig | None:
-    """Load `.myteam.yaml` from the working directory, if present."""
+    """Load and merge the home and working-directory `.myteam.yaml` files."""
 
-    root = Path.cwd() if cwd is None else cwd
-    config_path = root / MYTEAM_CONFIG_FILENAME if root.is_dir() else root
-    if not config_path.exists():
+    global_path = Path.home() / MYTEAM_CONFIG_FILENAME
+    root = Path.cwd() if cwd is None else Path(cwd)
+    project_path = root / MYTEAM_CONFIG_FILENAME if root.is_dir() else root
+
+    paths = [path for path in (global_path, project_path) if path.exists()]
+    if not paths:
         return None
+    if len(paths) == 2 and paths[0].samefile(paths[1]):
+        paths.pop()
 
+    return _merge_sources([_load_source(path) for path in paths])
+
+
+def _load_source(config_path: Path) -> _ConfigSource:
     try:
         loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
@@ -99,24 +122,44 @@ def load_myteam_config(cwd: Path | None = None) -> MyteamConfig | None:
             raise ValueError(f"Myteam config agent '{name}' at {config_path} must be a non-empty string target.")
         agents[name] = target
 
-    return MyteamConfig(defaults=defaults, agents=agents, path=config_path)
+    return _ConfigSource(path=config_path, defaults=defaults, agents=agents)
+
+
+def _merge_sources(sources: list[_ConfigSource]) -> MyteamConfig:
+    default_values: dict[str, Any] = {}
+    agents: dict[str, str] = {}
+    agent_origins: dict[str, Path] = {}
+
+    for source in sources:
+        default_values.update(source.defaults.model_dump(exclude_unset=True))
+        agents.update(source.agents)
+        agent_origins.update(dict.fromkeys(source.agents, source.path.parent))
+
+    return MyteamConfig(
+        defaults=WorkflowDefaults.model_validate(default_values),
+        agents=agents,
+        _agent_origins=agent_origins,
+    )
 
 
 def load_workflow_defaults(myteam_folder: Path) -> WorkflowDefaults | None:
-    """Load workflow defaults from legacy config or the new `.myteam.yaml`.
+    """Load workflow defaults from legacy config or the effective `.myteam.yaml`."""
 
-    New code should use load_myteam_config(). This helper remains so existing
-    imports continue to work during the workflow runtime refactor.
-    """
-
-    new_config = load_myteam_config(myteam_folder)
-    if new_config is not None:
-        return new_config.defaults
+    project_root = myteam_folder.parent if myteam_folder.name == ".myteam" else myteam_folder
+    project_path = project_root / MYTEAM_CONFIG_FILENAME
+    new_config = load_myteam_config(project_root)
 
     config_path = myteam_folder / CONFIG_FILENAME
+    if not project_path.exists() and config_path.exists():
+        return _load_legacy_defaults(config_path)
+    if new_config is not None:
+        return new_config.defaults
     if not config_path.exists():
         return None
+    return _load_legacy_defaults(config_path)
 
+
+def _load_legacy_defaults(config_path: Path) -> WorkflowDefaults:
     try:
         loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:

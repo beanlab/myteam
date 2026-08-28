@@ -8,19 +8,28 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import secrets
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 from .. import templates
+from ..config import (
+    MyteamConfig,
+    WorkflowDefaults,
+    load_myteam_config,
+    normalize_session_name,
+)
 from ..prompt_rendering import render_prompt_text
-from ..config import WorkflowDefaults, load_myteam_config, normalize_session_name
 from .agent_result_channel import AgentReportedResult, AgentResultServer
 from .agents.registry import DEFAULT_AGENT
-from .agents.runtime import AgentRuntimeConfig, AgentSessionContext, resolve_agent_runtime_config
+from .agents.runtime import (
+    AgentRuntimeConfig,
+    AgentSessionContext,
+    resolve_agent_runtime_config,
+)
 from .execution.protocol import (
     ENV_AGENT_SESSION_NONCE,
     ENV_AGENT_SESSION_RESULT_SOCKET,
@@ -30,11 +39,15 @@ from .execution.protocol import (
     KIND_UNREGISTER_AGENT,
     RpcClient,
 )
-from .execution.pty_forwarding import binary_output_stream, drain_pty_output, pump_pty_once, write_bytes
+from .execution.pty_forwarding import (
+    binary_output_stream,
+    drain_pty_output,
+    pump_pty_once,
+    write_bytes,
+)
 from .execution.pty_process import ManagedPtyProcess
 from .execution.terminal import RealTerminal
 from .results import SessionResult, UsageInfo
-
 
 _AGENT_RESULT_POLL_SECONDS = 0.05
 _AGENT_EXIT_TIMEOUT_SECONDS = 2.0
@@ -60,7 +73,8 @@ def run_agent(
     prompt_source_path: Path | str | None = None,
 ) -> SessionResult:
     cwd = Path.cwd().resolve()
-    defaults = _load_defaults(cwd)
+    config = load_myteam_config(cwd)
+    defaults = config.defaults if config is not None else WorkflowDefaults()
     agent_name = _choose(agent, defaults.agent, DEFAULT_AGENT)
     native_session_name = normalize_session_name(
         _choose(session_name, defaults.session_name, None)
@@ -68,7 +82,7 @@ def run_agent(
     effective_session_name = (
         native_session_name if native_session_name is not None else "New session"
     )
-    runtime_config = _resolve_runtime_config(agent_name, cwd)
+    runtime_config = _resolve_runtime_config(agent_name, cwd, config)
 
     effective_model = _choose(model, defaults.model, None)
     effective_reasoning = _choose(reasoning, defaults.reasoning, None)
@@ -401,13 +415,6 @@ def build_agent_prompt(
     return "\n\n".join(section for section in sections if section)
 
 
-def _load_defaults(cwd: Path) -> WorkflowDefaults:
-    config = load_myteam_config(cwd)
-    if config is None:
-        return WorkflowDefaults()
-    return config.defaults
-
-
 def _choose(explicit: Any, default: Any, fallback: Any) -> Any:
     if explicit is not None:
         return explicit
@@ -416,10 +423,15 @@ def _choose(explicit: Any, default: Any, fallback: Any) -> Any:
     return fallback
 
 
-def _resolve_runtime_config(agent_name: str, cwd: Path) -> AgentRuntimeConfig:
+def _resolve_runtime_config(
+    agent_name: str,
+    cwd: Path,
+    config: MyteamConfig | None,
+) -> AgentRuntimeConfig:
     return resolve_agent_runtime_config(
         agent_name,
         project_root=cwd,
+        _config=config,
         session_context=AgentSessionContext(
             home=Path.home().resolve(),
             project_root=cwd,

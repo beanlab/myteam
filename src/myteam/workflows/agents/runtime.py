@@ -10,9 +10,9 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from ...config import load_myteam_config
-from .agent_utils import encode_input
+from ...config import MyteamConfig, load_myteam_config
 from ..results import UsageInfo
+from .agent_utils import encode_input
 
 
 @dataclass(frozen=True)
@@ -53,15 +53,21 @@ class AgentConfigError(Exception):
     pass
 
 
+_CONFIG_NOT_LOADED = object()
+
+
 def resolve_agent_runtime_config(
     name: str | None,
     *,
     project_root: Path,
     session_context: AgentSessionContext,
     logger: Callable[[str], None] | None = None,
+    _config: MyteamConfig | None | object = _CONFIG_NOT_LOADED,
 ) -> AgentRuntimeConfig:
     agent_name = _require_agent_name(name)
-    local_path = _local_agent_config_path(project_root, agent_name)
+    config = load_myteam_config(project_root) if _config is _CONFIG_NOT_LOADED else _config
+    assert config is None or isinstance(config, MyteamConfig)
+    local_path = _local_agent_config_path(project_root, agent_name, config)
 
     if local_path is not None:
         try:
@@ -142,16 +148,18 @@ def _config_from_module(
     )
 
 
-def _local_agent_config_path(project_root: Path, agent_name: str) -> str | Path | None:
-    config = load_myteam_config(project_root)
+def _local_agent_config_path(
+    project_root: Path,
+    agent_name: str,
+    config: MyteamConfig | None,
+) -> str | Path | None:
     if config is not None:
         target = config.agents.get(agent_name)
         if target:
             target_path, separator, class_name = target.partition("::")
             path = Path(target_path)
             if not path.is_absolute():
-                assert config.path is not None
-                path = config.path.parent / path
+                path = config._agent_origins[agent_name] / path
             return f"{path}::{class_name}" if separator else path
 
     legacy_path = project_root / ".myteam" / ".config" / f"{agent_name}.py"

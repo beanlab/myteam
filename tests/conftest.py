@@ -30,6 +30,15 @@ def _test_env() -> dict[str, str]:
     return env
 
 
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Prevent a developer's home configuration from affecting tests."""
+    home = tmp_path / ".isolated-home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    return home
+
+
 @pytest.fixture
 def run_myteam(monkeypatch):
     def runner(project_dir: Path, *args: str) -> CommandResult:
