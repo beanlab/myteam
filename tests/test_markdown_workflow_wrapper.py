@@ -162,9 +162,82 @@ def test_markdown_wrapper_reports_no_text_for_none_output(
     assert reported == [None]
 
 
-def test_markdown_wrapper_rejects_non_object_input(tmp_path: Path) -> None:
+def test_markdown_wrapper_cli_null_omits_unresolved_settings_and_preserves_path_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "workflow.md"
+    workflow.write_text(
+        "---\n"
+        "type: workflow\n"
+        "agent: null\n"
+        "model: frontmatter-model\n"
+        "reasoning: null\n"
+        "interactive: null\n"
+        "extra_args: null\n"
+        "session_id: null\n"
+        "fork: null\n"
+        "---\nPrompt.\n",
+        encoding="utf-8",
+    )
+    seen: dict[str, object] = {}
+
+    def fake_run_agent(**kwargs: object) -> SessionResult:
+        seen.update(kwargs)
+        return SessionResult(exit_code=0, output=None, usage=[], transcript="", session_id=None)
+
+    monkeypatch.setattr(workflow_markdown_wrapper, "run_agent", fake_run_agent)
+    monkeypatch.setattr(workflow_markdown_wrapper, "report_workflow_result", lambda _value: None)
+
+    workflow_markdown_wrapper.main(
+        workflow,
+        "{}",
+        "./docs/../workflow.md",
+        "--model",
+        "null",
+    )
+
+    assert seen == {
+        "prompt": "Prompt.\n",
+        "input": {},
+        "prompt_source_path": workflow,
+        "output": None,
+        "session_name": "./docs/../workflow.md",
+    }
+
+
+def test_markdown_wrapper_reports_option_failure_without_launching(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "workflow.md"
+    workflow.write_text("---\ntype: workflow\n---\nPrompt.\n", encoding="utf-8")
+    reported: list[str | None] = []
+
+    def unexpected_run_agent(**_kwargs: object) -> SessionResult:
+        pytest.fail("invalid options must not launch an agent")
+
+    monkeypatch.setattr(workflow_markdown_wrapper, "run_agent", unexpected_run_agent)
+    monkeypatch.setattr(workflow_markdown_wrapper, "report_workflow_result", reported.append)
+
+    with pytest.raises(SystemExit) as raised:
+        workflow_markdown_wrapper.main(workflow, "{}", "workflow.md", "--fork", "true")
+
+    assert raised.value.code != 0
+    assert len(reported) == 1
+    assert reported[0] is not None
+    assert "session_id" in reported[0]
+
+
+def test_markdown_wrapper_rejects_non_object_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workflow = tmp_path / "workflow.md"
     workflow.write_text("---\ntype: workflow\n---\nPrompt\n", encoding="utf-8")
+    reported: list[str | None] = []
+    monkeypatch.setattr(workflow_markdown_wrapper, "report_workflow_result", reported.append)
 
-    with pytest.raises(ValueError, match="Workflow input must be a JSON object"):
+    with pytest.raises(SystemExit) as raised:
         workflow_markdown_wrapper.main(workflow, "[]")
+
+    assert raised.value.code != 0
+    assert len(reported) == 1
+    assert "Workflow input must be a JSON object" in (reported[0] or "")
