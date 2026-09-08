@@ -9,5 +9,6 @@ Agents need instructions about the meaning, structure, and intent of skills and 
 - `myteam` resources (skills and workflows) are organized hierarchically
 - how `myteam list` is used to discover available resources
 - how to load skills and start workflows, distinguishing Markdown's single JSON-object `--input` and listed Input/Output schemas from Python's arbitrary arguments/options and listed Usage
+- Markdown's eight agent-setting override flags and aliases; YAML values and shell quoting; duplicate and frontmatter/CLI/default/null precedence; strict validation and the fork/session-ID rule; an example using `--input`; and Markdown workflow `--help`
 - how to use `myteam where` to identify the active workflow/session hierarchy
 

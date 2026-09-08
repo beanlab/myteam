@@ -53,6 +53,15 @@ Markdown workflows accept a single JSON object through `--input`. Use their list
 myteam start <workflow-name> --input '{"field": "value"}'
 ```
 
+A Markdown invocation can override these agent settings: `--agent`, `--session-name`/`--session_name`, `--model`, `--reasoning`, `--interactive`, `--extra-args`/`--extra_args`, `--session-id`/`--session_id`, and `--fork`. Values use safe YAML syntax and may need shell quoting. Both `--option VALUE` and `--option=VALUE` work; repeated options use the last value.
+
+Settings resolve from workflow frontmatter, then supplied CLI values, then effective home/project defaults for missing or YAML `null` values. A still-missing session name falls back to the workflow path. Effective values must have the expected types; `--fork true` requires an effective `session_id`. Unknown or positional trailing arguments are errors. For example:
+```
+myteam start review.md --input '{"topic": "release"}' --model gpt-5 --interactive false --extra-args '[--flag, value]'
+```
+
+Run `myteam start <markdown-workflow> --help` for generic Markdown workflow option help.
+
 Python workflows may accept arbitrary arguments and options. Follow the listed Usage for each workflow:
 ```
 myteam start <workflow-name> <arguments-or-options>
@@ -64,4 +73,4 @@ Inside a workflow managed by `myteam start`, run `myteam where` to display the a
 
 Markdown workflows list Input and Output only when those schemas are specified. If either is absent, do not infer an input requirement or result structure.
 
-When invoking a workflow, do so with an indefinite timeout. Imposing a timelimit will likely result in errors.
+When invoking a workflow, do so with a very long timeout (e.g. 2 days). Imposing a time limit will likely result in errors.

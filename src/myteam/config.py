@@ -29,7 +29,7 @@ def normalize_session_name(value: Any) -> str | None:
     return name
 
 
-class WorkflowDefaults(BaseModel):
+class AgentSettingsModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     agent: Optional[str] = Field(default=None, min_length=1)
@@ -40,8 +40,6 @@ class WorkflowDefaults(BaseModel):
     session_id: Optional[str] = Field(default=None, min_length=1)
     fork: Optional[bool] = Field(default=None)
     extra_args: Optional[tuple[str, ...]] = Field(default=None)
-    usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
-    timeout: Optional[PositiveInt] = Field(default=None)
 
     @field_validator("session_name", mode="before")
     @classmethod
@@ -58,6 +56,14 @@ class WorkflowDefaults(BaseModel):
         if isinstance(value, list):
             return tuple(str(item) for item in value)
         return value
+
+
+AGENT_SETTING_FIELDS = tuple(AgentSettingsModel.model_fields)
+
+
+class WorkflowDefaults(AgentSettingsModel):
+    usage_logging: Optional[Literal["none", "summary", "per_model", "verbose"]] = Field(default=None)
+    timeout: Optional[PositiveInt] = Field(default=None)
 
 
 @dataclass(frozen=True)

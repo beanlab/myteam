@@ -54,6 +54,49 @@ def test_markdown_workflow_receives_input_json_and_original_target(
     ]
 
 
+def test_start_workflow_forwards_option_looking_python_arguments_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "workflow.py"
+    workflow.write_text(
+        "import sys\n"
+        "from myteam.workflows import report_workflow_result\n"
+        "report_workflow_result('|'.join(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result_text = start_workflow(str(workflow), "--help", "--model", "unchanged")
+
+    assert result_text == "--help|--model|unchanged\n"
+
+
+def test_start_workflow_markdown_help_returns_wrapper_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "workflow.md"
+    workflow.write_text("---\ntype: workflow\ndescription: help\n---\nPrompt.\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result_text = start_workflow(str(workflow), "--help", workflow_input_json="[]")
+
+    assert result_text.startswith("Usage: myteam start <markdown-workflow>")
+    assert "--interactive" in result_text
+    assert "--input" in result_text
+
+
+def test_start_workflow_markdown_failure_is_returned_as_result_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = tmp_path / "workflow.md"
+    workflow.write_text("---\ntype: workflow\ndescription: invalid\n---\nPrompt.\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result_text = start_workflow(str(workflow), "--unknown", workflow_input_json="[]")
+
+    assert "unknown" in result_text.lower()
+
+
 def test_start_workflow_returns_explicit_workflow_result_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     workflow = tmp_path / "workflow.py"
     workflow.write_text(

@@ -46,11 +46,15 @@ report_workflow_result("Review complete. See scratch/review.md for details.")
 
 Markdown files are treated as single-step workflows with a single call to `run_agent` made using arguments from the Markdown frontmatter and body.
 
-In Markdown workflows, all `run_agent` arguments except `input` and `prompt` are specified in the frontmatter. The `prompt` argument is the body of the Markdown document. The `input` field in the frontmatter is a schema describing the expected input to the workflow. This input is passed using the `--input` argument when invoking the Markdown workflow.
+In Markdown workflows, the `prompt` argument is the body of the Markdown document. The `input` field in the frontmatter is a schema describing the expected input to the workflow. This input is passed using the `--input` argument when invoking the Markdown workflow. The other agent settings may be specified in frontmatter or overridden for an invocation.
 
-Additional `run_agent` parameters specified in the frontmatter (e.g. `agent`, `session_name`, `model`, `reasoning`, or `interactive`) will be passed to the underlying invocation of `run_agent`.
+Markdown invocations may override the eight agent settings `agent`, `session_name`, `model`, `reasoning`, `interactive`, `extra_args`, `session_id`, and `fork` with trailing options. Multiword options accept both spellings: `--session-name`/`--session_name`, `--extra-args`/`--extra_args`, and `--session-id`/`--session_id`. Options support `--option VALUE` and `--option=VALUE`; values use safe YAML, so shell quoting should preserve values such as `'[--flag, value]'`, `false`, and `null`. Repeated options use the last value. Unknown options, positional arguments, missing or malformed YAML values, and values of the wrong type are errors.
 
-A Markdown session's display name resolves from frontmatter `session_name`, then the effective home/project `.myteam.yaml` `defaults.session_name`, then the workflow path exactly as supplied to `myteam start`. The fallback path is passed to `run_agent` as the session name, so adapters that support native naming may use it. It is not resolved or normalized, so spelling such as `./docs/../docs/review.md` is preserved. An explicitly empty frontmatter name takes precedence.
+Effective settings resolve in this order: Markdown frontmatter, supplied CLI overrides, effective home/project defaults for every missing or null value, and finally the workflow path as the fallback session name. Thus a CLI `null` suppresses a frontmatter value but falls through to a configured default. Values still null are omitted. The fallback path is passed to `run_agent` as the session name, so adapters that support native naming may use it. It is not resolved or normalized, so spelling such as `./docs/../docs/review.md` is preserved. An explicitly empty name takes precedence. Effective settings are strictly validated, and `fork: true` requires an effective `session_id`; `fork: false` does not.
+
+Expected invocation and setting failures are returned as concise workflow result text and exit nonzero. `myteam start <markdown-workflow> --help` returns stable generic Markdown usage as workflow result text and exits zero. Help still requires a resolvable workflow, but does not validate workflow input or settings, read defaults, render the prompt, or start an agent session.
+
+These trailing options are specific to Markdown workflows. The same arguments may be supplied after a Markdown workflow name to the public `start_workflow(...)` Python API. Python workflow arguments and options remain arbitrary and are forwarded unchanged.
 
 Markdown workflows automatically convert the single `run_agent` result into workflow result text:
 

@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.13
+
+- Added YAML-valued Markdown workflow overrides for agent, session name, model, reasoning, interactivity, extra arguments, session ID, and fork behavior, plus generic Markdown workflow `--help`.
+- `myteam explain` now documents Markdown override flags, aliases, precedence, and YAML values.
+- Migration note: unknown and positional Markdown trailing arguments, which were formerly ignored, now fail. Effective `fork=true` now requires a `session_id`. No migration tooling is required.
+
 ## 0.3.12
 
 - Enriched workflow listings across the CLI, Python API, and Jinja helper with Usage and Markdown Input/Output sections.

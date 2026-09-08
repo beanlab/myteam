@@ -6,10 +6,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 import sys
 import time
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 from .. import templates
-from ..config import WorkflowDefaults, normalize_session_name
+from ..config import AGENT_SETTING_FIELDS, AgentSettingsModel, WorkflowDefaults
 from ..templates import get_template_file
 from ..workflow_metadata import WorkflowMetadataError, read_workflow_metadata
 from .agent_session import build_agent_prompt
@@ -101,22 +101,15 @@ def resolve_agent_settings(
     """Merge frontmatter/explicit agent settings with workflow defaults."""
 
     explicit_settings = explicit_settings or {}
-    result: AgentSettings = {}
-    fields = ("agent", "session_name", "model", "reasoning", "interactive", "extra_args", "session_id", "fork")
-    for field in fields:
+    values: dict[str, Any] = {}
+    for field in AGENT_SETTING_FIELDS:
         value = explicit_settings.get(field)
         if value is None and defaults is not None:
-            if isinstance(defaults, dict):
-                value = defaults.get(field)
-            else:
-                value = getattr(defaults, field, None)
+            value = defaults.get(field) if isinstance(defaults, dict) else getattr(defaults, field, None)
         if value is not None:
-            if field == "session_name":
-                value = normalize_session_name(value)
-            if field == "extra_args" and isinstance(value, list):
-                value = tuple(str(item) for item in value)
-            result[field] = value
-    return result
+            values[field] = value
+    validated = AgentSettingsModel.model_validate(values)
+    return cast(AgentSettings, validated.model_dump(exclude_none=True))
 
 
 def start_workflow(

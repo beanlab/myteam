@@ -23,3 +23,25 @@ def test_explain_describes_resource_model_and_commands(run_myteam, tmp_path: Pat
     assert "python" in text
     assert "arbitrary" in text
     assert "usage" in text
+    for option in (
+        "--agent",
+        "--session-name",
+        "--session_name",
+        "--model",
+        "--reasoning",
+        "--interactive",
+        "--extra-args",
+        "--extra_args",
+        "--session-id",
+        "--session_id",
+        "--fork",
+        "--input",
+        "--help",
+    ):
+        assert option in result.stdout
+    assert "yaml" in text
+    assert "null" in text
+    assert "frontmatter" in text
+    assert "default" in text
+    assert "last" in text
+    assert "myteam start" in text and "--model" in text
