@@ -725,6 +725,7 @@ def run_implementation(state: FlowState) -> dict[str, Any]:
         if correction_feedback is not None:
             if remediation_cycles >= 2 and not authorized_remediation:
                 decision = run_review_resolution(state, "remediation_limit")
+                remediation_cycles = 0
                 if decision == "re_review":
                     correction_feedback = None
                 else:

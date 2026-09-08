@@ -72,6 +72,47 @@ def test_feature_flow_reports_cumulative_snapshots_and_step_deltas(
     assert report["totals"]["estimated_cost"] == pytest.approx(1.5)
 
 
+def test_remediation_limit_resets_after_user_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    feature_flow = load_feature_flow()
+    state = feature_flow.FlowState()
+    review_count = 0
+    remediation_count = 0
+    resolution_reasons: list[str] = []
+
+    monkeypatch.setattr(feature_flow, "run_initial_implementation", lambda _: None)
+
+    def review(_):
+        nonlocal review_count
+        review_count += 1
+        if review_count < 5:
+            raise feature_flow.ReturnToImplementation(
+                {"required_changes": f"revision {review_count}"},
+                "code_review",
+            )
+        return {"status": "approved"}
+
+    def remediate(*_):
+        nonlocal remediation_count
+        remediation_count += 1
+        state.remediation_result = {"review_disputed": False}
+
+    def resolve(_, reason: str) -> str:
+        resolution_reasons.append(reason)
+        return "re_review"
+
+    monkeypatch.setattr(feature_flow, "run_code_review", review)
+    monkeypatch.setattr(feature_flow, "run_remediation", remediate)
+    monkeypatch.setattr(feature_flow, "run_review_resolution", resolve)
+
+    result = feature_flow.run_implementation(state)
+
+    assert result == {"status": "approved"}
+    assert remediation_count == 3
+    assert resolution_reasons == ["remediation_limit"]
+
+
 def test_feature_flow_records_usage_before_stopping_on_no_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
