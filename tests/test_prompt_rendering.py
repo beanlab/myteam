@@ -441,8 +441,21 @@ def test_shell_timeout_reports_command_timeout_and_partial_combined_output(tmp_p
     assert "partial stdout\npartial stderr\n" in diagnostic
 
 
-def test_render_markdown_body_prefers_input_values_over_helper_names(tmp_path: Path) -> None:
+def test_render_markdown_body_prefers_input_values_over_helper_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "skill.md"
+    (tmp_path / "helpers.py").write_text(
+        "def custom():\n    return 'registered'\n", encoding="utf-8"
+    )
+    (tmp_path / ".myteam.yaml").write_text(
+        "jinja_functions:\n"
+        "  read_file: helpers.py::custom\n"
+        "  shell: helpers.py::custom\n"
+        "  increase_headers: helpers.py::custom\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
 
     rendered = prompt_rendering.render_markdown_body(
         "{{ read_file }}|{{ shell }}|{{ increase_headers }}",

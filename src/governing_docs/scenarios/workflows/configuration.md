@@ -65,13 +65,17 @@ If a given agent runtime does not support all of the provided arguments (e.g. it
 
 ## `.myteam.yaml`
 
-A `.myteam.yaml` file contains workflow argument defaults and custom agent information. `~/.myteam.yaml` provides reusable defaults and agents for every project; the working directory's `.myteam.yaml` customizes them for that project.
+A `.myteam.yaml` file contains workflow argument defaults, custom agent information, and Jinja function registrations. `~/.myteam.yaml` provides reusable configuration for every project; the working directory's `.myteam.yaml` customizes it for that project.
 
 Defaults merge by field, with the project file taking precedence. A project field that is omitted inherits the global value. A project field explicitly set to `null` clears the global value. Every provided field replaces the global field as a whole; collection-valued fields such as `extra_args` are not appended.
 
 Agent maps merge by name. Project agents override global agents with the same name, while other global agents remain available. In either file, `agents` maps an agent name to its Python config file, optionally followed by a class name delimited with `::`. A relative Python config path is resolved from the directory containing the `.myteam.yaml` file that defined that agent.
 
-If you reuse a built-in name, your custom configuration will take precedence over the built-in configuration.
+If you reuse a built-in agent name, your custom configuration will take precedence over the built-in configuration.
+
+Jinja function maps also merge by name, with project registrations overriding global registrations. Each `jinja_functions` value must use `file.py::function_name`. Relative Python file paths resolve from the directory containing the `.myteam.yaml` file that registered the function. There is no syntax for removing a global registration.
+
+See [Jinja2 Template Rendering](../jinja-support.md) for function loading, precedence, and security behavior.
 
 Every participating file is parsed and validated. An invalid home or project file is fatal, even when the other file is valid, and the error identifies the invalid file. If the home and project paths refer to the same physical file, it is treated as one source.
 
@@ -85,6 +89,9 @@ defaults:
 agents:
   myagent: agents/myagent.py::MyAgentConfig
   codex-mini: agents/codex_mini.py::CodexMiniConfig
+jinja_functions:
+  slugify: helpers/jinja.py::slugify
+  issue_url: helpers/jinja.py::issue_url
 ```
 
 `defaults.session_name` supplies the lifecycle display name when a `run_agent` call does not provide one and is forwarded to adapters that opt into native session naming. Empty names are valid and forwarded, non-string YAML values are converted to text, and names containing carriage returns or line feeds are rejected. When no explicit or configured name exists, the lifecycle display uses `New session`, but adapters receive `None`.

@@ -41,6 +41,12 @@ A non-zero exit aborts rendering with a diagnostic containing the command, exit 
 
 Document-relative path helpers support `~` home-directory expansion. Absolute paths remain absolute.
 
-Input field names take precedence over Jinja environment functions. An input named `shell`, for example, shadows the helper. Previously, an unshadowed `shell` name was undefined.
+Additional global functions can be registered with `.myteam.yaml` `jinja_functions`; see [Workflow Configuration](workflows/configuration.md) for the configuration syntax, merging, and path-resolution rules.
+
+Registered function modules load eagerly once per top-level rendering and are reused by rendered `read_file` includes. The selected attributes must be callable and are passed unchanged to Jinja, so decorators such as `pass_context` work normally.
+
+Built-in helpers are installed first, so a registered function may override one. Input field names have final precedence over both registered and built-in functions. An input named `shell`, for example, shadows either version.
+
+Importing a registered function module executes arbitrary Python without sandboxing, with myteam's environment and permissions. Home and project configuration and all registered files must therefore be trusted.
 
 Errors in rendering propagate to the calling process. In particular, a filesystem or workflow-metadata error from `myteam_list` writes the same diagnostic as the CLI to stderr, raises `SystemExit(1)`, and aborts rendering without returning partial rendered output.

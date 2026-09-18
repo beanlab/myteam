@@ -26,6 +26,11 @@ def write_config(tmp_path: Path, text: str) -> Path:
         ("agents: nope\n", "agents .* must be a mapping"),
         ("agents:\n  '': target.py::Config\n", "non-empty string names"),
         ("agents:\n  custom: ''\n", "must be a non-empty string target"),
+        ("jinja_functions: nope\n", "jinja_functions .* must be a mapping"),
+        ("jinja_functions: []\n", "jinja_functions .* must be a mapping"),
+        ("jinja_functions:\n  '': helpers.py::helper\n", "non-empty string names"),
+        ("jinja_functions:\n  helper: helpers.py\n", "file.py::function_name"),
+        ("jinja_functions:\n  helper: helpers.txt::helper\n", "file.py::function_name"),
         ("defaults:\n  interactive: sometimes\n", "defaults .* are invalid"),
         ("defaults:\n  unexpected: value\n", "defaults .* are invalid"),
     ],
@@ -106,7 +111,10 @@ def test_load_myteam_config_merges_global_and_project_by_documented_precedence(
         "  extra_args: [--global, value]\n"
         "agents:\n"
         "  global-agent: global.py::GlobalConfig\n"
-        "  shared: global-shared.py::GlobalSharedConfig\n",
+        "  shared: global-shared.py::GlobalSharedConfig\n"
+        "jinja_functions:\n"
+        "  global_helper: global-helpers.py::global_helper\n"
+        "  shared: global-helpers.py::shared\n",
     )
     write_config(
         tmp_path,
@@ -116,7 +124,10 @@ def test_load_myteam_config_merges_global_and_project_by_documented_precedence(
         "  extra_args: [--project]\n"
         "agents:\n"
         "  project-agent: project.py::ProjectConfig\n"
-        "  shared: project-shared.py::ProjectSharedConfig\n",
+        "  shared: project-shared.py::ProjectSharedConfig\n"
+        "jinja_functions:\n"
+        "  project_helper: project-helpers.py::project_helper\n"
+        "  shared: project-helpers.py::shared\n",
     )
 
     config = load_myteam_config(tmp_path)
@@ -131,6 +142,11 @@ def test_load_myteam_config_merges_global_and_project_by_documented_precedence(
         "global-agent": "global.py::GlobalConfig",
         "project-agent": "project.py::ProjectConfig",
         "shared": "project-shared.py::ProjectSharedConfig",
+    }
+    assert config.jinja_functions == {
+        "global_helper": "global-helpers.py::global_helper",
+        "project_helper": "project-helpers.py::project_helper",
+        "shared": "project-helpers.py::shared",
     }
 
 

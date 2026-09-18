@@ -35,6 +35,81 @@ def test_load_markdown_skill_renders_document_relative_jinja_helpers(run_myteam,
     assert result.stderr == ""
 
 
+def test_load_markdown_skill_uses_configured_jinja_functions(
+    run_myteam, tmp_path: Path, isolated_home: Path
+) -> None:
+    (isolated_home / "home_helpers.py").write_text(
+        "def source():\n    return 'home'\n"
+        "def shared():\n    return 'home shared'\n",
+        encoding="utf-8",
+    )
+    (isolated_home / ".myteam.yaml").write_text(
+        "jinja_functions:\n"
+        "  source: home_helpers.py::source\n"
+        "  shared: home_helpers.py::shared\n",
+        encoding="utf-8",
+    )
+    helpers = tmp_path / "helpers"
+    helpers.mkdir()
+    (helpers / "jinja.py").write_text(
+        "from pathlib import Path\n"
+        "from jinja2 import pass_context\n"
+        "marker = Path(__file__).with_name('imports.txt')\n"
+        "marker.write_text((marker.read_text() if marker.exists() else '') + 'x')\n"
+        "@pass_context\n"
+        "def contextual(context, prefix):\n"
+        "    return prefix + context['source']()\n"
+        "def shared():\n"
+        "    return 'project shared'\n"
+        "def shell():\n"
+        "    return 'custom shell'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".myteam.yaml").write_text(
+        "jinja_functions:\n"
+        "  contextual: helpers/jinja.py::contextual\n"
+        "  shared: helpers/jinja.py::shared\n"
+        "  shell: helpers/jinja.py::shell\n",
+        encoding="utf-8",
+    )
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "fragment.txt").write_text(
+        "{{ contextual('included: ') }}", encoding="utf-8"
+    )
+    (docs / "skill.md").write_text(
+        "---\ntype: skill\ndescription: demo\n---\n"
+        "{{ source() }}|{{ shared() }}|{{ shell() }}|{{ read_file('fragment.txt') }}",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "load", "docs/skill.md")
+
+    assert result.exit_code == 0
+    assert result.stdout == "home|project shared|custom shell|included: home"
+    assert result.stderr == ""
+    assert (helpers / "imports.txt").read_text(encoding="utf-8") == "x"
+
+
+def test_load_markdown_skill_rejects_noncallable_registered_function(
+    run_myteam, tmp_path: Path
+) -> None:
+    (tmp_path / "helpers.py").write_text("not_a_function = 42\n", encoding="utf-8")
+    (tmp_path / ".myteam.yaml").write_text(
+        "jinja_functions:\n  helper: helpers.py::not_a_function\n", encoding="utf-8"
+    )
+    (tmp_path / "skill.md").write_text(
+        "---\ntype: skill\ndescription: demo\n---\nliteral", encoding="utf-8"
+    )
+
+    result = run_myteam(tmp_path, "load", "skill.md")
+
+    assert result.exit_code != 0
+    assert result.stdout == ""
+    assert "helper" in result.stderr
+    assert "callable" in result.stderr
+
+
 def test_load_markdown_skill_runs_shell_in_skill_directory(run_myteam, tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
