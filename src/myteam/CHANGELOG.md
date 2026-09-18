@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.14
+
+- Added `.myteam.yaml` `jinja_functions` registrations for adding or overriding Jinja globals from Python callables.
+
 ## 0.3.13
 
 - Added YAML-valued Markdown workflow overrides for agent, session name, model, reasoning, interactivity, extra arguments, session ID, and fork behavior, plus generic Markdown workflow `--help`.

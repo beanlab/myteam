@@ -480,7 +480,7 @@ wheels = [
 
 [[package]]
 name = "myteam"
-version = "0.3.13"
+version = "0.3.14"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
@@ -494,6 +494,7 @@ dependencies = [
 dev = [
     { name = "faster-whisper" },
     { name = "pytest" },
+    { name = "rosters" },
 ]
 
 [package.metadata]
@@ -509,6 +510,7 @@ requires-dist = [
 dev = [
     { name = "faster-whisper", specifier = ">=1.2.1" },
     { name = "pytest", specifier = ">=8.3" },
+    { name = "rosters", editable = "../rosters" },
 ]
 
 [[package]]
@@ -894,6 +896,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/b3/c6/f3b320c27991c46f4
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/25/b208c5683343959b670dc001595f2f3737e051da617f66c31f7c4fa93abc/rich-14.3.3-py3-none-any.whl", hash = "sha256:793431c1f8619afa7d3b52b2cdec859562b950ea0d4b6b505397612db8d5362d", size = 310458, upload-time = "2026-02-19T17:23:13.732Z" },
 ]
+
+[[package]]
+name = "rosters"
+version = "0.0.0"
+source = { editable = "../rosters" }
 
 [[package]]
 name = "setuptools"

@@ -70,7 +70,9 @@ class WorkflowDefaults(AgentSettingsModel):
 class MyteamConfig:
     defaults: WorkflowDefaults = field(default_factory=WorkflowDefaults)
     agents: dict[str, str] = field(default_factory=dict)
+    jinja_functions: dict[str, str] = field(default_factory=dict)
     _agent_origins: dict[str, Path] = field(default_factory=dict, repr=False, compare=False)
+    _jinja_function_origins: dict[str, Path] = field(default_factory=dict, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,7 @@ class _ConfigSource:
     path: Path
     defaults: WorkflowDefaults
     agents: dict[str, str]
+    jinja_functions: dict[str, str]
 
 
 def load_myteam_config(cwd: Path | None = None) -> MyteamConfig | None:
@@ -115,6 +118,11 @@ def _load_source(config_path: Path) -> _ConfigSource:
     if not isinstance(agents_raw, dict):
         raise ValueError(f"Myteam config agents at {config_path} must be a mapping.")
 
+    jinja_functions_value = loaded.get("jinja_functions")
+    jinja_functions_raw = {} if jinja_functions_value is None else jinja_functions_value
+    if not isinstance(jinja_functions_raw, dict):
+        raise ValueError(f"Myteam config jinja_functions at {config_path} must be a mapping.")
+
     try:
         defaults = WorkflowDefaults.model_validate(defaults_raw)
     except ValidationError as exc:
@@ -128,23 +136,56 @@ def _load_source(config_path: Path) -> _ConfigSource:
             raise ValueError(f"Myteam config agent '{name}' at {config_path} must be a non-empty string target.")
         agents[name] = target
 
-    return _ConfigSource(path=config_path, defaults=defaults, agents=agents)
+    jinja_functions: dict[str, str] = {}
+    for name, target in jinja_functions_raw.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Myteam config jinja_functions at {config_path} must use non-empty string names.")
+        if not isinstance(target, str) or not _is_python_symbol_target(target):
+            raise ValueError(
+                f"Myteam config Jinja function '{name}' at {config_path} "
+                "must use a non-empty 'file.py::function_name' target."
+            )
+        jinja_functions[name] = target
+
+    return _ConfigSource(
+        path=config_path,
+        defaults=defaults,
+        agents=agents,
+        jinja_functions=jinja_functions,
+    )
+
+
+def _is_python_symbol_target(target: str) -> bool:
+    path, separator, symbol = target.partition("::")
+    return bool(
+        separator
+        and path.strip()
+        and Path(path.strip()).suffix == ".py"
+        and symbol.strip()
+        and "::" not in symbol
+    )
 
 
 def _merge_sources(sources: list[_ConfigSource]) -> MyteamConfig:
     default_values: dict[str, Any] = {}
     agents: dict[str, str] = {}
+    jinja_functions: dict[str, str] = {}
     agent_origins: dict[str, Path] = {}
+    jinja_function_origins: dict[str, Path] = {}
 
     for source in sources:
         default_values.update(source.defaults.model_dump(exclude_unset=True))
         agents.update(source.agents)
+        jinja_functions.update(source.jinja_functions)
         agent_origins.update(dict.fromkeys(source.agents, source.path.parent))
+        jinja_function_origins.update(dict.fromkeys(source.jinja_functions, source.path.parent))
 
     return MyteamConfig(
         defaults=WorkflowDefaults.model_validate(default_values),
         agents=agents,
+        jinja_functions=jinja_functions,
         _agent_origins=agent_origins,
+        _jinja_function_origins=jinja_function_origins,
     )
 
 

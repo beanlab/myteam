@@ -123,6 +123,26 @@ def test_run_agent_applies_myteam_yaml_defaults(tmp_path: Path, monkeypatch, cap
     }
 
 
+def test_run_agent_uses_configured_jinja_function(tmp_path: Path, monkeypatch) -> None:
+    write_recording_agent_project(tmp_path)
+    (tmp_path / "jinja_helpers.py").write_text(
+        "def greeting(name):\n    return f'Hello, {name}!'\n", encoding="utf-8"
+    )
+    config_path = tmp_path / ".myteam.yaml"
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8")
+        + "jinja_functions:\n  greeting: jinja_helpers.py::greeting\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result = run_agent(prompt="{{ greeting(name) }}", input={"name": "Ada"})
+
+    assert result.exit_code == 0
+    assert result.output is not None
+    assert "Hello, Ada!" in result.output["prompt"]
+
+
 def test_run_agent_uses_global_only_defaults_and_agent(
     tmp_path: Path,
     isolated_home: Path,
