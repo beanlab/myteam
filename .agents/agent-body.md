@@ -2,10 +2,6 @@
 
 {{ read_file('dev/project.md') }}
 
-{{ read_file('dev/feature-flow/code-planning.md') }}
-
-{{ read_file('dev/feature-flow/code-style.md') }}
-
 {{ myteam_explain() }}
 
 {{ myteam_list('dev/skills') }}

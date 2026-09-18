@@ -21,10 +21,14 @@ myteam = "myteam.cli:main"
 dev = [
     "faster-whisper>=1.2.1",
     "pytest>=8.3",
+    "rosters",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+rosters = { path = "../rosters", editable = true }
 
 [build-system]
 requires = ["uv-build>=0.2"]
