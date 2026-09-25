@@ -64,7 +64,7 @@ Instead of a single `AGENTS.md` that all agents use, define your various agent r
 
 For example, you might have separate roles for planning, implementing, reviewing, documenting, etc.  
 
-All Markdown bodies are rendered with Jinja2. The environment includes `read_file` for composing prompts from nearby files and `shell` for injecting local command output.
+All Markdown bodies are rendered with Jinja2. The environment includes `this_file`, a Python `Path` for the file currently being rendered, plus `read_file` for composing prompts from nearby files and `shell` for injecting local command output.
 
 You can also use `myteam_explain()` to include instructions about skills and workflows and `myteam_list()` to control which resources are visible to an agent. Additional Python callables can be registered with `.myteam.yaml` `jinja_functions`. See [Jinja template rendering](scenarios/jinja-support.md) for helper documentation, including execution and security considerations.
 

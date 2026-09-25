@@ -5,6 +5,9 @@ import json
 import textwrap
 from pathlib import Path
 
+import pytest
+from jinja2 import UndefinedError
+
 import myteam.workflows.agent_session as agent_session
 from myteam import run_agent
 
@@ -271,12 +274,22 @@ def test_run_agent_renders_prompt_relative_to_source_path(tmp_path: Path, monkey
     (docs / "fragment.txt").write_text("# Relative fragment", encoding="utf-8")
 
     result = run_agent(
-        prompt="Read {{ read_file('fragment.txt') | increase_headers }}",
+        prompt="From {{ this_file.name }} read {{ read_file('fragment.txt') | increase_headers }}",
         prompt_source_path=docs / "workflow.md",
     )
 
     assert result.output is not None
-    assert "## Relative fragment" in result.output["prompt"]
+    assert "From workflow.md read ## Relative fragment" in result.output["prompt"]
+
+
+def test_run_agent_without_source_path_does_not_define_this_file(
+    tmp_path: Path, monkeypatch
+) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(UndefinedError):
+        run_agent(prompt="{{ this_file }}")
 
 
 def test_run_agent_shell_without_source_path_uses_process_cwd(tmp_path: Path, monkeypatch) -> None:

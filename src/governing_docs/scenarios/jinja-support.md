@@ -4,6 +4,8 @@ Myteam renders Markdown skill bodies, Markdown workflow prompts, direct `run_age
 
 The fields of the input dictionary, when provided, are passed as variables to the rendering (for example, `render(**inputs)`).
 
+When rendering from a source file, `this_file` is the resolved absolute Python `pathlib.Path` of the file currently being rendered. A rendered `read_file` include receives its own path, so `this_file` changes while rendering the included file. It can be used to locate adjacent resources, for example `"Run {{ this_file.with_name('script.py') }}"`. Direct `run_agent` prompts without `prompt_source_path` have no current file, so `this_file` is undefined.
+
 The following `myteam` functions are included in the Jinja environment:
 
 - `myteam_explain()` - injects the output of `myteam explain`.
@@ -45,7 +47,7 @@ Additional global functions can be registered with `.myteam.yaml` `jinja_functio
 
 Registered function modules load eagerly once per top-level rendering and are reused by rendered `read_file` includes. The selected attributes must be callable and are passed unchanged to Jinja, so decorators such as `pass_context` work normally.
 
-Built-in helpers are installed first, so a registered function may override one. Input field names have final precedence over both registered and built-in functions. An input named `shell`, for example, shadows either version.
+Built-in helpers and variables are installed first, so a registered function may override one. Input field names have final precedence over both registered and built-in values. Inputs named `shell` or `this_file`, for example, shadow those built-ins.
 
 Importing a registered function module executes arbitrary Python without sandboxing, with myteam's environment and permissions. Home and project configuration and all registered files must therefore be trusted.
 

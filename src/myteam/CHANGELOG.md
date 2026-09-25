@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.15
+
+- Added the Jinja `this_file` variable, containing the resolved `pathlib.Path` of the file currently being rendered.
+
 ## 0.3.14
 
 - Added `.myteam.yaml` `jinja_functions` registrations for adding or overriding Jinja globals from Python callables.
