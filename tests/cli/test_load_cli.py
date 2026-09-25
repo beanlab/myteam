@@ -35,6 +35,28 @@ def test_load_markdown_skill_renders_document_relative_jinja_helpers(run_myteam,
     assert result.stderr == ""
 
 
+def test_load_markdown_skill_exposes_current_file_to_jinja(run_myteam, tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    parts = docs / "parts"
+    parts.mkdir(parents=True)
+    (docs / "adjacent.txt").write_text("adjacent", encoding="utf-8")
+    (parts / "included.txt").write_text("{{ this_file.name }}", encoding="utf-8")
+    skill = docs / "skill.md"
+    skill.write_text(
+        "---\ntype: skill\ndescription: demo\n---\n"
+        "{{ this_file.is_absolute() }}|{{ this_file.name }}|"
+        "{{ read_file(this_file.with_name('adjacent.txt'), render=False) }}|"
+        "{{ read_file('parts/included.txt') }}",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "load", "docs/skill.md")
+
+    assert result.exit_code == 0
+    assert result.stdout == "True|skill.md|adjacent|included.txt"
+    assert result.stderr == ""
+
+
 def test_load_markdown_skill_uses_configured_jinja_functions(
     run_myteam, tmp_path: Path, isolated_home: Path
 ) -> None:
@@ -62,14 +84,17 @@ def test_load_markdown_skill_uses_configured_jinja_functions(
         "def shared():\n"
         "    return 'project shared'\n"
         "def shell():\n"
-        "    return 'custom shell'\n",
+        "    return 'custom shell'\n"
+        "def replacement_file():\n"
+        "    return 'custom file'\n",
         encoding="utf-8",
     )
     (tmp_path / ".myteam.yaml").write_text(
         "jinja_functions:\n"
         "  contextual: helpers/jinja.py::contextual\n"
         "  shared: helpers/jinja.py::shared\n"
-        "  shell: helpers/jinja.py::shell\n",
+        "  shell: helpers/jinja.py::shell\n"
+        "  this_file: helpers/jinja.py::replacement_file\n",
         encoding="utf-8",
     )
     docs = tmp_path / "docs"
@@ -79,14 +104,15 @@ def test_load_markdown_skill_uses_configured_jinja_functions(
     )
     (docs / "skill.md").write_text(
         "---\ntype: skill\ndescription: demo\n---\n"
-        "{{ source() }}|{{ shared() }}|{{ shell() }}|{{ read_file('fragment.txt') }}",
+        "{{ source() }}|{{ shared() }}|{{ shell() }}|{{ this_file() }}|"
+        "{{ read_file('fragment.txt') }}",
         encoding="utf-8",
     )
 
     result = run_myteam(tmp_path, "load", "docs/skill.md")
 
     assert result.exit_code == 0
-    assert result.stdout == "home|project shared|custom shell|included: home"
+    assert result.stdout == "home|project shared|custom shell|custom file|included: home"
     assert result.stderr == ""
     assert (helpers / "imports.txt").read_text(encoding="utf-8") == "x"
 

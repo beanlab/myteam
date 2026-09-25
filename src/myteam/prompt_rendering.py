@@ -59,20 +59,23 @@ def _build_environment(
 ) -> Environment:
     environment = Environment(undefined=StrictUndefined)
     base_dir = _resolve_base_dir(source_path)
-    environment.globals.update(
-        myteam_explain=explain_resources,
-        myteam_onboard=onboard,
-        myteam_list=_make_list_helper(base_dir),
-        myteam_load=_make_load_helper(base_dir),
-        increase_headers=increase_headers,
-        read_file=_make_read_file_helper(
+    builtins: dict[str, Any] = {
+        "myteam_explain": explain_resources,
+        "myteam_onboard": onboard,
+        "myteam_list": _make_list_helper(base_dir),
+        "myteam_load": _make_load_helper(base_dir),
+        "increase_headers": increase_headers,
+        "read_file": _make_read_file_helper(
             base_dir,
             input_values=input_values,
             include_stack=include_stack,
             jinja_functions=jinja_functions,
         ),
-        shell=_make_shell_helper(base_dir),
-    )
+        "shell": _make_shell_helper(base_dir),
+    }
+    if source_path is not None:
+        builtins["this_file"] = Path(source_path).resolve()
+    environment.globals.update(builtins)
     environment.globals.update(jinja_functions)
     environment.filters["increase_headers"] = increase_headers
     return environment

@@ -232,7 +232,10 @@ def test_start_markdown_workflow_reports_agent_output_as_json_text(run_myteam, t
 
         prompt = sys.argv[1]
         Path('native-session.txt').write_text('native-session', encoding='utf-8')
-        report_result({'summary': 'ok', 'saw_rendered_prompt': 'Review release.' in prompt})
+        report_result({
+            'summary': 'ok',
+            'saw_rendered_prompt': 'Review release from input value.' in prompt,
+        })
         assert sys.stdin.readline() == 'exit\\n'
         """,
     )
@@ -244,14 +247,21 @@ def test_start_markdown_workflow_reports_agent_output_as_json_text(run_myteam, t
         "agent: fake-agent\n"
         "input:\n"
         "  topic: topic to review\n"
+        "  this_file: demonstrates that input values may shadow the Jinja global\n"
         "output:\n"
         "  summary: short summary\n"
         "---\n"
-        "Review {{ topic }}.\n",
+        "Review {{ topic }} from {{ this_file }}.\n",
         encoding="utf-8",
     )
 
-    result = run_myteam(tmp_path, "start", "review.md", "--input", '{"topic": "release"}')
+    result = run_myteam(
+        tmp_path,
+        "start",
+        "review.md",
+        "--input",
+        '{"topic": "release", "this_file": "input value"}',
+    )
 
     assert result.exit_code == 0
     assert result.stdout == '{"summary": "ok", "saw_rendered_prompt": true}\n'
