@@ -42,12 +42,13 @@ def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Pat
     ...
 
 def build_argv(
-        prompt_text: str,
+        prompt_text: str | None,
         interactive: bool = True,
         session_id: str | None = None,
         fork: bool = False,
         extra_args: tuple[str, ...] | None = None,
         session_name: str | None = None,
+        system_prompt: str | None = None,
 ) -> list[str]:
     ...
 ```
@@ -64,13 +65,21 @@ may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
 
 `EXEC` is the command name used to launch the agent CLI. It must be a string.
 
-### `build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None, session_name=None)`
+### `build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None, session_name=None, system_prompt=None)`
 
-`build_argv` returns the argv list used to start the agent process. Parameters
-are opt-in: the runtime passes only keyword names declared by the adapter, so
-existing adapters may omit `session_name`. Adapters that declare it receive the
-explicit or configured name, including an empty string, or `None` when no name
-was supplied.
+`build_argv` returns the argv list used to start the agent process. Optional
+parameters are opt-in: the runtime passes only keyword names declared by the
+adapter, so existing adapters may omit `session_name`. Adapters that declare
+`session_name` receive the explicit or configured name, including an empty
+string, or `None` when no name was supplied.
+
+Adapters must accept `system_prompt` and use non-`None` content rather than
+ignoring it. The effective system prompt contains caller-supplied system content
+followed by `myteam`'s framework instructions. The adapter should preserve the
+distinction between system instructions and user input when the agent supports
+it. Otherwise, it may concatenate `system_prompt` with `prompt_text` and pass
+the combined content as user input. `prompt_text` is `None` when no initial user
+input was supplied.
 
 Use `session_id` to resume an existing session. Set `fork=True` to fork that
 session into a new one. `extra_args` contains optional workflow-authored argv
@@ -81,21 +90,25 @@ syntax:
 
 ```python
 def build_argv(
-    prompt_text: str,
+    prompt_text: str | None,
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
     extra_args: tuple[str, ...] | None = None,
     session_name: str | None = None,
+    system_prompt: str | None = None,
 ) -> list[str]:
     extras = extra_args or []
+    if system_prompt is not None:
+        extras = ["-c", f"developer-instructions={system_prompt}", *extras]
+    prompt_args = [] if prompt_text is None else [prompt_text]
     if session_id is not None and fork:
-        return ["codex", "fork", session_id, *extras, prompt_text]
+        return ["codex", "fork", session_id, *extras, *prompt_args]
     if session_id is not None:
-        return ["codex", "resume", session_id, *extras, prompt_text]
+        return ["codex", "resume", session_id, *extras, *prompt_args]
     if not interactive:
-        return ["codex", "exec", *extras, prompt_text]
-    return ["codex", *extras, prompt_text]
+        return ["codex", "exec", *extras, *prompt_args]
+    return ["codex", *extras, *prompt_args]
 ```
 
 ### `EXIT_COMMAND`
@@ -119,7 +132,7 @@ EXIT_SEQUENCE = b"exit\r"
 ### `get_session_info(nonce, context)`
 
 `get_session_info` returns the session id for a completed step and the 
-session filepath. `myteam` embeds a session nonce in the prompt, then calls
+session filepath. `myteam` embeds a session nonce in the system prompt, then calls
 this function after completion so Python workflows can resume or fork previous
 sessions.
 
@@ -169,12 +182,13 @@ from myteam.workflows.agents.codex import build_argv as build_codex_argv
 
 
 def build_argv(
-    prompt_text: str,
+    prompt_text: str | None,
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
     extra_args: tuple[str, ...] | None = None,
     session_name: str | None = None,
+    system_prompt: str | None = None,
 ) -> list[str]:
     argv = build_codex_argv(
         prompt_text,
@@ -183,6 +197,7 @@ def build_argv(
         fork,
         extra_args=extra_args,
         session_name=session_name,
+        system_prompt=system_prompt,
     )
     argv[1:1] = ["--model", "gpt-5.4-mini"]
     return argv

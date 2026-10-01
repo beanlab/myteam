@@ -53,9 +53,9 @@ Markdown workflows accept a single JSON object through `--input`. Use their list
 myteam start <workflow-name> --input '{"field": "value"}'
 ```
 
-A Markdown invocation can override these agent settings: `--agent`, `--session-name`/`--session_name`, `--model`, `--reasoning`, `--interactive`, `--extra-args`/`--extra_args`, `--session-id`/`--session_id`, and `--fork`. Values use safe YAML syntax and may need shell quoting. Both `--option VALUE` and `--option=VALUE` work; repeated options use the last value.
+A Markdown invocation can override these agent settings: `--agent`, `--session-name`/`--session_name`, `--model`, `--reasoning`, `--interactive`, `--extra-args`/`--extra_args`, `--session-id`/`--session_id`, `--system-prompt`/`--system_prompt`, and `--fork`. Values use safe YAML syntax and may need shell quoting. Both `--option VALUE` and `--option=VALUE` work; repeated options use the last value.
 
-Settings resolve from workflow frontmatter, then supplied CLI values, then effective home/project defaults for missing or YAML `null` values. A still-missing session name falls back to the workflow path. Effective values must have the expected types; `--fork true` requires an effective `session_id`. Unknown or positional trailing arguments are errors. For example:
+Agent settings resolve from the last CLI value, then frontmatter, then effective home/project defaults for missing or YAML `null` values. A still-missing session name falls back to the workflow path. Effective values must have the expected types; `--fork true` requires an effective `session_id`. Unknown or positional trailing arguments are errors. For example:
 ```
 myteam start review.md --input '{"topic": "release"}' --model gpt-5 --interactive false --extra-args '[--flag, value]'
 ```

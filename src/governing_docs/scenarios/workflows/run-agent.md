@@ -16,7 +16,8 @@ class SessionResult:
     
 def run_agent(
         *,
-        prompt: str | Path,
+        prompt: str | Path | None = None,
+        system_prompt: str | Path | None = None,
         input: dict[str, Any] = None,
         output: dict[Any, Any] | None = None,
         agent: str | None = None,
@@ -28,12 +29,14 @@ def run_agent(
         session_id: str | None = None,
         fork: bool | None = None,
         prompt_source_path: Path | None = None,
+        system_prompt_source_path: Path | None = None,
     ) -> SessionResult:
 ```
 
 ### Arguments
 
-- `prompt`: the instructions passed to the agent session. A `str` is always treated as prompt content. A `Path` is read as UTF-8 prompt content and automatically used as `prompt_source_path`.
+- `prompt`: optional user instructions passed to the agent session. A `str` is always treated as prompt content. A `Path` is read as UTF-8 prompt content and automatically used as `prompt_source_path`.
+- `system_prompt`: optional system or developer instructions for the agent session. A `str` is always treated as prompt content. A `Path` is read as UTF-8 prompt content and automatically used as `system_prompt_source_path`.
 - `input`: the input to the session
 - `output`: a YAML-presented mapping describing the required output content and format; YAML-native key and value types are preserved in the schema shown to the agent
 - `agent`: the name of the agent executable to use (e.g. `codex` or `claude`)
@@ -43,19 +46,28 @@ def run_agent(
 - `interactive`: controls whether the agent session supports human interaction or runs in headless mode
 - `extra_args`: additional command-line arguments to be passed to the agent session; this gives developers additional control over session customization
 - `session_id`: indicates the prior agent session to resume; this value is whatever session ID the agent uses and can be obtained from a prior `SessionResult`
-- `fork`: determines whether the specified session is forked or resumed. When `False`, the session is resumed in place; when `True`, it is forked and a new session is created from the history of the specified session. Fork is examined only if `session_id` is provided. 
+- `fork`: determines whether the specified session is forked or resumed. When `False`, the session is resumed in place; when `True`, it is forked and a new session is created from the history of the specified session. Fork is examined only if `session_id` is provided.
+- `prompt_source_path`: optional source document for string user-prompt content
+- `system_prompt_source_path`: optional source document for string system-prompt content
 
 The session name resolves from the explicit `session_name`, then the effective home/project `.myteam.yaml` defaults, then `New session`. Explicit and configured names are also forwarded to adapters that support native session naming. This includes an explicit or configured empty string. The implicit `New session` fallback is display-only and is not forwarded to the agent CLI. Non-string values are converted to text, and carriage returns or line feeds are rejected.
 
-Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. A `Path` prompt automatically supplies its own source path. For string prompt content, if `prompt_source_path` is provided, source-relative helpers use that document; otherwise they use the process's current working directory. See [Jinja2 Template Rendering](../jinja-support.md) for the available helpers and their execution and precedence rules.
+Before running the agent session, the optional user and system prompts are rendered independently using `jinja2` with `**input` as inputs—i.e. the keys of the input object are available as variables in both templates. A `Path` prompt supplies its own source path, overriding the corresponding explicit source-path argument. For string prompt content, `prompt_source_path` and `system_prompt_source_path` identify the respective source documents. Supplying a source path without its corresponding prompt raises `ValueError`. Without a source path, source-relative helpers use the process's current working directory and `this_file` is undefined. See [Jinja2 Template Rendering](../jinja-support.md) for the available helpers and their execution and precedence rules.
 
 In effect (pseudocode):
 
 ```
-session_prompt = jinja.render(prompt, **input)
+session_prompt = jinja.render(prompt, **input) if prompt is not None else None
+session_system_prompt = (
+    jinja.render(system_prompt, **input) if system_prompt is not None else None
+)
 ```
 
-Certainly, the workflow author may choose to prepare the prompt as static text and not pass in `input`, in which case the prompt text is used as-is.
+`myteam` appends its framework instructions, described below, to the rendered system prompt after caller-supplied content. The effective system prompt and rendered user prompt are passed separately to the agent adapter and must not be ignored. When an agent does not distinguish system instructions from user instructions, its adapter may concatenate the system and user prompts and pass the combined content as user input.
+
+Static prompt content does not require `input`; `input` is used in rendering Jinja templates.
+
+When the agent supports a distinction between system instructions and user input, `system_prompt` configures the session without starting an agent turn, while `prompt` supplies user input and starts a turn. To start a session awaiting user input, omit `prompt`. A system-only prompt in a non-interactive session may produce undefined agent-specific behavior.
 
 ### Session Result
 
@@ -123,13 +135,13 @@ Only the active child session receives terminal input and produces visible termi
 
 ## Session Nonce
 
-When a session starts, `myteam` augments the prompt with a session identifier. This unique token is used to identify the conversation on disk so usage information and the agent-native session ID can be identified reliably.
+When a session starts, `myteam` appends a session identifier to the effective system prompt. This unique token is used to identify the conversation on disk so usage information and the agent-native session ID can be identified reliably.
 
 The nonce plumbing is required for resumed/forked sessions, usage lookup, and reliable association between a managed `myteam` session and the underlying agent runtime's session data.
 
 ## Reporting Agent Session Results
 
-When an agent session starts, `myteam` augments the provided prompt with brief instructions detailing:
+When an output schema is provided, `myteam` appends brief result-reporting instructions to the effective system prompt, after caller-supplied system-prompt content. These instructions detail:
 
 - the expected output format, presenting the provided mapping as an advisory YAML schema without coercing YAML-native keys or values;
 - how to report the result using `myteam result`.

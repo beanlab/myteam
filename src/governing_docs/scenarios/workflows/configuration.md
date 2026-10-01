@@ -22,7 +22,7 @@ class AgentSessionContext:
 class AgentConfig(Protocol):
     def build_argv(
             self,
-            prompt_text: str,
+            prompt_text: str | None,
             model: str | None,
             reasoning: str | None,
             interactive: bool,
@@ -30,6 +30,7 @@ class AgentConfig(Protocol):
             fork: bool,
             extra_args: tuple[str, ...] | None,
             session_name: str | None = None,
+            system_prompt: str | None = None,
     ) -> list[str]:
         """Returns the Popen-style args to launch the agent session"""
 
@@ -55,7 +56,11 @@ class AgentConfig(Protocol):
 
 If the agent config module cannot be loaded, an error is raised.
 
-Adapter parameters are opt-in: `myteam` passes only the supported keyword names declared by `build_argv`, so existing adapters do not need to declare `session_name`. An adapter that declares `session_name: str | None = None` receives the explicit or configured name, or `None` when neither exists.
+Optional adapter parameters are opt-in: `myteam` passes only supported keyword names declared by `build_argv`, so existing adapters do not need to declare `session_name`. An adapter that declares `session_name: str | None = None` receives the explicit or configured name, or `None` when neither exists.
+
+Adapters must accept `system_prompt: str | None = None` and use non-`None` content rather than ignoring it. The adapter receives the rendered user prompt separately from the effective system prompt, which contains caller-supplied system content followed by `myteam`'s framework instructions. If the agent distinguishes system instructions from user input, the adapter should preserve that distinction. Otherwise, it may concatenate `system_prompt` with `prompt_text` and pass the combined text as user input. `prompt_text` is `None` when the session should start without user input.
+
+The built-in Pi and Claude adapters pass system-prompt content with `--append-system-prompt`. The built-in Codex adapter passes it with the `developer-instructions` configuration override.
 
 If a given agent runtime does not support all of the provided arguments (e.g. it cannot fork an agent session), then an error should be raised from `build_argv` when unsupported arguments are supplied. 
 
