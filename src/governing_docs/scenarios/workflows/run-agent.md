@@ -16,7 +16,7 @@ class SessionResult:
     
 def run_agent(
         *,
-        prompt: str,
+        prompt: str | Path,
         input: dict[str, Any] = None,
         output: dict[Any, Any] | None = None,
         agent: str | None = None,
@@ -27,13 +27,13 @@ def run_agent(
         interactive: bool | None = None,
         session_id: str | None = None,
         fork: bool | None = None,
-        prompt_source_path: Path | str | None = None,
+        prompt_source_path: Path | None = None,
     ) -> SessionResult:
 ```
 
 ### Arguments
 
-- `prompt`: the instructions passed to the agent session
+- `prompt`: the instructions passed to the agent session. A `str` is always treated as prompt content. A `Path` is read as UTF-8 prompt content and automatically used as `prompt_source_path`.
 - `input`: the input to the session
 - `output`: a YAML-presented mapping describing the required output content and format; YAML-native key and value types are preserved in the schema shown to the agent
 - `agent`: the name of the agent executable to use (e.g. `codex` or `claude`)
@@ -47,7 +47,7 @@ def run_agent(
 
 The session name resolves from the explicit `session_name`, then the effective home/project `.myteam.yaml` defaults, then `New session`. Explicit and configured names are also forwarded to adapters that support native session naming. This includes an explicit or configured empty string. The implicit `New session` fallback is display-only and is not forwarded to the agent CLI. Non-string values are converted to text, and carriage returns or line feeds are rejected.
 
-Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. If `prompt_source_path` is provided, source-relative helpers use that document; otherwise they use the process's current working directory. See [Jinja2 Template Rendering](../jinja-support.md) for the available helpers and their execution and precedence rules.
+Before running the agent session, the prompt is rendered using `jinja2` with `**input` as inputs—i.e. the keys of the input object will all be available as variables in the jinja template. A `Path` prompt automatically supplies its own source path. For string prompt content, if `prompt_source_path` is provided, source-relative helpers use that document; otherwise they use the process's current working directory. See [Jinja2 Template Rendering](../jinja-support.md) for the available helpers and their execution and precedence rules.
 
 In effect (pseudocode):
 

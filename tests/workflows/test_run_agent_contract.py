@@ -265,6 +265,39 @@ def test_run_agent_does_not_forward_implicit_display_name(tmp_path: Path, monkey
     assert read_observed_settings(tmp_path)["session_name"] is None
 
 
+def test_run_agent_reads_path_prompt_and_uses_it_as_source(
+    tmp_path: Path, monkeypatch
+) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "fragment.txt").write_text("# Relative fragment", encoding="utf-8")
+    prompt_path = docs / "prompt.md"
+    prompt_path.write_text(
+        "From {{ this_file.name }} read {{ read_file('fragment.txt') | increase_headers }}",
+        encoding="utf-8",
+    )
+
+    result = run_agent(prompt=prompt_path)
+
+    assert result.output is not None
+    assert "From prompt.md read ## Relative fragment" in result.output["prompt"]
+
+
+def test_run_agent_treats_string_path_as_prompt_content(tmp_path: Path, monkeypatch) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "prompt.md").write_text("File content", encoding="utf-8")
+
+    result = run_agent(prompt="prompt.md")
+
+    assert result.output is not None
+    assert "prompt.md" in result.output["prompt"]
+    assert "File content" not in result.output["prompt"]
+
+
 def test_run_agent_renders_prompt_relative_to_source_path(tmp_path: Path, monkeypatch) -> None:
     write_recording_agent_project(tmp_path)
     monkeypatch.chdir(tmp_path)

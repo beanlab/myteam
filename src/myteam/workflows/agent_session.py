@@ -61,7 +61,7 @@ _RESET = "\x1b[0m"
 
 def run_agent(
     *,
-    prompt: str,
+    prompt: str | Path,
     input: dict[str, Any] | None = None,
     output: dict[Any, Any] | None = None,
     agent: str | None = None,
@@ -72,7 +72,7 @@ def run_agent(
     interactive: bool | None = None,
     session_id: str | None = None,
     fork: bool | None = None,
-    prompt_source_path: Path | str | None = None,
+    prompt_source_path: Path | None = None,
 ) -> SessionResult:
     cwd = Path.cwd().resolve()
     config = load_myteam_config(cwd)
@@ -96,6 +96,9 @@ def run_agent(
         effective_extra_args = tuple(str(item) for item in effective_extra_args)
 
     session_nonce = secrets.token_urlsafe(16)
+    if isinstance(prompt, Path):
+        prompt_source_path = prompt
+        prompt = prompt.read_text(encoding="utf-8")
     rendered_prompt = render_prompt_text(prompt, input or {}, source_path=prompt_source_path)
     agent_prompt = build_agent_prompt(
         rendered_prompt,
