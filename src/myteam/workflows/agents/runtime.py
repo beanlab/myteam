@@ -34,12 +34,13 @@ class AgentRuntimeConfig:
     get_session_info: Callable[[str], tuple[str, Path]]
     build_argv: Callable[
         [
-            str,
+            str | None,
             bool,
             str | None,
             bool,
             str | None,
             tuple[str, ...] | None,
+            str | None,
             str | None,
             str | None,
         ],
@@ -298,12 +299,13 @@ def _require_positional_parameter_count(
 
 def _build_argv_callable(config_object: Any) -> Callable[
     [
-        str,
+        str | None,
         bool,
         str | None,
         bool,
         str | None,
         tuple[str, ...] | None,
+        str | None,
         str | None,
         str | None,
     ],
@@ -316,9 +318,20 @@ def _build_argv_callable(config_object: Any) -> Callable[
     build_argv = getattr(config_object, "build_argv")
     if not callable(build_argv):
         raise AgentConfigError("build_argv must be callable")
+    try:
+        signature = inspect.signature(build_argv)
+    except (TypeError, ValueError) as exc:
+        raise AgentConfigError("build_argv signature could not be inspected") from exc
+    accepts_arbitrary_keywords = any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+    accepts_system_prompt = "system_prompt" in signature.parameters or accepts_arbitrary_keywords
+    if not accepts_system_prompt:
+        raise AgentConfigError("build_argv must accept system_prompt")
 
     def wrapper(
-        prompt_text: str,
+        prompt_text: str | None,
         interactive: bool = True,
         session_id: str | None = None,
         fork: bool = False,
@@ -326,6 +339,7 @@ def _build_argv_callable(config_object: Any) -> Callable[
         extra_args: tuple[str, ...] | None = None,
         reasoning: str | None = None,
         session_name: str | None = None,
+        system_prompt: str | None = None,
     ) -> list[str]:
         kwargs = {
             "prompt_text": prompt_text,
@@ -336,20 +350,14 @@ def _build_argv_callable(config_object: Any) -> Callable[
             "extra_args": extra_args,
             "reasoning": reasoning,
             "session_name": session_name,
+            "system_prompt": system_prompt,
         }
-        try:
-            signature = inspect.signature(build_argv)
-        except (TypeError, ValueError):
-            return build_argv(prompt_text, interactive, session_id, fork, model, extra_args)
-        accepted = {
+        accepted = kwargs if accepts_arbitrary_keywords else {
             key: value
             for key, value in kwargs.items()
             if key in signature.parameters
         }
-        try:
-            return build_argv(**accepted)
-        except TypeError:
-            return build_argv(prompt_text, interactive, session_id, fork, model, extra_args)
+        return build_argv(**accepted)
 
     return wrapper
 

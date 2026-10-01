@@ -336,6 +336,7 @@ def test_list_omits_unspecified_and_blank_python_usage(run_myteam, tmp_path: Pat
         ("workflow.py", "usage: 42", "usage", "int", "string"),
         ("workflow.md", "input: []", "input", "list", "mapping"),
         ("workflow.md", "output: false", "output", "bool", "mapping"),
+        ("workflow.md", "system_prompt: 'yes'", "system_prompt", "str", "boolean"),
     ],
 )
 def test_list_rejects_invalid_workflow_metadata_without_partial_stdout(

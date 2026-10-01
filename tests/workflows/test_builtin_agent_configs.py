@@ -135,6 +135,42 @@ def test_claude_build_argv_supports_session_modes_and_settings() -> None:
     ]
 
 
+def test_builtin_agents_forward_system_prompt_separately_and_allow_no_user_prompt() -> None:
+    assert build_pi_argv("user", system_prompt="system") == [
+        "pi",
+        "--append-system-prompt",
+        "system",
+        "user",
+    ]
+    assert build_pi_argv(None, system_prompt="system") == [
+        "pi",
+        "--append-system-prompt",
+        "system",
+    ]
+    assert build_claude_argv("user", system_prompt="system") == [
+        "claude",
+        "--append-system-prompt",
+        "system",
+        "user",
+    ]
+    assert build_claude_argv(None, system_prompt="system") == [
+        "claude",
+        "--append-system-prompt",
+        "system",
+    ]
+    assert build_codex_argv("user", system_prompt="system") == [
+        "codex",
+        "-c",
+        "developer-instructions=system",
+        "user",
+    ]
+    assert build_codex_argv(None, system_prompt="system") == [
+        "codex",
+        "-c",
+        "developer-instructions=system",
+    ]
+
+
 def test_pi_build_argv_forwards_session_name_in_every_launch_mode() -> None:
     assert build_pi_argv("prompt", session_name="new") == ["pi", "--name", "new", "prompt"]
     assert build_pi_argv("prompt", interactive=False, session_name="headless") == [

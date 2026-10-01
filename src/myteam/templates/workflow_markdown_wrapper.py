@@ -22,13 +22,14 @@ Markdown workflow options (values use YAML syntax):
   --interactive VALUE
   --extra-args VALUE, --extra_args VALUE
   --session-id VALUE, --session_id VALUE
+  --system-prompt VALUE, --system_prompt VALUE
   --fork VALUE
   --help
 
 Options accept both `--option VALUE` and `--option=VALUE`. Quote YAML values as
 needed for your shell; booleans, lists, and null retain their YAML types.
-Repeated options use the last value. Settings resolve from frontmatter, then CLI
-overrides, then effective home/project defaults for null or missing values. A
+Repeated options use the last value. Settings resolve from the last CLI value,
+then frontmatter, then effective home/project defaults for null or missing values. A
 missing session name finally falls back to the workflow path. `fork: true`
 requires an effective session ID. `--input` supplies the workflow's JSON object.
 """
@@ -44,6 +45,8 @@ _OPTION_FIELDS = {
     "--extra_args": "extra_args",
     "--session-id": "session_id",
     "--session_id": "session_id",
+    "--system-prompt": "system_prompt",
+    "--system_prompt": "system_prompt",
     "--fork": "fork",
 }
 
@@ -74,10 +77,15 @@ def main(
         raise SystemExit(1) from None
 
     output_schema = frontmatter.get("output")
+    use_system_prompt = settings.pop("system_prompt", False)
+    prompt_arguments = (
+        {"system_prompt": content, "system_prompt_source_path": markdown_file}
+        if use_system_prompt
+        else {"prompt": content, "prompt_source_path": markdown_file}
+    )
     result = run_agent(
-        prompt=content,
+        **prompt_arguments,
         input=input_values,
-        prompt_source_path=markdown_file,
         output=output_schema if isinstance(output_schema, dict) else None,
         **settings,
     )

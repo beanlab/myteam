@@ -89,6 +89,7 @@ def test_load_myteam_config_uses_global_file(
         "reasoning": "medium",
         "interactive": False,
         "session_id": "home-session-id",
+        "system_prompt": None,
         "fork": True,
         "extra_args": ("--home",),
         "usage_logging": "summary",
@@ -200,13 +201,35 @@ def test_same_physical_global_and_project_file_is_parsed_once(
     assert safe_load_calls == 1
 
 
+def test_agent_adapter_must_accept_system_prompt(tmp_path: Path) -> None:
+    (tmp_path / "agent.py").write_text(
+        "def build_argv(prompt_text): return ['agent', prompt_text]\n"
+        "EXIT_COMMAND = '/quit'\n"
+        "def get_session_info(nonce, context): return nonce, context.launch_cwd / 'session'\n",
+        encoding="utf-8",
+    )
+    write_config(tmp_path, "agents:\n  custom: agent.py\n")
+
+    with pytest.raises(KeyError, match="system_prompt"):
+        resolve_agent_runtime_config(
+            "custom",
+            project_root=tmp_path,
+            session_context=AgentSessionContext(
+                home=tmp_path,
+                project_root=tmp_path,
+                launch_cwd=tmp_path,
+            ),
+        )
+
+
 def test_custom_agent_can_override_builtin_name_from_myteam_yaml(tmp_path: Path) -> None:
     (tmp_path / "agents").mkdir()
     (tmp_path / "agents" / "codex.py").write_text(
         "class CustomCodexConfig:\n"
         "    EXEC = 'custom-codex'\n"
-        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "        return ['custom-codex', prompt_text]\n"
+        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None, system_prompt=None):\n"
+        "        combined_prompt = '\\n\\n'.join(part for part in (system_prompt, prompt_text) if part is not None)\n"
+        "        return ['custom-codex', combined_prompt]\n"
         "    def get_exit_sequence(self):\n"
         "        return b'/quit\\r'\n"
         "    def locate_session_data(self, nonce, context):\n"

@@ -14,11 +14,12 @@ from myteam import run_agent
 
 def write_recording_agent_project(tmp_path: Path) -> None:
     (tmp_path / "fake_agent.py").write_text(
+        "import json\n"
         "import sys\n"
         "from pathlib import Path\n"
         "from myteam.workflows.results import report_result\n"
         "Path('native-session.txt').write_text('native-session-from-fake', encoding='utf-8')\n"
-        "report_result({'prompt': sys.argv[1]})\n"
+        "report_result({'prompt': json.loads(sys.argv[1]), 'system_prompt': json.loads(sys.argv[2])})\n"
         "assert sys.stdin.readline() == 'exit\\n'\n",
         encoding="utf-8",
     )
@@ -40,6 +41,7 @@ def write_recording_agent_project(tmp_path: Path) -> None:
                     fork=False,
                     extra_args=None,
                     session_name=None,
+                    system_prompt=None,
                 ):
                     Path('observed-agent-settings.json').write_text(
                         json.dumps(
@@ -56,7 +58,12 @@ def write_recording_agent_project(tmp_path: Path) -> None:
                         ),
                         encoding='utf-8',
                     )
-                    return [sys.executable, 'fake_agent.py', prompt_text]
+                    return [
+                        sys.executable,
+                        'fake_agent.py',
+                        json.dumps(prompt_text),
+                        json.dumps(system_prompt),
+                    ]
 
                 def get_exit_sequence(self):
                     return b'exit\\n'
@@ -352,11 +359,12 @@ def test_run_agent_preserves_yaml_native_output_schema_content(
     )
 
     assert result.output is not None
-    prompt = result.output["prompt"]
-    assert "\n1: numeric result field" in prompt
-    assert "completed_at: 2025-01-02" in prompt
-    assert "```yaml" in prompt
-    assert "valid JSON" in prompt
+    system_prompt = result.output["system_prompt"]
+    assert result.output["prompt"] == "Produce the answer."
+    assert "\n1: numeric result field" in system_prompt
+    assert "completed_at: 2025-01-02" in system_prompt
+    assert "```yaml" in system_prompt
+    assert "valid JSON" in system_prompt
 
 
 def test_run_agent_supplies_output_schema_content_to_agent_prompt_without_locking_wording(
@@ -372,7 +380,82 @@ def test_run_agent_supplies_output_schema_content_to_agent_prompt_without_lockin
     )
 
     assert result.output is not None
-    prompt = result.output["prompt"]
-    assert "Produce the answer." in prompt
-    assert "answer" in prompt
-    assert "short answer" in prompt
+    assert result.output["prompt"] == "Produce the answer."
+    system_prompt = result.output["system_prompt"]
+    assert "Produce the answer." not in system_prompt
+    assert "answer" in system_prompt
+    assert "short answer" in system_prompt
+
+
+def test_run_agent_renders_user_and_system_prompts_independently(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    user_dir = tmp_path / "user"
+    system_dir = tmp_path / "system"
+    user_dir.mkdir()
+    system_dir.mkdir()
+    (user_dir / "fragment.txt").write_text("user fragment", encoding="utf-8")
+    (system_dir / "fragment.txt").write_text("system fragment", encoding="utf-8")
+
+    result = run_agent(
+        prompt="User {{ name }} from {{ this_file.name }}: {{ read_file('fragment.txt') }}",
+        system_prompt="System {{ name }} from {{ this_file.name }}: {{ read_file('fragment.txt') }}",
+        input={"name": "Ada"},
+        prompt_source_path=user_dir / "user.md",
+        system_prompt_source_path=system_dir / "system.md",
+    )
+
+    assert result.output is not None
+    assert result.output["prompt"] == "User Ada from user.md: user fragment"
+    system_prompt = result.output["system_prompt"]
+    assert system_prompt.startswith("System Ada from system.md: system fragment\n\n")
+    assert "Session ID:" in system_prompt
+
+
+def test_path_prompts_override_explicit_source_paths(tmp_path: Path, monkeypatch) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    user_path = tmp_path / "actual-user.md"
+    system_path = tmp_path / "actual-system.md"
+    user_path.write_text("User from {{ this_file.name }}", encoding="utf-8")
+    system_path.write_text("System from {{ this_file.name }}", encoding="utf-8")
+
+    result = run_agent(
+        prompt=user_path,
+        system_prompt=system_path,
+        prompt_source_path=tmp_path / "ignored-user.md",
+        system_prompt_source_path=tmp_path / "ignored-system.md",
+    )
+
+    assert result.output is not None
+    assert result.output["prompt"] == "User from actual-user.md"
+    assert result.output["system_prompt"].startswith("System from actual-system.md\n\n")
+
+
+def test_run_agent_can_start_without_user_prompt(tmp_path: Path, monkeypatch) -> None:
+    write_recording_agent_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = run_agent(system_prompt="Configure the session.")
+
+    assert result.output is not None
+    assert result.output["prompt"] is None
+    assert result.output["system_prompt"].startswith("Configure the session.\n\n")
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        ({"prompt_source_path": Path("user.md")}, "prompt_source_path"),
+        ({"system_prompt_source_path": Path("system.md")}, "system_prompt_source_path"),
+    ],
+)
+def test_run_agent_rejects_source_path_without_corresponding_prompt(
+    arguments: dict[str, Path],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        run_agent(**arguments)

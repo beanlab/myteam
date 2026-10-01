@@ -144,8 +144,9 @@ def test_hyphenated_agent_name_can_resolve_from_myteam_yaml(tmp_path: Path) -> N
     agents_dir.mkdir()
     (agents_dir / "codex_mini.py").write_text(
         "class CodexMiniConfig:\n"
-        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "        return ['codex-mini', prompt_text]\n"
+        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None, system_prompt=None):\n"
+        "        combined_prompt = '\\n\\n'.join(part for part in (system_prompt, prompt_text) if part is not None)\n"
+        "        return ['codex-mini', combined_prompt]\n"
         "    def get_exit_sequence(self):\n"
         "        return b'/quit\\r'\n"
         "    def locate_session_data(self, nonce, context):\n"
@@ -182,8 +183,9 @@ def test_local_agent_config_errors_do_not_fall_back_to_packaged_config(tmp_path:
     agents_dir.mkdir()
     (agents_dir / "codex.py").write_text(
         "class CustomCodexConfig:\n"
-        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "        return ['custom-codex', prompt_text]\n"
+        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None, system_prompt=None):\n"
+        "        combined_prompt = '\\n\\n'.join(part for part in (system_prompt, prompt_text) if part is not None)\n"
+        "        return ['custom-codex', combined_prompt]\n"
         "    def get_exit_sequence(self):\n"
         "        return b'/quit\\r'\n"
         "    def locate_session_data(self, nonce, context):\n"

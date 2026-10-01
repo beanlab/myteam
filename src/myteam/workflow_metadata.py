@@ -15,6 +15,7 @@ class WorkflowMetadata:
     usage: str | None = None
     input_schema: dict[Any, Any] | None = None
     output_schema: dict[Any, Any] | None = None
+    system_prompt: bool | None = None
 
 
 class WorkflowMetadataError(ValueError):
@@ -48,10 +49,14 @@ def read_workflow_metadata(
     if suffix == ".md":
         input_schema = _mapping_field(file, metadata, "input")
         output_schema = _mapping_field(file, metadata, "output")
+        system_prompt = metadata.get("system_prompt")
+        if system_prompt is not None and not isinstance(system_prompt, bool):
+            _invalid(file, "system_prompt", system_prompt, "boolean")
         return WorkflowMetadata(
             format="markdown",
             input_schema=input_schema,
             output_schema=output_schema,
+            system_prompt=system_prompt,
         )
 
     return None
