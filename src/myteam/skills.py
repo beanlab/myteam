@@ -3,7 +3,10 @@ import sys
 from pathlib import Path
 
 from . import templates
-from .frontmatter import split_markdown_frontmatter
+from .frontmatter import (
+    determine_resource_format,
+    split_markdown_frontmatter,
+)
 from .prompt_rendering import render_markdown_body
 
 ENCODING = "utf-8"
@@ -37,11 +40,13 @@ def _load_skill(skill_file: Path) -> str:
         )
         raise SystemExit(1)
 
-    suffix = skill_file.suffix.lower()
-    if suffix == ".md":
-        return _load_markdown_skill(skill_file)
-    if suffix == ".py":
+    resource_format = determine_resource_format(skill_file.suffixes)
+
+    if resource_format == ".py":
         return _load_python_skill(skill_file)
+
+    if resource_format == ".md":
+        return _load_markdown_skill(skill_file)
 
     print(f"Skill '{skill_file}' has unsupported extension '{skill_file.suffix}'.", file=sys.stderr)
     raise SystemExit(1)
@@ -101,16 +106,12 @@ def new_skill(skill_name: str, parents: bool = False) -> None:
         print("File", skill_path.absolute() / "description.md", "created")
         return
 
-    suffix = skill_path.suffix.lower()
-    if suffix == ".md":
-        if skill_path.exists():
-            _skill_exists_error(skill_path)
+    resource_format = determine_resource_format(skill_path.suffixes)
+    if resource_format is None:
+        print(f"Skill '{skill_name}' has unsupported extension '{skill_path.suffix}'.", file=sys.stderr)
+        raise SystemExit(1)
 
-        _ensure_parent_directories(skill_path.parent, parents=parents)
-        skill_path.write_text(templates.get_template("new_skill.md"), encoding=ENCODING)
-        print("File", skill_path.absolute(), "created")
-        return
-    if suffix == ".py":
+    if resource_format == ".py":
         if skill_path.exists():
             _skill_exists_error(skill_path)
 
@@ -119,5 +120,11 @@ def new_skill(skill_name: str, parents: bool = False) -> None:
         print("File", skill_path.absolute(), "created")
         return
 
-    print(f"Skill '{skill_name}' has unsupported extension '{skill_path.suffix}'.", file=sys.stderr)
-    raise SystemExit(1)
+    if resource_format == ".md":
+        if skill_path.exists():
+            _skill_exists_error(skill_path)
+
+        _ensure_parent_directories(skill_path.parent, parents=parents)
+        skill_path.write_text(templates.get_template("new_skill.md"), encoding=ENCODING)
+        print("File", skill_path.absolute(), "created")
+        return

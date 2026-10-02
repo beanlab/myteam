@@ -4,7 +4,11 @@ import dataclasses
 from pathlib import Path
 from typing import Any, Literal
 
-from .frontmatter import parse_python_frontmatter, split_markdown_frontmatter
+from .frontmatter import (
+    determine_resource_format,
+    parse_python_frontmatter,
+    split_markdown_frontmatter,
+)
 
 WorkflowFormat = Literal["python", "markdown"]
 
@@ -24,29 +28,34 @@ class WorkflowMetadataError(ValueError):
 
 def read_resource_frontmatter(file: Path) -> dict[str, Any]:
     text = file.read_text(encoding="utf-8")
-    if file.suffix.lower() == ".py":
+    resource_format = determine_resource_format(file.suffixes)
+
+    if resource_format == ".py":
         return parse_python_frontmatter(text)
-    if file.suffix.lower() == ".md":
+
+    if resource_format == ".md":
         return split_markdown_frontmatter(text)[0]
+
     return {}
 
 
 def read_workflow_metadata(
-    file: Path, frontmatter: dict[str, Any] | None = None
+        file: Path, frontmatter: dict[str, Any] | None = None
 ) -> WorkflowMetadata | None:
     metadata = read_resource_frontmatter(file) if frontmatter is None else frontmatter
     resource_type = metadata.get("type")
     if not isinstance(resource_type, str) or resource_type.strip().lower() != "workflow":
         return None
 
-    suffix = file.suffix.lower()
-    if suffix == ".py":
+    resource_format = determine_resource_format(file.suffixes)
+
+    if resource_format == ".py":
         usage = metadata.get("usage")
         if usage is not None and not isinstance(usage, str):
             _invalid(file, "usage", usage, "string")
         return WorkflowMetadata(format="python", usage=usage)
 
-    if suffix == ".md":
+    if resource_format == ".md":
         input_schema = _mapping_field(file, metadata, "input")
         output_schema = _mapping_field(file, metadata, "output")
         system_prompt = metadata.get("system_prompt")
@@ -63,7 +72,7 @@ def read_workflow_metadata(
 
 
 def _mapping_field(
-    file: Path, metadata: dict[str, Any], field: str
+        file: Path, metadata: dict[str, Any], field: str
 ) -> dict[Any, Any] | None:
     value = metadata.get(field)
     if value is not None and not isinstance(value, dict):
