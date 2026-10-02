@@ -157,17 +157,17 @@ def _local_agent_config_path(
     agent_name: str,
     config: MyteamConfig | None,
 ) -> str | Path | None:
-    if config is not None:
-        target = config.agents.get(agent_name)
-        if target:
-            target_path, separator, class_name = target.partition("::")
-            path = Path(target_path)
-            if not path.is_absolute():
-                path = config._agent_origins[agent_name] / path
-            return f"{path}::{class_name}" if separator else path
+    if config is None:
+        return None
 
-    legacy_path = project_root / ".myteam" / ".config" / f"{agent_name}.py"
-    return legacy_path if legacy_path.exists() else None
+    target = config.agents.get(agent_name)
+    if not target:
+        return None
+    target_path, separator, class_name = target.partition("::")
+    path = Path(target_path)
+    if not path.is_absolute():
+        path = config._agent_origins[agent_name] / path
+    return f"{path}::{class_name}" if separator else path
 
 
 def _load_config_target(agent_name: str, target: str | Path) -> tuple[ModuleType, str | None]:

@@ -43,7 +43,7 @@ A non-zero exit aborts rendering with a diagnostic containing the command, exit 
 
 Document-relative path helpers support `~` home-directory expansion. Absolute paths remain absolute.
 
-Additional global functions can be registered with `.myteam.yaml` `jinja_functions`; see [Workflow Configuration](workflows/configuration.md) for the configuration syntax, merging, and path-resolution rules.
+Additional global functions can be registered with `.myteam/config.yaml` `jinja_functions`; see [Workflow Configuration](workflows/configuration.md) for the configuration syntax, merging, and path-resolution rules.
 
 Registered function modules load eagerly once per top-level rendering and are reused by rendered `read_file` includes. The selected attributes must be callable and are passed unchanged to Jinja, so decorators such as `pass_context` work normally.
 

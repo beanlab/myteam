@@ -17,18 +17,16 @@ and argv shaping in the adapter module itself.
 Agent configs are resolved by
 [`runtime.py`](runtime.py):
 
-1. An agent registered in the effective `~/.myteam.yaml` and project
-   `.myteam.yaml` configuration is used. Project registrations override global
-   registrations with the same name; a relative target is resolved relative to
-   the file that registered it.
-2. Otherwise, the legacy project-local override is used:
-   `.myteam/.config/<agent>.py`
-3. Otherwise it falls back on the packaged default:
+1. An agent registered in the effective `~/.myteam/config.yaml` and project
+   `.myteam/config.yaml` configuration is used. The deprecated `.myteam.yaml`
+   files are used only when the preferred file at that scope is absent and emit
+   a warning. Project registrations override global registrations with the same
+   name; a relative target is resolved relative to the file that registered it.
+2. Otherwise it falls back on the packaged default:
    `myteam.workflows.agents.<agent>`
 
 Configured agents let users reuse an agent CLI that is not shipped with
-`myteam`, or override a packaged agent. The legacy project-local location
-remains supported for existing projects.
+`myteam`, or override a packaged agent.
 
 ## Required Module Contract
 
@@ -142,7 +140,7 @@ See [codex.py](codex.py) or [pi.py](pi.py) for examples
 Let's say you want to create an agent alias that launches codex with specific
 command-line flags included. For example, create an agent named `codex_mini`
 that uses `--model gpt-5.4-mini`. Put this module at
-`agents/codex_mini.py`, then register it in the project `.myteam.yaml`:
+`agents/codex_mini.py`, then register it in the project `.myteam/config.yaml`:
 
 ```yaml
 agents:
