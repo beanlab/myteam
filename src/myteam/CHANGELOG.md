@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.3.18
+
+- `myteam` ships with built-in agent skills.
+- `myteam explain` presents a redesigned overview of `myteam` and lists the skill tree; agents should continue to start here. 
+- `myteam onboard` has been deprecated; use `myteam explain` instead.
+- Deprecated, stale migration support for legacy `load.py` files has been removed.
+
 ## 0.3.17
 
 - Restored the `myteam rosters` CLI commands for listing, downloading, and updating managed rosters.
