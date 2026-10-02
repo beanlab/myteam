@@ -38,27 +38,43 @@ def build_argv(
     session_id: str | None = None,
     fork: bool = False,
     model: str | None = None,
+    reasoning: str | None = None,
     extra_args: tuple[str, ...] | None = None,
     session_name: str | None = None,
     system_prompt: str | None = None,
 ) -> list[str]:
-    extras = list(extra_args or [])
+    argv = []
+    
+    # session_name is not supported by codex - 2026-10-02
+    
     if system_prompt is not None:
-        extras = ["-c", f"developer-instructions={system_prompt}", *extras]
+        argv += ["-c", f"developer-instructions={system_prompt}"]
+    
     if model is not None:
-        extras = ["--model", model, *extras]
+        argv += ["--model", model]
+    
+    if reasoning is not None:
+        argv += ["--reasoning", reasoning]
+        
     if not interactive and fork:
         raise ValueError("Codex non-interactive task steps do not support fork.")
+    
     prompt_args = [] if prompt_text is None else [prompt_text]
+    argv += (extra_args or [])
+    
     if not interactive and session_id is not None:
-        return [EXEC, "exec", "resume", session_id, *extras, *prompt_args]
+        return [EXEC, "exec", "resume", session_id, *argv, *prompt_args]
+    
     if session_id is not None and fork:
-        return [EXEC, "fork", session_id, *extras, *prompt_args]
+        return [EXEC, "fork", session_id, *argv, *prompt_args]
+    
     if session_id is not None:
-        return [EXEC, "resume", session_id, *extras, *prompt_args]
+        return [EXEC, "resume", session_id, *argv, *prompt_args]
+    
     if not interactive:
-        return [EXEC, "exec", *extras, *prompt_args]
-    return [EXEC, *extras, *prompt_args]
+        return [EXEC, "exec", *argv, *prompt_args]
+    
+    return [EXEC, *argv, *prompt_args]
 
 
 def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Path]:

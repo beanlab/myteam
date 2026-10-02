@@ -34,6 +34,7 @@ def write_fake_agent_project(tmp_path: Path, script: str) -> None:
                     session_id=None,
                     fork=False,
                     extra_args=None,
+                    session_name=None,
                     system_prompt=None,
                 ):
                     combined_prompt = '\\n\\n'.join(

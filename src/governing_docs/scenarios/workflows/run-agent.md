@@ -63,7 +63,7 @@ session_system_prompt = (
 )
 ```
 
-`myteam` appends its framework instructions, described below, to the rendered system prompt after caller-supplied content. The effective system prompt and rendered user prompt are passed separately to the agent adapter and must not be ignored. When an agent does not distinguish system instructions from user instructions, its adapter may concatenate the system and user prompts and pass the combined content as user input.
+`myteam` appends its framework instructions, described below, to the rendered system prompt after caller-supplied content. The effective system prompt and rendered user prompt are passed separately to the agent adapter. The adapter determines how to implement these values: it may preserve the distinction, concatenate them, reject an unsupported combination, or ignore either value.
 
 Static prompt content does not require `input`; `input` is used in rendering Jinja templates.
 

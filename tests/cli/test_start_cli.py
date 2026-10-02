@@ -21,6 +21,7 @@ def write_fake_agent_project(tmp_path: Path, script: str) -> None:
         "        session_id=None,\n"
         "        fork=False,\n"
         "        extra_args=None,\n"
+        "        session_name=None,\n"
         "        system_prompt=None,\n"
         "    ):\n"
         "        combined_prompt = '\\n\\n'.join(part for part in (system_prompt, prompt_text) if part is not None)\n"

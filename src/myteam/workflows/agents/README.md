@@ -43,6 +43,8 @@ def get_session_info(nonce: str, context: AgentSessionContext) -> tuple[str, Pat
 
 def build_argv(
         prompt_text: str | None,
+        model: str | None = None,
+        reasoning: str | None = None,
         interactive: bool = True,
         session_id: str | None = None,
         fork: bool = False,
@@ -65,21 +67,20 @@ may encode bytes directly with `EXIT_SEQUENCE`. When both `EXIT_SEQUENCE` and
 
 `EXEC` is the command name used to launch the agent CLI. It must be a string.
 
-### `build_argv(prompt_text, interactive=True, session_id=None, fork=False, extra_args=None, session_name=None, system_prompt=None)`
+### `build_argv(prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None, session_name=None, system_prompt=None)`
 
-`build_argv` returns the argv list used to start the agent process. Optional
-parameters are opt-in: the runtime passes only keyword names declared by the
-adapter, so existing adapters may omit `session_name`. Adapters that declare
-`session_name` receive the explicit or configured name, including an empty
-string, or `None` when no name was supplied.
+`build_argv` returns the argv list used to start the agent process. Every adapter
+must accept every parameter shown above. The runtime always passes the complete
+set as keyword arguments, including inactive or `None` values. An adapter may
+implement, transform, reject, or ignore each value as appropriate for its agent
+CLI. Omitting a supported parameter causes the adapter call to fail.
 
-Adapters must accept `system_prompt` and use non-`None` content rather than
-ignoring it. The effective system prompt contains caller-supplied system content
-followed by `myteam`'s framework instructions. The adapter should preserve the
-distinction between system instructions and user input when the agent supports
-it. Otherwise, it may concatenate `system_prompt` with `prompt_text` and pass
-the combined content as user input. `prompt_text` is `None` when no initial user
-input was supplied.
+The effective system prompt contains caller-supplied system content followed by
+`myteam`'s framework instructions. The adapter may preserve the distinction
+between system instructions and user input, concatenate the prompts, reject an
+unsupported combination, or ignore either value. `prompt_text` is `None` when
+no initial user input was supplied. `session_name` is the explicit or configured
+name, including an empty string, or `None` when no name was supplied.
 
 Use `session_id` to resume an existing session. Set `fork=True` to fork that
 session into a new one. `extra_args` contains optional workflow-authored argv
@@ -91,6 +92,8 @@ syntax:
 ```python
 def build_argv(
     prompt_text: str | None,
+    model: str | None = None,
+    reasoning: str | None = None,
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
@@ -183,6 +186,8 @@ from myteam.workflows.agents.codex import build_argv as build_codex_argv
 
 def build_argv(
     prompt_text: str | None,
+    model: str | None = None,
+    reasoning: str | None = None,
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
@@ -191,10 +196,12 @@ def build_argv(
     system_prompt: str | None = None,
 ) -> list[str]:
     argv = build_codex_argv(
-        prompt_text,
-        interactive,
-        session_id,
-        fork,
+        prompt_text=prompt_text,
+        model=model,
+        reasoning=reasoning,
+        interactive=interactive,
+        session_id=session_id,
+        fork=fork,
         extra_args=extra_args,
         session_name=session_name,
         system_prompt=system_prompt,

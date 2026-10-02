@@ -318,18 +318,7 @@ def _build_argv_callable(config_object: Any) -> Callable[
     build_argv = getattr(config_object, "build_argv")
     if not callable(build_argv):
         raise AgentConfigError("build_argv must be callable")
-    try:
-        signature = inspect.signature(build_argv)
-    except (TypeError, ValueError) as exc:
-        raise AgentConfigError("build_argv signature could not be inspected") from exc
-    accepts_arbitrary_keywords = any(
-        parameter.kind is inspect.Parameter.VAR_KEYWORD
-        for parameter in signature.parameters.values()
-    )
-    accepts_system_prompt = "system_prompt" in signature.parameters or accepts_arbitrary_keywords
-    if not accepts_system_prompt:
-        raise AgentConfigError("build_argv must accept system_prompt")
-
+    
     def wrapper(
         prompt_text: str | None,
         interactive: bool = True,
@@ -352,12 +341,7 @@ def _build_argv_callable(config_object: Any) -> Callable[
             "session_name": session_name,
             "system_prompt": system_prompt,
         }
-        accepted = kwargs if accepts_arbitrary_keywords else {
-            key: value
-            for key, value in kwargs.items()
-            if key in signature.parameters
-        }
-        return build_argv(**accepted)
+        return build_argv(**kwargs)
 
     return wrapper
 
