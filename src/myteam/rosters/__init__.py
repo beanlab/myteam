@@ -11,16 +11,23 @@ from pathlib import Path
 
 import yaml
 
-from ..paths import APP_NAME, DEFAULT_LOCAL_ROOT, agents_root, normalize_local_root
-
+APP_NAME = "myteam"
+DEFAULT_LOCAL_ROOT = ".myteam"
 DEFAULT_REPO = "beanlab/rosters"
 SOURCE_METADATA = ".source.yml"
 DEFAULT_REF = "main"
 
 
+def _normalize_local_root(prefix: str | Path | None = None) -> Path:
+    root = Path(DEFAULT_LOCAL_ROOT if prefix is None else prefix)
+    if root.is_absolute():
+        raise ValueError("Local root prefix must be a relative path.")
+    return root
+
+
 def _selected_root(base: Path, prefix: str | Path | None = None) -> Path:
     try:
-        return agents_root(base, prefix)
+        return (base / _normalize_local_root(prefix)).resolve()
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         exit(1)
@@ -236,7 +243,7 @@ def _managed_roots(base: Path, prefix: str | Path | None = None) -> list[Path]:
 
 def _update_target(base: Path, path: Path | str, prefix: str | Path | None = None) -> Path:
     local_root = _selected_root(base, prefix)
-    local_root_relative = normalize_local_root(prefix)
+    local_root_relative = _normalize_local_root(prefix)
     raw_path = Path(path)
     if raw_path.is_absolute():
         try:
@@ -256,13 +263,13 @@ def download_roster(
     repo: str = DEFAULT_REPO,
     prefix: str = DEFAULT_LOCAL_ROOT,
 ):
-    base = Path.cwd()
+    base = Path.cwd().resolve()
     destination = _download_destination(base, roster_dir_name, destination, prefix)
     _install_roster_tree(base=base, destination=destination, repo=repo, roster_dir_name=roster_dir_name)
 
 
 def update_roster(path: Path | str | None = None, prefix: str = DEFAULT_LOCAL_ROOT) -> None:
-    base = Path.cwd()
+    base = Path.cwd().resolve()
     local_root = _selected_root(base, prefix)
     targets = _managed_roots(base, prefix) if path is None else [_update_target(base, path, prefix)]
     if not targets:
