@@ -1,11 +1,16 @@
 """Explanation helpers for myteam resources."""
 from __future__ import annotations
 
-from .templates import get_template
+from pathlib import Path
+
+
+USING_MYTEAM_SKILL = Path(__file__).parent / "agent_skills" / "using-myteam.md"
 
 
 def explain_resources() -> str:
-    return get_template("explain_resources.md")
+    from .skills import load_skill
+
+    return load_skill(str(USING_MYTEAM_SKILL))
 
 
 __all__ = ["explain_resources"]

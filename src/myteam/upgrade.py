@@ -7,7 +7,6 @@ from pathlib import Path
 
 from . import __version__
 
-BUILTIN_ROOT_NAME = 'builtin'
 ENCODING = 'utf-8'
 TRACKED_VERSION_FILENAME = ".myteam-version"
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
@@ -47,60 +46,9 @@ def _parse_version(version: str) -> tuple[int, int, int]:
     return int(major), int(minor), int(patch)
 
 
-def _sorted_versions(versions: list[str]) -> list[str]:
-    return sorted(versions, key=_parse_version)
-
-
-def available_migration_versions(current_version: str = __version__) -> list[str]:
-    migration_dir = Path(__file__).resolve().parent / "migrations"
-    versions = [
-        path.stem
-        for path in migration_dir.glob("*.md")
-        if _SEMVER_RE.match(path.stem) and _parse_version(path.stem) <= _parse_version(current_version)
-    ]
-    return _sorted_versions(versions)
-
-
-def pending_migration_versions(
-        tracked_version: str | None,
-        current_version: str = __version__,
-) -> list[str]:
-    current = _parse_version(current_version)
-    if tracked_version is None:
-        return [version for version in available_migration_versions(current_version) if
-                _parse_version(version) <= current]
-    tracked = _parse_version(tracked_version)
-    return [
-        version
-        for version in available_migration_versions(current_version)
-        if tracked < _parse_version(version) <= current
-    ]
-
-
-def _migration_text(version: str) -> str:
-    migration_file = Path(__file__).resolve().parent / "migrations" / f"{version}.md"
-    return migration_file.read_text(encoding=ENCODING).rstrip()
-
-
 def packaged_changelog_text() -> str:
     packaged_changelog = files("myteam").joinpath("CHANGELOG.md")
     return packaged_changelog.read_text(encoding=ENCODING)
-
-
-def format_pending_migrations(myteam_root: Path) -> str:
-    tracked_version, tracked_label = tracked_version_info(myteam_root)
-    pending_versions = pending_migration_versions(tracked_version)
-    if not pending_versions:
-        return "No packaged `.myteam` migrations are pending.\n"
-
-    blocks = [
-        f"Pending migrations for `.myteam` tracked at {tracked_label}:\n"
-    ]
-    for index, version in enumerate(pending_versions):
-        if index:
-            blocks.append("")
-        blocks.append(_migration_text(version))
-    return "\n".join(blocks).rstrip() + "\n"
 
 
 def _parse_changelog_sections() -> list[tuple[str, str]]:
@@ -150,10 +98,6 @@ def format_release_notes(myteam_root: Path, current_version: str = __version__) 
     return heading + "\n\n".join(relevant).rstrip() + "\n"
 
 
-def print_pending_migrations(myteam_root: Path) -> None:
-    print(format_pending_migrations(myteam_root), end="")
-
-
 def print_release_notes(myteam_root: Path) -> None:
     print(format_release_notes(myteam_root), end="")
 
@@ -174,12 +118,8 @@ def print_upgrade_notice(myteam_root: Path, current_version: str = __version__) 
             f"This `.myteam` tree is tracked at myteam {tracked_version}, "
             f"but the installed version is {current_version}."
         )
-    print("The agent can assist with migrating this existing `.myteam` tree if you want to proceed.")
+    print("The agent can assist with reviewing this existing `.myteam` tree if you want to proceed.")
     print(
-        f"If the user agrees, load `myteam get skill {BUILTIN_ROOT_NAME}/migration` "
-        "to perform the migration correctly."
-    )
-    print(
-        f"Load `myteam get skill {BUILTIN_ROOT_NAME}/changelog` for release notes, "
+        "Run `myteam changelog` for release notes, "
         "and apply approved project-specific updates manually.\n"
     )

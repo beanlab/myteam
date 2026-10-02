@@ -9,14 +9,14 @@ pip install myteam
 Then start your favorite agent and ask:
 
 ```text
-Please run `myteam onboard` and briefly explain to me how you can help me build a better harness.
+Please run `myteam explain` and briefly explain to me how you can help me build a better harness.
 ```
 
 See also:
 
 - [demos](src/docs/demos/)
 - [users-guide.md](src/myteam/governing_docs/users-guide.md)
-- [governing documents](src/myteam/governing_docs) (which is what `myteam onboard` prints).
+- [governing documents](src/myteam/governing_docs)
 - [motivating philosophy](src/myteam/governing_docs/myteam-philosophy.md)
 
 ## Skills and Workflows
