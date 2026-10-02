@@ -38,6 +38,7 @@ class AgentSettingsModel(BaseModel):
     reasoning: Optional[str] = Field(default=None, min_length=1)
     interactive: Optional[bool] = None
     session_id: Optional[str] = Field(default=None, min_length=1)
+    system_prompt: Optional[bool] = None
     fork: Optional[bool] = Field(default=None)
     extra_args: Optional[tuple[str, ...]] = Field(default=None)
 

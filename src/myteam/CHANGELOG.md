@@ -1,5 +1,22 @@
 # Change Log
 
+## 0.3.16
+
+- Fixed: Moved `governing_docs` into the `myteam` package so they ship with the code; `myteam onboard` now works on machines without a local clone of the `myteam` project.
+- Added: `myteam` and built-in agent adapters now distinguish between user and system prompts. `run_agent` now exposes `system_prompt`.
+  - Markdown workflow content defaults to `prompt` (user input). Use the `system_prompt=true` frontmatter setting to treat the content as system prompt.
+- Changed: `run_agent` `prompt` and `system_prompt` arguments now support `Path` inputs as well as literal strings. 
+
+Most agent runtimes support system (or developer) prompts separate from user inputs. Before this release, all prompt inputs to `run_agent` were injected into the agent session via user input. Now, `system_prompt` gives the author the option of using the system/developer prompt feature of their runtime.
+
+Agent sessions typically begin awaiting user input. Injecting a user input starts the session with the agent automatically starting its turn. Providing additional system prompt does not trigger an agent turn. 
+
+System prompt is not exposed to the user in the agent session, whereas user input is. 
+
+So, if you want a session to start awaiting user input, make sure all your instructions are supplied via `system_prompt`. If you want a session to start with the agent taking some action (e.g. reading files, checking status, etc.), then be sure those instructions are supplied via `prompt` (or automate that content via `shell` in the system prompt Jinja).
+
+Note: `myteam` special instructions, such as session nonce and session output schema, are now supplied via `system_prompt`. While no longer visible in the agent UI, these instructions are still being supplied to the session.
+
 ## 0.3.15
 
 - Added the Jinja `this_file` variable, containing the resolved `pathlib.Path` of the file currently being rendered.

@@ -12,7 +12,6 @@ from .. import templates
 from ..config import AGENT_SETTING_FIELDS, AgentSettingsModel, WorkflowDefaults
 from ..templates import get_template_file
 from ..workflow_metadata import WorkflowMetadataError, read_workflow_metadata
-from .agent_session import build_agent_prompt
 from .execution.supervisor import Supervisor
 from .execution.protocol import (
     ENV_AGENT_SESSION_NONCE,
@@ -55,6 +54,7 @@ class AgentSettings(TypedDict, total=False):
     interactive: bool | None
     extra_args: tuple[str, ...] | list[str] | None
     session_id: str | None
+    system_prompt: bool | None
     fork: bool | None
 
 
@@ -366,13 +366,4 @@ def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_inp
             *args,
         ]
     raise RuntimeError(f"Workflow '{target}' has unsupported extension '{path.suffix}'.")
-
-
-def _build_agent_prompt(
-    prompt: str,
-    *,
-    session_nonce: str,
-    output_schema: dict[Any, Any] | None,
-) -> str:
-    return build_agent_prompt(prompt, session_nonce=session_nonce, output_schema=output_schema)
 

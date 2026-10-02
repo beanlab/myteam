@@ -89,6 +89,7 @@ def test_load_myteam_config_uses_global_file(
         "reasoning": "medium",
         "interactive": False,
         "session_id": "home-session-id",
+        "system_prompt": None,
         "fork": True,
         "extra_args": ("--home",),
         "usage_logging": "summary",
@@ -200,13 +201,61 @@ def test_same_physical_global_and_project_file_is_parsed_once(
     assert safe_load_calls == 1
 
 
+def test_agent_adapter_receives_every_supported_argument(tmp_path: Path) -> None:
+    (tmp_path / "agent.py").write_text(
+        "def build_argv(prompt_text, **kwargs): return [prompt_text, ','.join(sorted(kwargs))]\n"
+        "EXIT_COMMAND = '/quit'\n"
+        "def get_session_info(nonce, context): return nonce, context.launch_cwd / 'session'\n",
+        encoding="utf-8",
+    )
+    write_config(tmp_path, "agents:\n  custom: agent.py\n")
+    config = resolve_agent_runtime_config(
+        "custom",
+        project_root=tmp_path,
+        session_context=AgentSessionContext(
+            home=tmp_path,
+            project_root=tmp_path,
+            launch_cwd=tmp_path,
+        ),
+    )
+
+    assert config.build_argv(prompt_text="hello") == [
+        "hello",
+        "extra_args,fork,interactive,model,reasoning,session_id,session_name,system_prompt",
+    ]
+
+
+def test_agent_adapter_must_accept_every_supported_argument(tmp_path: Path) -> None:
+    (tmp_path / "agent.py").write_text(
+        "def build_argv(prompt_text): return ['agent', prompt_text]\n"
+        "EXIT_COMMAND = '/quit'\n"
+        "def get_session_info(nonce, context): return nonce, context.launch_cwd / 'session'\n",
+        encoding="utf-8",
+    )
+    write_config(tmp_path, "agents:\n  custom: agent.py\n")
+
+    config = resolve_agent_runtime_config(
+        "custom",
+        project_root=tmp_path,
+        session_context=AgentSessionContext(
+            home=tmp_path,
+            project_root=tmp_path,
+            launch_cwd=tmp_path,
+        ),
+    )
+
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        config.build_argv(prompt_text="hello")
+
+
 def test_custom_agent_can_override_builtin_name_from_myteam_yaml(tmp_path: Path) -> None:
     (tmp_path / "agents").mkdir()
     (tmp_path / "agents" / "codex.py").write_text(
         "class CustomCodexConfig:\n"
         "    EXEC = 'custom-codex'\n"
-        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "        return ['custom-codex', prompt_text]\n"
+        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None, session_name=None, system_prompt=None):\n"
+        "        combined_prompt = '\\n\\n'.join(part for part in (system_prompt, prompt_text) if part is not None)\n"
+        "        return ['custom-codex', combined_prompt]\n"
         "    def get_exit_sequence(self):\n"
         "        return b'/quit\\r'\n"
         "    def locate_session_data(self, nonce, context):\n"
@@ -231,4 +280,4 @@ def test_custom_agent_can_override_builtin_name_from_myteam_yaml(tmp_path: Path)
 
     assert config.name == "codex"
     assert config.exec == "custom-codex"
-    assert config.build_argv("hello") == ["custom-codex", "hello"]
+    assert config.build_argv(prompt_text="hello") == ["custom-codex", "hello"]

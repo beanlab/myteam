@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 APP_NAME = 'myteam'
-GOVERNING_DOCS_ROOT = Path(__file__).resolve().parents[1] / "governing_docs"
+GOVERNING_DOCS_ROOT = Path(__file__).resolve().parent / "governing_docs"
 
 
 def version() -> str:

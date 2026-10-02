@@ -15,19 +15,19 @@ Please run `myteam onboard` and briefly explain to me how you can help me build 
 See also:
 
 - [demos](src/docs/demos/)
-- [users-guide.md](src/governing_docs/users-guide.md)
-- [governing documents](src/governing_docs) (which is what `myteam onboard` prints).
-- [motivating philosophy](src/governing_docs/myteam-philosophy.md)
+- [users-guide.md](src/myteam/governing_docs/users-guide.md)
+- [governing documents](src/myteam/governing_docs) (which is what `myteam onboard` prints).
+- [motivating philosophy](src/myteam/governing_docs/myteam-philosophy.md)
 
 ## Skills and Workflows
 
 **Skills** are simply content-on-demand. They have a description that instructs the agent about when and why to retrieve the associated content.
 
-See [skills.md](src/governing_docs/scenarios/skills.md).
+See [skills.md](src/myteam/governing_docs/scenarios/skills.md).
 
 **Workflows** are pipelines of agent sessions. They can be invoked directly by the user, or by an agent as if it were a tool. 
 
-See [workflows.md](src/governing_docs/scenarios/workflows/workflows.md).
+See [workflows.md](src/myteam/governing_docs/scenarios/workflows/workflows.md).
 
 ## Requirements
 

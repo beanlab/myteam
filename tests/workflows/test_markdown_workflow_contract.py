@@ -11,10 +11,12 @@ from myteam.workflows.execution.protocol import ENV_SOCKET
 
 def write_markdown_fake_agent_project(tmp_path: Path) -> None:
     (tmp_path / "fake_agent.py").write_text(
+        "import json\n"
         "import sys\n"
         "from pathlib import Path\n"
         "from myteam.workflows.results import report_result\n"
-        "Path('seen-prompt.txt').write_text(sys.argv[1], encoding='utf-8')\n"
+        "Path('seen-prompt.txt').write_text(json.loads(sys.argv[1]) or '', encoding='utf-8')\n"
+        "Path('seen-system-prompt.txt').write_text(json.loads(sys.argv[2]) or '', encoding='utf-8')\n"
         "report_result({'ok': True})\n"
         "assert sys.stdin.readline() == 'exit\\n'\n",
         encoding="utf-8",
@@ -37,6 +39,7 @@ def write_markdown_fake_agent_project(tmp_path: Path) -> None:
                     fork=False,
                     extra_args=None,
                     session_name=None,
+                    system_prompt=None,
                 ):
                     Path('observed-markdown-agent-settings.json').write_text(
                         json.dumps(
@@ -53,7 +56,12 @@ def write_markdown_fake_agent_project(tmp_path: Path) -> None:
                         ),
                         encoding='utf-8',
                     )
-                    return [sys.executable, 'fake_agent.py', prompt_text]
+                    return [
+                        sys.executable,
+                        'fake_agent.py',
+                        json.dumps(prompt_text),
+                        json.dumps(system_prompt),
+                    ]
 
                 def get_exit_sequence(self):
                     return b'exit\\n'
@@ -121,9 +129,10 @@ def test_markdown_workflow_frontmatter_controls_run_agent_settings(
         "extra_args": ["--flag", "value"],
     }
     prompt = (tmp_path / "seen-prompt.txt").read_text(encoding="utf-8")
-    assert "Discuss release." in prompt
-    assert "ok" in prompt
-    assert "whether the agent completed" in prompt
+    assert prompt == "Discuss release.\n"
+    system_prompt = (tmp_path / "seen-system-prompt.txt").read_text(encoding="utf-8")
+    assert "ok" in system_prompt
+    assert "whether the agent completed" in system_prompt
 
 
 def test_markdown_workflow_cli_overrides_all_agent_settings(run_myteam, tmp_path: Path) -> None:
@@ -221,6 +230,7 @@ def test_markdown_workflow_cli_null_falls_through_to_effective_default(
         (("--model=",), "model"),
         (("--extra-args", "[unterminated"), "extra-args"),
         (("--interactive", "quoted-string"), "interactive"),
+        (("--system-prompt", "quoted-string"), "system_prompt"),
         (("--fork", "true"), "session_id"),
     ],
 )
@@ -362,6 +372,8 @@ def test_markdown_workflow_help_short_circuits_wrapper_processing(run_myteam, tm
         "--extra_args",
         "--session-id",
         "--session_id",
+        "--system-prompt",
+        "--system_prompt",
         "--fork",
         "--input",
         "--help",
@@ -372,6 +384,77 @@ def test_markdown_workflow_help_short_circuits_wrapper_processing(run_myteam, tm
     assert "frontmatter" in result.stdout.lower()
     assert "default" in result.stdout.lower()
     assert not (tmp_path / "observed-markdown-agent-settings.json").exists()
+
+
+def test_markdown_workflow_can_use_its_body_as_the_system_prompt(
+    run_myteam, tmp_path: Path
+) -> None:
+    write_markdown_fake_agent_project(tmp_path)
+    (tmp_path / "workflow.md").write_text(
+        "---\n"
+        "type: workflow\n"
+        "agent: fake-agent\n"
+        "system_prompt: true\n"
+        "interactive: true\n"
+        "---\n"
+        "Configure {{ topic }}.\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(
+        tmp_path,
+        "start",
+        "workflow.md",
+        "--input",
+        '{"topic": "reviews"}',
+    )
+
+    assert result.exit_code == 0
+    assert (tmp_path / "seen-prompt.txt").read_text(encoding="utf-8") == ""
+    system_prompt = (tmp_path / "seen-system-prompt.txt").read_text(encoding="utf-8")
+    assert system_prompt.startswith("Configure reviews.\n\n")
+    assert "Session ID:" in system_prompt
+
+
+def test_markdown_workflow_uses_configured_system_prompt_default(
+    run_myteam, tmp_path: Path
+) -> None:
+    write_markdown_fake_agent_project(tmp_path)
+    config_path = tmp_path / ".myteam.yaml"
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8") + "defaults:\n  system_prompt: true\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.md").write_text(
+        "---\ntype: workflow\nagent: fake-agent\n---\nConfigured system body.\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "start", "workflow.md")
+
+    assert result.exit_code == 0
+    assert (tmp_path / "seen-prompt.txt").read_text(encoding="utf-8") == ""
+    assert "Configured system body." in (
+        tmp_path / "seen-system-prompt.txt"
+    ).read_text(encoding="utf-8")
+
+
+def test_markdown_workflow_cli_can_override_system_prompt_selection(
+    run_myteam, tmp_path: Path
+) -> None:
+    write_markdown_fake_agent_project(tmp_path)
+    (tmp_path / "workflow.md").write_text(
+        "---\ntype: workflow\nagent: fake-agent\nsystem_prompt: true\n---\nUser body.\n",
+        encoding="utf-8",
+    )
+
+    result = run_myteam(tmp_path, "start", "workflow.md", "--system-prompt=false")
+
+    assert result.exit_code == 0
+    assert (tmp_path / "seen-prompt.txt").read_text(encoding="utf-8") == "User body.\n"
+    assert "User body." not in (
+        tmp_path / "seen-system-prompt.txt"
+    ).read_text(encoding="utf-8")
 
 
 def test_markdown_workflow_input_schema_is_advisory_not_enforced(run_myteam, tmp_path: Path) -> None:

@@ -25,17 +25,12 @@ def write_fake_agent_project(tmp_path: Path, script: str) -> None:
             import sys
 
             class FakeAgentConfig:
-                def build_argv(
-                    self,
-                    prompt_text,
-                    model=None,
-                    reasoning=None,
-                    interactive=True,
-                    session_id=None,
-                    fork=False,
-                    extra_args=None,
-                ):
-                    return [sys.executable, 'fake_agent.py', prompt_text]
+                def build_argv(self, prompt_text, **_kwargs):
+                    system_prompt = _kwargs['system_prompt']
+                    combined_prompt = '\\n\\n'.join(
+                        part for part in (system_prompt, prompt_text) if part is not None
+                    )
+                    return [sys.executable, 'fake_agent.py', combined_prompt]
 
                 def get_exit_sequence(self):
                     return b'exit\\n'

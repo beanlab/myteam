@@ -49,7 +49,7 @@ PRICING_INFO: dict[str, tuple[float, float | None, float]] = {
 
 
 def build_argv(
-    prompt_text: str,
+    prompt_text: str | None,
     interactive: bool = True,
     session_id: str | None = None,
     fork: bool = False,
@@ -57,6 +57,7 @@ def build_argv(
     extra_args: tuple[str, ...] | list[str] | None = None,
     reasoning: str | None = None,
     session_name: str | None = None,
+    system_prompt: str | None = None,
 ) -> list[str]:
     argv = [EXEC]
     if not interactive:
@@ -71,8 +72,11 @@ def build_argv(
         argv.extend(["--effort", reasoning])
     if session_name is not None:
         argv.extend(["--name", session_name])
+    if system_prompt is not None:
+        argv.extend(["--append-system-prompt", system_prompt])
     argv.extend(extra_args or [])
-    argv.append(prompt_text)
+    if prompt_text is not None:
+        argv.append(prompt_text)
     return argv
 
 

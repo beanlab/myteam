@@ -22,7 +22,7 @@ class AgentSessionContext:
 class AgentConfig(Protocol):
     def build_argv(
             self,
-            prompt_text: str,
+            prompt_text: str | None,
             model: str | None,
             reasoning: str | None,
             interactive: bool,
@@ -30,6 +30,7 @@ class AgentConfig(Protocol):
             fork: bool,
             extra_args: tuple[str, ...] | None,
             session_name: str | None = None,
+            system_prompt: str | None = None,
     ) -> list[str]:
         """Returns the Popen-style args to launch the agent session"""
 
@@ -55,9 +56,13 @@ class AgentConfig(Protocol):
 
 If the agent config module cannot be loaded, an error is raised.
 
-Adapter parameters are opt-in: `myteam` passes only the supported keyword names declared by `build_argv`, so existing adapters do not need to declare `session_name`. An adapter that declares `session_name: str | None = None` receives the explicit or configured name, or `None` when neither exists.
+Every adapter must accept every `build_argv` parameter in the protocol. `myteam` always passes the complete set as keyword arguments, including arguments whose values are `None` or otherwise inactive. Adapters may implement, transform, reject, or ignore each argument as appropriate for the underlying agent runtime. Omitting a supported parameter from an adapter is an error when `build_argv` is called.
 
-If a given agent runtime does not support all of the provided arguments (e.g. it cannot fork an agent session), then an error should be raised from `build_argv` when unsupported arguments are supplied. 
+The adapter receives the rendered user prompt separately from the effective system prompt, which contains caller-supplied system content followed by `myteam`'s framework instructions. An adapter may preserve that distinction, concatenate the prompts, or ignore either value according to the behavior it provides. `prompt_text` is `None` when the session should start without user input. `session_name` contains the explicit or configured name, including an empty string, or `None` when neither exists.
+
+The built-in Pi and Claude adapters pass system-prompt content with `--append-system-prompt`. The built-in Codex adapter passes it with the `developer-instructions` configuration override.
+
+When the underlying runtime does not support an argument, the adapter decides whether to reject that value, approximate the behavior, or ignore it.
 
 ## Session IDs and Data
 
@@ -94,4 +99,4 @@ jinja_functions:
   issue_url: helpers/jinja.py::issue_url
 ```
 
-`defaults.session_name` supplies the lifecycle display name when a `run_agent` call does not provide one and is forwarded to adapters that opt into native session naming. Empty names are valid and forwarded, non-string YAML values are converted to text, and names containing carriage returns or line feeds are rejected. When no explicit or configured name exists, the lifecycle display uses `New session`, but adapters receive `None`.
+`defaults.session_name` supplies the lifecycle display name when a `run_agent` call does not provide one and is forwarded to adapters. Empty names are valid and forwarded, non-string YAML values are converted to text, and names containing carriage returns or line feeds are rejected. When no explicit or configured name exists, the lifecycle display uses `New session`, but adapters receive `None`.

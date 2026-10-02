@@ -1,10 +1,10 @@
 # Jinja2 Template Rendering
 
-Myteam renders Markdown skill bodies, Markdown workflow prompts, direct `run_agent` prompts, and rendered `read_file` includes with Jinja2. Full Jinja2 syntax is supported.
+Myteam renders Markdown skill bodies, Markdown workflow prompts, direct `run_agent` user and system prompts, and rendered `read_file` includes with Jinja2. Full Jinja2 syntax is supported.
 
 The fields of the input dictionary, when provided, are passed as variables to the rendering (for example, `render(**inputs)`).
 
-When rendering from a source file, `this_file` is the resolved absolute Python `pathlib.Path` of the file currently being rendered. A rendered `read_file` include receives its own path, so `this_file` changes while rendering the included file. It can be used to locate adjacent resources, for example `"Run {{ this_file.with_name('script.py') }}"`. Direct `run_agent` prompts without `prompt_source_path` have no current file, so `this_file` is undefined.
+When rendering from a source file, `this_file` is the resolved absolute Python `pathlib.Path` of the file currently being rendered. A rendered `read_file` include receives its own path, so `this_file` changes while rendering the included file. It can be used to locate adjacent resources, for example `"Run {{ this_file.with_name('script.py') }}"`. A direct `run_agent` user prompt uses `prompt_source_path`, while its system prompt independently uses `system_prompt_source_path`. A `Path` supplied as either prompt becomes that prompt's source path and overrides the corresponding explicit source-path argument. A prompt without its corresponding source path has no current file, so `this_file` is undefined while rendering it.
 
 The following `myteam` functions are included in the Jinja environment:
 
@@ -35,7 +35,7 @@ Headings inside standard backtick or tilde fenced code blocks are unchanged, inc
 
 The default offset is `1`. An offset of `0` returns the content unchanged, a negative offset raises `ValueError`, and a non-integer offset (including a boolean) raises `TypeError`. Non-string content also raises `TypeError`. At the Python string boundary, the helper preserves LF and CRLF endings and every character other than the inserted `#` markers. Existing file reads, subprocess text capture, and Jinja template parsing may normalize input before it reaches the helper; their newline behavior is unchanged.
 
-A shell command runs in the directory of the file containing its expression. A command in a rendered `read_file` include therefore runs in the included file's directory. A direct prompt with no source path uses the process's current working directory. Commands inherit myteam's environment and permissions, receive non-interactive stdin, and have stderr redirected into stdout. Successful output is returned exactly, including interleaved stderr, trailing newlines, or empty output.
+A shell command runs in the directory of the file containing its expression. A command in a rendered `read_file` include therefore runs in the included file's directory. A direct user or system prompt with no corresponding source path uses the process's current working directory. Commands inherit myteam's environment and permissions, receive non-interactive stdin, and have stderr redirected into stdout. Successful output is returned exactly, including interleaved stderr, trailing newlines, or empty output.
 
 A non-zero exit aborts rendering with a diagnostic containing the command, exit code, and combined output. A timeout likewise aborts rendering and identifies the command and timeout while including output captured before termination. No partial rendered template text is returned. Commands may still have side effects before a later command or rendering step fails; repeated expressions run the command repeatedly without caching or rollback.
 

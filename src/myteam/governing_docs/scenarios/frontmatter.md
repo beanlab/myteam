@@ -12,7 +12,7 @@ The `description` field is encouraged but optional. It provides instructions abo
 Recognized workflows have format-specific optional metadata:
 
 - Python `usage`, when non-null, must be a string. Python `input` and `output` have no schema meaning and are not validated as schemas.
-- Markdown `input` and `output`, when non-null, must be mappings. Their keys and values may use YAML-native types. Markdown `usage` is ignored because invocation usage is generated from `input`.
+- Markdown `input` and `output`, when non-null, must be mappings. Their keys and values may use YAML-native types. Markdown `system_prompt`, when non-null, must be a Boolean selecting whether the document body is used as the system prompt (`true`) or user prompt (`false`). Markdown `usage` is ignored because invocation usage is generated from `input`.
 
 Missing and null fields are unspecified. Empty mappings are specified schemas. Invalid recognized workflow fields prevent both listing and starting that workflow.
 

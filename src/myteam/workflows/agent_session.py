@@ -61,7 +61,8 @@ _RESET = "\x1b[0m"
 
 def run_agent(
     *,
-    prompt: str,
+    prompt: str | Path | None = None,
+    system_prompt: str | Path | None = None,
     input: dict[str, Any] | None = None,
     output: dict[Any, Any] | None = None,
     agent: str | None = None,
@@ -72,8 +73,14 @@ def run_agent(
     interactive: bool | None = None,
     session_id: str | None = None,
     fork: bool | None = None,
-    prompt_source_path: Path | str | None = None,
+    prompt_source_path: Path | None = None,
+    system_prompt_source_path: Path | None = None,
 ) -> SessionResult:
+    if prompt is None and prompt_source_path is not None:
+        raise ValueError("prompt_source_path requires prompt")
+    if system_prompt is None and system_prompt_source_path is not None:
+        raise ValueError("system_prompt_source_path requires system_prompt")
+
     cwd = Path.cwd().resolve()
     config = load_myteam_config(cwd)
     defaults = config.defaults if config is not None else WorkflowDefaults()
@@ -96,21 +103,43 @@ def run_agent(
         effective_extra_args = tuple(str(item) for item in effective_extra_args)
 
     session_nonce = secrets.token_urlsafe(16)
-    rendered_prompt = render_prompt_text(prompt, input or {}, source_path=prompt_source_path)
-    agent_prompt = build_agent_prompt(
-        rendered_prompt,
+    if isinstance(prompt, Path):
+        prompt_source_path = prompt
+        prompt = prompt.read_text(encoding="utf-8")
+    if isinstance(system_prompt, Path):
+        system_prompt_source_path = system_prompt
+        system_prompt = system_prompt.read_text(encoding="utf-8")
+
+    render_inputs = input or {}
+    rendered_prompt = (
+        render_prompt_text(prompt, render_inputs, source_path=prompt_source_path)
+        if prompt is not None
+        else None
+    )
+    rendered_system_prompt = (
+        render_prompt_text(
+            system_prompt,
+            render_inputs,
+            source_path=system_prompt_source_path,
+        )
+        if system_prompt is not None
+        else None
+    )
+    agent_system_prompt = build_agent_system_prompt(
+        rendered_system_prompt,
         session_nonce=session_nonce,
         output_schema=output,
     )
     argv = runtime_config.build_argv(
-        agent_prompt,
-        bool(effective_interactive),
-        effective_session_id,
-        bool(effective_fork),
-        effective_model,
-        effective_extra_args,
-        effective_reasoning,
-        native_session_name,
+        prompt_text=rendered_prompt,
+        model=effective_model,
+        reasoning=effective_reasoning,
+        interactive=bool(effective_interactive),
+        session_id=effective_session_id,
+        fork=bool(effective_fork),
+        extra_args=effective_extra_args,
+        session_name=native_session_name,
+        system_prompt=agent_system_prompt,
     )
 
     registration = _ManagedAgentRegistration.create(
@@ -393,15 +422,15 @@ def _close_launched_session(session: ManagedPtyProcess) -> None:
         session.close()
 
 
-def build_agent_prompt(
-    prompt: str,
+def build_agent_system_prompt(
+    system_prompt: str | None,
     *,
     session_nonce: str,
     output_schema: dict[Any, Any] | None,
 ) -> str:
     sections = [
+        system_prompt.rstrip() if system_prompt is not None else None,
         f"*Session ID: {session_nonce}*",
-        prompt.rstrip(),
     ]
 
     if output_schema is not None:

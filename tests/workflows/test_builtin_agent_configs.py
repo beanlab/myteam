@@ -85,7 +85,7 @@ def test_packaged_claude_config_resolves(tmp_path: Path) -> None:
 
     assert config.name == "claude"
     assert config.exec == "claude"
-    assert config.build_argv("prompt") == ["claude", "prompt"]
+    assert config.build_argv(prompt_text="prompt") == ["claude", "prompt"]
 
 
 def test_claude_build_argv_supports_session_modes_and_settings() -> None:
@@ -132,6 +132,42 @@ def test_claude_build_argv_supports_session_modes_and_settings() -> None:
         "--permission-mode",
         "auto",
         "prompt",
+    ]
+
+
+def test_builtin_agents_forward_system_prompt_separately_and_allow_no_user_prompt() -> None:
+    assert build_pi_argv("user", system_prompt="system") == [
+        "pi",
+        "--append-system-prompt",
+        "system",
+        "user",
+    ]
+    assert build_pi_argv(None, system_prompt="system") == [
+        "pi",
+        "--append-system-prompt",
+        "system",
+    ]
+    assert build_claude_argv("user", system_prompt="system") == [
+        "claude",
+        "--append-system-prompt",
+        "system",
+        "user",
+    ]
+    assert build_claude_argv(None, system_prompt="system") == [
+        "claude",
+        "--append-system-prompt",
+        "system",
+    ]
+    assert build_codex_argv("user", system_prompt="system") == [
+        "codex",
+        "-c",
+        "developer-instructions=system",
+        "user",
+    ]
+    assert build_codex_argv(None, system_prompt="system") == [
+        "codex",
+        "-c",
+        "developer-instructions=system",
     ]
 
 

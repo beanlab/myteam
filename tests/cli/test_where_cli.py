@@ -48,8 +48,10 @@ def write_agent_project(tmp_path: Path) -> None:
     (tmp_path / "fake_config.py").write_text(
         "import sys\n"
         "class FakeAgentConfig:\n"
-        "    def build_argv(self, prompt_text, model=None, reasoning=None, interactive=True, session_id=None, fork=False, extra_args=None):\n"
-        "        return [sys.executable, 'fake_agent.py', prompt_text]\n"
+        "    def build_argv(self, prompt_text, **_kwargs):\n"
+        "        system_prompt = _kwargs['system_prompt']\n"
+        "        combined_prompt = '\\n\\n'.join(part for part in (system_prompt, prompt_text) if part is not None)\n"
+        "        return [sys.executable, 'fake_agent.py', combined_prompt]\n"
         "    def get_exit_sequence(self): return b'exit\\n'\n"
         "    def locate_session_data(self, nonce, context): return context.launch_cwd / 'missing-session'\n"
         "    def get_session_id(self, session_data): return session_data.read_text(encoding='utf-8')\n"
