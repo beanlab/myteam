@@ -131,15 +131,15 @@ def run_agent(
         output_schema=output,
     )
     argv = runtime_config.build_argv(
-        rendered_prompt,
-        bool(effective_interactive),
-        effective_session_id,
-        bool(effective_fork),
-        effective_model,
-        effective_extra_args,
-        effective_reasoning,
-        native_session_name,
-        agent_system_prompt,
+        prompt_text=rendered_prompt,
+        model=effective_model,
+        reasoning=effective_reasoning,
+        interactive=bool(effective_interactive),
+        session_id=effective_session_id,
+        fork=bool(effective_fork),
+        extra_args=effective_extra_args,
+        session_name=native_session_name,
+        system_prompt=agent_system_prompt,
     )
 
     registration = _ManagedAgentRegistration.create(

@@ -219,7 +219,7 @@ def test_agent_adapter_receives_every_supported_argument(tmp_path: Path) -> None
         ),
     )
 
-    assert config.build_argv("hello") == [
+    assert config.build_argv(prompt_text="hello") == [
         "hello",
         "extra_args,fork,interactive,model,reasoning,session_id,session_name,system_prompt",
     ]
@@ -245,7 +245,7 @@ def test_agent_adapter_must_accept_every_supported_argument(tmp_path: Path) -> N
     )
 
     with pytest.raises(TypeError, match="unexpected keyword argument"):
-        config.build_argv("hello")
+        config.build_argv(prompt_text="hello")
 
 
 def test_custom_agent_can_override_builtin_name_from_myteam_yaml(tmp_path: Path) -> None:
@@ -280,4 +280,4 @@ def test_custom_agent_can_override_builtin_name_from_myteam_yaml(tmp_path: Path)
 
     assert config.name == "codex"
     assert config.exec == "custom-codex"
-    assert config.build_argv("hello") == ["custom-codex", "hello"]
+    assert config.build_argv(prompt_text="hello") == ["custom-codex", "hello"]

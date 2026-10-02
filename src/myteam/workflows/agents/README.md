@@ -86,33 +86,9 @@ Use `session_id` to resume an existing session. Set `fork=True` to fork that
 session into a new one. `extra_args` contains optional workflow-authored argv
 items that the agent config places wherever that CLI expects additional flags.
 The built-in Pi and Claude adapters pass non-`None` names to their CLIs with
-`--name`; Codex accepts but ignores the value. Different CLIs use different
-syntax:
-
-```python
-def build_argv(
-    prompt_text: str | None,
-    model: str | None = None,
-    reasoning: str | None = None,
-    interactive: bool = True,
-    session_id: str | None = None,
-    fork: bool = False,
-    extra_args: tuple[str, ...] | None = None,
-    session_name: str | None = None,
-    system_prompt: str | None = None,
-) -> list[str]:
-    extras = extra_args or []
-    if system_prompt is not None:
-        extras = ["-c", f"developer-instructions={system_prompt}", *extras]
-    prompt_args = [] if prompt_text is None else [prompt_text]
-    if session_id is not None and fork:
-        return ["codex", "fork", session_id, *extras, *prompt_args]
-    if session_id is not None:
-        return ["codex", "resume", session_id, *extras, *prompt_args]
-    if not interactive:
-        return ["codex", "exec", *extras, *prompt_args]
-    return ["codex", *extras, *prompt_args]
-```
+`--name`; Codex accepts but ignores the value. See [codex.py](codex.py),
+[pi.py](pi.py), and [claude.py](claude.py) for the maintained CLI-specific
+argument transformations.
 
 ### `EXIT_COMMAND`
 

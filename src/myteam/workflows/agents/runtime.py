@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, Protocol
 
 from ...config import MyteamConfig, load_myteam_config
 from ..results import UsageInfo
@@ -26,26 +26,29 @@ class AgentSessionContext:
         return self.home
 
 
+class BuildArgv(Protocol):
+    def __call__(
+        self,
+        *,
+        prompt_text: str | None,
+        model: str | None = None,
+        reasoning: str | None = None,
+        interactive: bool = True,
+        session_id: str | None = None,
+        fork: bool = False,
+        extra_args: tuple[str, ...] | None = None,
+        session_name: str | None = None,
+        system_prompt: str | None = None,
+    ) -> list[str]: ...
+
+
 @dataclass(frozen=True)
 class AgentRuntimeConfig:
     name: str
     exec: str
     exit_sequence: bytes
     get_session_info: Callable[[str], tuple[str, Path]]
-    build_argv: Callable[
-        [
-            str | None,
-            bool,
-            str | None,
-            bool,
-            str | None,
-            tuple[str, ...] | None,
-            str | None,
-            str | None,
-            str | None,
-        ],
-        list[str],
-    ]
+    build_argv: BuildArgv
     source: Path | str
     get_usage_info: Callable[[Path], UsageInfo | list[UsageInfo] | None] | None = None
 
@@ -297,20 +300,7 @@ def _require_positional_parameter_count(
         raise AgentConfigError(f"{name} must accept nonce and context")
 
 
-def _build_argv_callable(config_object: Any) -> Callable[
-    [
-        str | None,
-        bool,
-        str | None,
-        bool,
-        str | None,
-        tuple[str, ...] | None,
-        str | None,
-        str | None,
-        str | None,
-    ],
-    list[str],
-]:
+def _build_argv_callable(config_object: Any) -> BuildArgv:
     if not hasattr(config_object, "build_argv"):
         raise AgentConfigError(
             "missing build_argv; workflow agent configs must return a list of argv strings."
@@ -318,30 +308,30 @@ def _build_argv_callable(config_object: Any) -> Callable[
     build_argv = getattr(config_object, "build_argv")
     if not callable(build_argv):
         raise AgentConfigError("build_argv must be callable")
-    
+
     def wrapper(
+        *,
         prompt_text: str | None,
+        model: str | None = None,
+        reasoning: str | None = None,
         interactive: bool = True,
         session_id: str | None = None,
         fork: bool = False,
-        model: str | None = None,
         extra_args: tuple[str, ...] | None = None,
-        reasoning: str | None = None,
         session_name: str | None = None,
         system_prompt: str | None = None,
     ) -> list[str]:
-        kwargs = {
-            "prompt_text": prompt_text,
-            "model": model,
-            "interactive": interactive,
-            "session_id": session_id,
-            "fork": fork,
-            "extra_args": extra_args,
-            "reasoning": reasoning,
-            "session_name": session_name,
-            "system_prompt": system_prompt,
-        }
-        return build_argv(**kwargs)
+        return build_argv(
+            prompt_text=prompt_text,
+            model=model,
+            reasoning=reasoning,
+            interactive=interactive,
+            session_id=session_id,
+            fork=fork,
+            extra_args=extra_args,
+            session_name=session_name,
+            system_prompt=system_prompt,
+        )
 
     return wrapper
 

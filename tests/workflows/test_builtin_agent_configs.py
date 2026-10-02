@@ -85,7 +85,7 @@ def test_packaged_claude_config_resolves(tmp_path: Path) -> None:
 
     assert config.name == "claude"
     assert config.exec == "claude"
-    assert config.build_argv("prompt") == ["claude", "prompt"]
+    assert config.build_argv(prompt_text="prompt") == ["claude", "prompt"]
 
 
 def test_claude_build_argv_supports_session_modes_and_settings() -> None:

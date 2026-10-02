@@ -44,36 +44,36 @@ def build_argv(
     system_prompt: str | None = None,
 ) -> list[str]:
     argv = []
-    
+
     # session_name is not supported by codex - 2026-10-02
-    
+
     if system_prompt is not None:
         argv += ["-c", f"developer-instructions={system_prompt}"]
-    
+
     if model is not None:
         argv += ["--model", model]
-    
+
     if reasoning is not None:
         argv += ["--reasoning", reasoning]
-        
+
     if not interactive and fork:
         raise ValueError("Codex non-interactive task steps do not support fork.")
-    
+
     prompt_args = [] if prompt_text is None else [prompt_text]
     argv += (extra_args or [])
-    
+
     if not interactive and session_id is not None:
         return [EXEC, "exec", "resume", session_id, *argv, *prompt_args]
-    
+
     if session_id is not None and fork:
         return [EXEC, "fork", session_id, *argv, *prompt_args]
-    
+
     if session_id is not None:
         return [EXEC, "resume", session_id, *argv, *prompt_args]
-    
+
     if not interactive:
         return [EXEC, "exec", *argv, *prompt_args]
-    
+
     return [EXEC, *argv, *prompt_args]
 
 
