@@ -1,9 +1,24 @@
 from __future__ import annotations
 
 import ast
-from typing import Any
+from typing import Any, Literal, Sequence
 
 import yaml
+
+
+ResourceFormat = Literal[".py", ".md"]
+
+
+def determine_resource_format(suffixes: Sequence[str]) -> ResourceFormat | None:
+    suffixes = [suf.lower() for suf in suffixes]
+
+    if suffixes and suffixes[-1] == ".py":
+        return ".py"
+
+    if ".md" in suffixes:
+        return ".md"
+
+    return None
 
 
 def parse_python_frontmatter(content: str) -> dict[str, Any]:
@@ -50,6 +65,3 @@ def split_markdown_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     if text.endswith("\n"):
         body += "\n"
     return data, body
-
-
-

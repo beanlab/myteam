@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.3.17
+
+- Restored the `myteam rosters` CLI commands for listing, downloading, and updating managed rosters.
+- Added roster-management guidance to the README and governing documentation.
+- Added preferred `.myteam/config.yaml` configuration with deprecated `.myteam.yaml` fallback warnings.
+- Removed support for custom agent configurations under `.myteam/.config/`; custom agents must be registered in `.myteam/config.yaml`.
+
 ## 0.3.16
 
 - Fixed: Moved `governing_docs` into the `myteam` package so they ship with the code; `myteam onboard` now works on machines without a local clone of the `myteam` project.

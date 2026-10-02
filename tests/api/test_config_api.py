@@ -18,6 +18,13 @@ def write_config(tmp_path: Path, text: str) -> Path:
     return path
 
 
+def write_preferred_config(tmp_path: Path, text: str) -> Path:
+    path = tmp_path / ".myteam" / "config.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 @pytest.mark.parametrize(
     ("config_text", "message"),
     [
@@ -59,6 +66,48 @@ def test_load_myteam_config_returns_none_without_global_or_project_file(
     assert load_myteam_config(tmp_path) is None
 
 
+def test_load_myteam_config_uses_preferred_project_file_without_warning(
+    tmp_path: Path,
+    recwarn: pytest.WarningsRecorder,
+) -> None:
+    write_preferred_config(tmp_path, "defaults:\n  model: preferred-model\n")
+
+    config = load_myteam_config(tmp_path)
+
+    assert config is not None
+    assert config.defaults.model == "preferred-model"
+    assert not recwarn
+
+
+def test_deprecated_project_file_warns_and_is_used_as_fallback(
+    tmp_path: Path,
+    recwarn: pytest.WarningsRecorder,
+) -> None:
+    write_config(tmp_path, "defaults:\n  model: deprecated-model\n")
+
+    config = load_myteam_config(tmp_path)
+
+    assert config is not None
+    assert config.defaults.model == "deprecated-model"
+    assert len(recwarn) == 1
+    assert ".myteam.yaml is deprecated" in str(recwarn[0].message)
+
+
+def test_preferred_project_file_wins_without_parsing_deprecated_file(
+    tmp_path: Path,
+    recwarn: pytest.WarningsRecorder,
+) -> None:
+    write_preferred_config(tmp_path, "defaults:\n  model: preferred-model\n")
+    write_config(tmp_path, "defaults: [invalid\n")
+
+    config = load_myteam_config(tmp_path)
+
+    assert config is not None
+    assert config.defaults.model == "preferred-model"
+    assert len(recwarn) == 1
+    assert ".myteam.yaml is deprecated" in str(recwarn[0].message)
+
+
 def test_load_myteam_config_uses_global_file(
     tmp_path: Path,
     isolated_home: Path,
@@ -96,6 +145,20 @@ def test_load_myteam_config_uses_global_file(
         "timeout": 30,
     }
     assert config.agents == {"home-agent": "adapters/home.py::HomeConfig"}
+
+
+def test_preferred_global_and_project_files_merge_by_documented_precedence(
+    tmp_path: Path,
+    isolated_home: Path,
+) -> None:
+    write_preferred_config(isolated_home, "defaults:\n  model: global-model\n")
+    write_preferred_config(tmp_path, "defaults:\n  reasoning: high\n")
+
+    config = load_myteam_config(tmp_path)
+
+    assert config is not None
+    assert config.defaults.model == "global-model"
+    assert config.defaults.reasoning == "high"
 
 
 def test_load_myteam_config_merges_global_and_project_by_documented_precedence(

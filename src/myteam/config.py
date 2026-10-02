@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -15,9 +16,27 @@ from pydantic import (
 )
 
 MYTEAM_CONFIG_FILENAME = ".myteam.yaml"
-# Legacy filename retained for compatibility with code/tests that still call
-# load_workflow_defaults(myteam_folder) during the workflow refactor.
-CONFIG_FILENAME = ".config.yaml"
+MYTEAM_CONFIG_PATH = (".myteam", "config.yaml")
+class MyteamConfigDeprecationWarning(UserWarning):
+    """Warning emitted when the deprecated `.myteam.yaml` is present."""
+
+
+def _select_config_path(root: Path) -> Path | None:
+    preferred_path = root.joinpath(*MYTEAM_CONFIG_PATH)
+    deprecated_path = root / MYTEAM_CONFIG_FILENAME
+
+    if deprecated_path.exists():
+        warnings.warn(
+            f"{deprecated_path} is deprecated; use {preferred_path} instead.",
+            MyteamConfigDeprecationWarning,
+            stacklevel=3,
+        )
+
+    if preferred_path.exists():
+        return preferred_path
+    if deprecated_path.exists():
+        return deprecated_path
+    return None
 
 
 def normalize_session_name(value: Any) -> str | None:
@@ -85,19 +104,24 @@ class _ConfigSource:
 
 
 def load_myteam_config(cwd: Path | None = None) -> MyteamConfig | None:
-    """Load and merge the home and working-directory `.myteam.yaml` files."""
+    """Load and merge the selected global and project configuration files."""
 
-    global_path = Path.home() / MYTEAM_CONFIG_FILENAME
     root = Path.cwd() if cwd is None else Path(cwd)
-    project_path = root / MYTEAM_CONFIG_FILENAME if root.is_dir() else root
+    project_root = root if root.is_dir() else root.parent
+    paths = [
+        path
+        for path in (_select_config_path(Path.home()), _select_config_path(project_root))
+        if path is not None
+    ]
+    unique_paths: list[Path] = []
+    for path in paths:
+        if not any(path.samefile(existing) for existing in unique_paths):
+            unique_paths.append(path)
 
-    paths = [path for path in (global_path, project_path) if path.exists()]
-    if not paths:
+    if not unique_paths:
         return None
-    if len(paths) == 2 and paths[0].samefile(paths[1]):
-        paths.pop()
 
-    return _merge_sources([_load_source(path) for path in paths])
+    return _merge_sources([_load_source(path) for path in unique_paths])
 
 
 def _load_source(config_path: Path) -> _ConfigSource:
@@ -188,32 +212,3 @@ def _merge_sources(sources: list[_ConfigSource]) -> MyteamConfig:
         _agent_origins=agent_origins,
         _jinja_function_origins=jinja_function_origins,
     )
-
-
-def load_workflow_defaults(myteam_folder: Path) -> WorkflowDefaults | None:
-    """Load workflow defaults from legacy config or the effective `.myteam.yaml`."""
-
-    project_root = myteam_folder.parent if myteam_folder.name == ".myteam" else myteam_folder
-    project_path = project_root / MYTEAM_CONFIG_FILENAME
-    new_config = load_myteam_config(project_root)
-
-    config_path = myteam_folder / CONFIG_FILENAME
-    if not project_path.exists() and config_path.exists():
-        return _load_legacy_defaults(config_path)
-    if new_config is not None:
-        return new_config.defaults
-    if not config_path.exists():
-        return None
-    return _load_legacy_defaults(config_path)
-
-
-def _load_legacy_defaults(config_path: Path) -> WorkflowDefaults:
-    try:
-        loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
-        raise ValueError(f"Failed to parse workflow project config at {config_path}: {exc}") from exc
-
-    try:
-        return WorkflowDefaults.model_validate(loaded)
-    except ValidationError as exc:
-        raise ValueError(f"Workflow project config at {config_path} is invalid: {exc}") from exc

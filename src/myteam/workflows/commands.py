@@ -10,6 +10,7 @@ from typing import Any, TypedDict, cast
 
 from .. import templates
 from ..config import AGENT_SETTING_FIELDS, AgentSettingsModel, WorkflowDefaults
+from ..frontmatter import determine_resource_format
 from ..templates import get_template_file
 from ..workflow_metadata import WorkflowMetadataError, read_workflow_metadata
 from .execution.supervisor import Supervisor
@@ -82,11 +83,14 @@ def new_workflow(workflow_name: str, parents: bool = False) -> None:
             raise SystemExit(1)
         workflow_path.parent.mkdir(parents=True)
 
-    suffix = workflow_path.suffix.lower()
-    if suffix == ".md":
-        workflow_path.write_text(templates.get_template("new_workflow.md"), encoding=ENCODING)
-    elif suffix == ".py":
+    resource_format = determine_resource_format(workflow_path.suffixes)
+
+    if resource_format == ".py":
         workflow_path.write_text(templates.get_template("new_workflow.py"), encoding=ENCODING)
+
+    elif resource_format == ".md":
+        workflow_path.write_text(templates.get_template("new_workflow.md"), encoding=ENCODING)
+
     else:
         print(f"Workflow '{workflow_name}' has unsupported extension '{workflow_path.suffix}'.", file=sys.stderr)
         raise SystemExit(1)
@@ -350,13 +354,17 @@ def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_inp
     if not path.exists():
         raise RuntimeError(f"Workflow '{target}' does not exist.")
 
-    suffix = path.suffix.lower()
     absolute = str(path.resolve())
-    if suffix in {".py", ".md"}:
-        read_workflow_metadata(path)
-    if suffix == ".py":
+    resource_format = determine_resource_format(path.suffixes)
+    if resource_format is None:
+        raise RuntimeError(f"Workflow '{target}' has unsupported extension '{path.suffix}'.")
+
+    read_workflow_metadata(path)
+
+    if resource_format == ".py":
         return [sys.executable, absolute, *args]
-    if suffix == ".md":
+
+    if resource_format == ".md":
         return [
             sys.executable,
             str(get_template_file("workflow_markdown_wrapper.py")),
@@ -365,5 +373,6 @@ def _build_workflow_argv(target: str | None, args: tuple[str, ...], workflow_inp
             target,
             *args,
         ]
+
     raise RuntimeError(f"Workflow '{target}' has unsupported extension '{path.suffix}'.")
 

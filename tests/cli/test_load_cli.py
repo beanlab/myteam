@@ -60,19 +60,20 @@ def test_load_markdown_skill_exposes_current_file_to_jinja(run_myteam, tmp_path:
 def test_load_markdown_skill_uses_configured_jinja_functions(
     run_myteam, tmp_path: Path, isolated_home: Path
 ) -> None:
-    (isolated_home / "home_helpers.py").write_text(
+    (isolated_home / ".myteam" / "home_helpers.py").parent.mkdir(parents=True)
+    (isolated_home / ".myteam" / "home_helpers.py").write_text(
         "def source():\n    return 'home'\n"
         "def shared():\n    return 'home shared'\n",
         encoding="utf-8",
     )
-    (isolated_home / ".myteam.yaml").write_text(
+    (isolated_home / ".myteam" / "config.yaml").write_text(
         "jinja_functions:\n"
         "  source: home_helpers.py::source\n"
         "  shared: home_helpers.py::shared\n",
         encoding="utf-8",
     )
-    helpers = tmp_path / "helpers"
-    helpers.mkdir()
+    helpers = tmp_path / ".myteam" / "helpers"
+    helpers.mkdir(parents=True)
     (helpers / "jinja.py").write_text(
         "from pathlib import Path\n"
         "from jinja2 import pass_context\n"
@@ -89,7 +90,7 @@ def test_load_markdown_skill_uses_configured_jinja_functions(
         "    return 'custom file'\n",
         encoding="utf-8",
     )
-    (tmp_path / ".myteam.yaml").write_text(
+    (tmp_path / ".myteam" / "config.yaml").write_text(
         "jinja_functions:\n"
         "  contextual: helpers/jinja.py::contextual\n"
         "  shared: helpers/jinja.py::shared\n"

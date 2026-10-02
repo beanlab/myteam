@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from myteam.config import load_myteam_config, load_workflow_defaults
+from myteam.config import load_myteam_config
 from myteam.workflows.agents.runtime import (
     AgentSessionContext,
     resolve_agent_runtime_config,
@@ -116,27 +116,6 @@ def test_merged_agents_resolve_relative_to_the_file_that_defined_each_agent(
     assert global_config.exec == "from-global"
     assert project_config.exec == "from-project"
     assert overridden_config.exec == "from-project"
-
-
-def test_global_config_does_not_bypass_legacy_project_defaults(
-    tmp_path: Path,
-    isolated_home: Path,
-) -> None:
-    (isolated_home / ".myteam.yaml").write_text(
-        "defaults:\n  model: global-model\n",
-        encoding="utf-8",
-    )
-    myteam_folder = tmp_path / ".myteam"
-    myteam_folder.mkdir()
-    (myteam_folder / ".config.yaml").write_text(
-        "model: legacy-project-model\n",
-        encoding="utf-8",
-    )
-
-    defaults = load_workflow_defaults(myteam_folder)
-
-    assert defaults is not None
-    assert defaults.model == "legacy-project-model"
 
 
 def test_hyphenated_agent_name_can_resolve_from_myteam_yaml(tmp_path: Path) -> None:
