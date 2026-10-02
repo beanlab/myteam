@@ -4,14 +4,20 @@ from pathlib import Path
 
 import pytest
 
-from myteam import explain_resources, list_resources, load_skill, onboard
+import myteam
+from myteam import explain_resources, list_resources, load_skill
 
 
-def test_explain_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
+def test_explain_cli_and_api_load_the_packaged_using_myteam_skill(
+    run_myteam, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    skill = Path(myteam.__file__).parent / "agent_skills" / "using-myteam.md"
+    monkeypatch.chdir(tmp_path)
+
     result = run_myteam(tmp_path, "explain")
 
     assert result.exit_code == 0
-    assert result.stdout == explain_resources()
+    assert result.stdout == explain_resources() == load_skill(str(skill))
 
 
 def test_list_api_matches_cli_stdout(run_myteam, tmp_path: Path, monkeypatch) -> None:
@@ -118,10 +124,3 @@ def test_load_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert result.stdout == load_skill(str(skill))
-
-
-def test_onboard_api_matches_cli_stdout(run_myteam, tmp_path: Path) -> None:
-    result = run_myteam(tmp_path, "onboard")
-
-    assert result.exit_code == 0
-    assert result.stdout == onboard()

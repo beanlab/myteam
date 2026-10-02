@@ -1,5 +1,7 @@
-# Onboarding an agent to `myteam`
+# Deprecated Onboarding Command
 
-`myteam onboard` prints the contents of the packaged governing-docs directory so an agent understands how the tool is designed and intended to be used.
+`myteam onboard` is deprecated and will be removed in a future release.
 
-It starts with `application-overview.md` and prints every other file in the directory tree with a clear filename header.
+For compatibility, it prints a warning to stderr directing the caller to use `myteam explain`, then returns exactly the same content as `myteam explain`. It no longer prints the governing-document tree.
+
+The public `onboard()` Python API and the `myteam_onboard()` Jinja helper follow the same deprecated behavior. New integrations should use `explain_resources()` or `myteam_explain()` instead.

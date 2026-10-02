@@ -9,7 +9,7 @@ When rendering from a source file, `this_file` is the resolved absolute Python `
 The following `myteam` functions are included in the Jinja environment:
 
 - `myteam_explain()` - injects the output of `myteam explain`.
-- `myteam_onboard()` - injects the output of `myteam onboard`.
+- `myteam_onboard()` - deprecated compatibility alias for `myteam_explain()`; it emits the same warning as `myteam onboard`.
 - `myteam_list(*paths, directory=False)` - injects the equivalent resource listing for one or more paths. Every path is relative to the Markdown document. With no paths, it lists the document's directory. `directory=True` selects the paths themselves, equivalent to `myteam list -d`.
 - `myteam_load(skill)` - loads the specified skill content. The skill path is relative to the document.
 

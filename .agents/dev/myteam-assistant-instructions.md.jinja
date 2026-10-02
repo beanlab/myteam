@@ -10,6 +10,17 @@ For example, if the docs describe how an agent should behave, those are instruct
 
 {{ read_file("../../src/myteam/governing_docs/application-overview.md") | increase_headers(2)}}
 
-## Other Details
+## Running Tests
 
-Tests are run with `uv run pytest`.
+Run tests with:
+
+```bash
+env \
+  -u MYTEAM_AGENT_SESSION_NONCE \
+  -u MYTEAM_AGENT_SESSION_RESULT_SOCKET \
+  -u MYTEAM_SUPERVISOR_SOCKET \
+  -u MYTEAM_WORKFLOW_INVOCATION_ID \
+  uv run pytest
+```
+
+The `MYTEAM_*` variables must be removed because this development session may itself be running inside a managed workflow. If inherited by test subprocesses, they can be mistaken for nested workflow processes and produce failures such as `Nested workflow parent is not the current hierarchy entry.` Apply the same prefix when running a subset of the suite.
