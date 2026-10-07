@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.19
+
+- Fixed Pi agent launches with a reasoning setting by using Pi's current `--thinking` command-line option.
+
 ## 0.3.18
 
 - `myteam` ships with built-in agent skills.

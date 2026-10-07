@@ -41,7 +41,7 @@ def build_argv(
         argv.extend(["--model", model])
 
     if reasoning is not None:
-        argv.extend(["--reasoning", reasoning])
+        argv.extend(["--thinking", reasoning])
 
     if session_name is not None:
         argv.extend(["--name", session_name])
