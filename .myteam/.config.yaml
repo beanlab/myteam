@@ -1,5 +1,0 @@
-agent: codex
-model: gpt-5.4-mini
-interactive: true
-usage_logging: summary
-timeout: 900
