@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from importlib.resources import files
 
-
+ENCODING = 'utf-8'
 APP_NAME = 'myteam'
 ONBOARD_DEPRECATION_WARNING = (
     "Warning: 'myteam onboard' is deprecated; use 'myteam explain' instead."
@@ -18,9 +19,8 @@ def version() -> str:
 
 
 def changelog() -> str:
-    from .upgrade import packaged_changelog_text
-
-    return packaged_changelog_text().rstrip()
+    packaged_changelog = files("myteam").joinpath("CHANGELOG.md")
+    return packaged_changelog.read_text(encoding=ENCODING)
 
 
 def onboard(root: str | Path | None = None) -> str:

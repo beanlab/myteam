@@ -29,18 +29,6 @@ See [skills.md](src/myteam/governing_docs/scenarios/skills.md).
 
 See [workflows.md](src/myteam/governing_docs/scenarios/workflows/workflows.md).
 
-## Rosters
-
-Reusable rosters can be listed, downloaded, and updated from GitHub:
-
-```bash
-myteam rosters list
-myteam rosters download <roster>
-myteam rosters update
-```
-
-See [roster management](src/myteam/governing_docs/scenarios/rosters.md) for repository, destination, and managed-root options.
-
 ## Requirements
 
 - Python 3.11+

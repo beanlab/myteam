@@ -1,12 +1,11 @@
 [project]
 name = "myteam"
-version = "0.3.19"
-description = "Agent roster CLI"
+version = "0.3.20"
+description = "Agent Harness Framework and CLI"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.11",
-    "requests>=2.32.5",
     "pyyaml>=6.0",
     "pyparsing>=3.3.2",
     "jinja2>=3.1.6",

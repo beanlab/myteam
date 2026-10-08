@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.20
+
+- Remove remote-content-management feature ("rosters download"). Instead, clone the remote content manually and manage the content via Git.
+
+Rosters repo: https://github.com/beanlab/rosters
+
 ## 0.3.19
 
 - Fixed Pi agent launches with a reasoning setting by using Pi's current `--thinking` command-line option.
