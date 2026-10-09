@@ -10,10 +10,8 @@ from myteam.workflows.execution.workflow_stack import WorkflowStack, WorkflowSta
 
 
 class FakeTerminal:
-    def __init__(self, *, can_display_live_output: bool = True) -> None:
+    def __init__(self) -> None:
         self.flush_count = 0
-        self.output = b""
-        self.can_display_live_output = can_display_live_output
 
     def flush_input(self):
         self.flush_count += 1
@@ -21,15 +19,13 @@ class FakeTerminal:
     def winsize(self) -> tuple[int, int]:
         return (24, 80)
 
-    def write_stdout(self, data: bytes):
-        self.output += data
-
 
 class FakeSession:
     def __init__(self, session_id: str) -> None:
         self.session_id = session_id
         self.suspended = False
         self.resumed = False
+        self.redraw_requested = False
         self.terminated = False
         self.closed = False
         self.resized_to: tuple[int, int] | None = None
@@ -39,6 +35,9 @@ class FakeSession:
 
     def resume(self):
         self.resumed = True
+
+    def request_redraw(self):
+        self.redraw_requested = True
 
     def terminate(self):
         self.terminated = True
@@ -99,7 +98,9 @@ def test_workflow_stack_suspends_child_parent_and_resumes(monkeypatch: pytest.Mo
     assert stack.sessions == {"child-1": child}
 
     assert stack.resume_previous() is True
+    assert parent.resized_to == (24, 80)
     assert parent.resumed is True
+    assert parent.redraw_requested is True
     assert stack.active is parent
     assert stack.stack == []
 
@@ -120,7 +121,9 @@ def test_workflow_stack_restores_parent_when_child_launch_fails(monkeypatch: pyt
     assert stack.active is parent
     assert stack.stack == []
     assert parent.suspended is True
+    assert parent.resized_to == (24, 80)
     assert parent.resumed is True
+    assert parent.redraw_requested is True
 
 
 def test_workflow_stack_launches_with_supervisor_environment(monkeypatch: pytest.MonkeyPatch) -> None:

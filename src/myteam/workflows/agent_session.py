@@ -499,7 +499,11 @@ def _forward_pty_until_complete(
     def stdout_writer(chunk: bytes) -> None:
         write_bytes(output, chunk)
 
-    with RealTerminal(on_resize=session.resize) as terminal:
+    def resize_and_redraw(winsize: tuple[int, int]) -> None:
+        session.resize(winsize)
+        session.request_redraw()
+
+    with RealTerminal(on_resize=resize_and_redraw) as terminal:
         session.resize(terminal.winsize())
         while True:
             poll_result_channel()

@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.21
+
+- On resuming a parent session, `myteam` properly sends `SIGWINCH` to the PTY, inviting a TUI redraw. Use in connection with the new `pi_redraw_on_resume.ts` **pi** extension for clean TUI redrawing after a pi session resumes. Not tested on Codex or Claude.
+
 ## 0.3.20
 
 - Remove remote-content-management feature ("rosters download"). Instead, clone the remote content manually and manage the content via Git.

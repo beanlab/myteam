@@ -139,6 +139,12 @@ class ManagedPtyProcess:
         except OSError:
             pass
 
+    def request_redraw(self) -> None:
+        try:
+            self._signal_process_group(signal.SIGWINCH)
+        except OSError:
+            pass
+
     def terminate(self, *, timeout: float = 0.5) -> None:
         if self.process.poll() is not None:
             return
