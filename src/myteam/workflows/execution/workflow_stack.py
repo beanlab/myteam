@@ -55,19 +55,14 @@ class WorkflowStack:
     def resume_previous(self) -> bool:
         if self.stack:
             self.terminal.flush_input()
-            self._scroll_current_view_offscreen()
             self.active = self.stack.pop()
+            self.active.resize(self.terminal.winsize())
             self.active.resume()
+            self.active.request_redraw()
             self.terminal.flush_input()
             return True
         self.active = None
         return False
-
-    def _scroll_current_view_offscreen(self):
-        if not self.terminal.can_display_live_output:
-            return
-        rows, _ = self.terminal.winsize()
-        self.terminal.write_stdout(b"\r\n" * rows)
 
     def remove(self, session: ManagedPtyProcess):
         self.sessions.pop(session.session_id, None)
